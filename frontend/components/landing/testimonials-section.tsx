@@ -1,36 +1,85 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageSquare } from "lucide-react";
 
-const testimonials = [
+const insights = [
   {
-    quote: "The audit revealed we were wasting $47K monthly on duplicate prompts. Fixed it in one day.",
-    author: "Sarah Chen",
-    role: "Engineering Lead",
-    company: "TechFlow AI",
-    metric: { value: "62%", label: "Cost reduction" },
+    quote: "Most people debug this by tracing individual calls but the real problem is usually not knowing which node in your workflow is responsible for what chunk of spend. Basic logging won't catch it if you have multiple models or code steps mixed together.",
+    author: "Skymel Developer",
+    source: "Reddit",
+    platform: "reddit",
+    insight: "Workflow-level visibility is critical",
   },
   {
-    quote: "We had no idea our cache hit rate was so low. The recommendations were actionable and immediate.",
-    author: "Marcus Webb",
-    role: "CTO",
-    company: "DataStream",
-    metric: { value: "$89K", label: "Annual savings" },
+    quote: "Yeah this happens a lot, costs look fine overall but leaks show up per workflow. Repeated system prompts plus growing context usually the main culprits, also agent retries quietly add up. Once you add per flow logging plus pruning, things become way clearer.",
+    author: "AI Engineer",
+    source: "Reddit Discussion",
+    platform: "reddit",
+    insight: "Hidden costs in agent workflows",
   },
   {
-    quote: "The token usage analysis showed us exactly where we were bleeding money. Game changer.",
-    author: "Elena Rodriguez",
-    role: "VP Engineering",
-    company: "CloudScale",
-    metric: { value: "3.2M", label: "Tokens saved/month" },
+    quote: "Token usage spikes can indeed be frustrating to diagnose, especially in complex agent setups. A single line integration that provides real-time visualization of the execution graph, showing where each token is consumed in the workflow, helps pinpoint the source of unexpected usage.",
+    author: "LangGraphics Creator",
+    source: "Reddit",
+    platform: "reddit",
+    insight: "Real-time visibility prevents surprises",
   },
   {
-    quote: "Local processing meant we could audit sensitive data without compliance concerns. Perfect.",
-    author: "James Liu",
-    role: "Head of AI",
-    company: "SecureAI Labs",
-    metric: { value: "100%", label: "Privacy maintained" },
+    quote: "Love langsmith - but would really love something local to test with too.",
+    author: "Developer",
+    source: "Reddit",
+    platform: "reddit",
+    insight: "Local processing is a key requirement",
+  },
+  {
+    quote: "Once you start looking it's like pulling on a piece of string 😅 The best solution is to just track an event whenever inference happens and handle the aggregation out of your app. It's pretty neat since we can then see all the overall costs for a particular workflow.",
+    author: "Credyt.ai Team",
+    source: "Reddit",
+    platform: "reddit",
+    insight: "Event-based tracking reveals patterns",
+  },
+  {
+    quote: "Ran into this exact thing. Turns out one of our agents was re-sending the full conversation history on every tool call because the prompt was built wrong. Each tool call doubled the context. Helicone caught it - you can trace per-call token usage and filter by agent. Took 20 min to spot a $200/month leak.",
+    author: "Engineering Team",
+    source: "Reddit",
+    platform: "reddit",
+    insight: "Context explosion is common and costly",
+  },
+  {
+    quote: "We cut roughly 40% of spend just by routing classification tasks to a smaller model and saving the heavy ones for generation only. The 'use the biggest model for everything' default is almost always the first place to look.",
+    author: "Engineering Lead",
+    source: "LinkedIn",
+    platform: "linkedin",
+    insight: "Model selection drives major savings",
+  },
+  {
+    quote: "In my experience the visibility was usually there once we wired up Helicone or similar. The hard part was deciding whether to spend two weeks on prompt caching vs shipping the next feature.",
+    author: "CTO",
+    source: "LinkedIn",
+    platform: "linkedin",
+    insight: "Prioritization requires clear data",
+  },
+  {
+    quote: "Common pattern: small inefficiencies compound faster than most teams expect.",
+    author: "AI Founder",
+    source: "LinkedIn",
+    platform: "linkedin",
+    insight: "Early detection prevents escalation",
+  },
+  {
+    quote: "Visibility into token usage is the only way to prevent these sudden cost spikes in production.",
+    author: "Platform Engineer",
+    source: "LinkedIn",
+    platform: "linkedin",
+    insight: "Proactive monitoring is essential",
+  },
+  {
+    quote: "This is the real problem, not high costs, but invisible costs. It needs to be mapped for cost → feature → outcome.",
+    author: "Product Leader",
+    source: "In-Person Event",
+    platform: "event",
+    insight: "Cost attribution drives decisions",
   },
 ];
 
@@ -55,7 +104,7 @@ export function TestimonialsSection() {
   useEffect(() => {
     const interval = setInterval(() => {
       setDirection("right");
-      setActiveIndex((prev) => (prev + 1) % testimonials.length);
+      setActiveIndex((prev) => (prev + 1) % insights.length);
     }, 8000);
     return () => clearInterval(interval);
   }, []);
@@ -67,15 +116,24 @@ export function TestimonialsSection() {
 
   const goPrev = () => {
     setDirection("left");
-    setActiveIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
+    setActiveIndex((prev) => (prev - 1 + insights.length) % insights.length);
   };
 
   const goNext = () => {
     setDirection("right");
-    setActiveIndex((prev) => (prev + 1) % testimonials.length);
+    setActiveIndex((prev) => (prev + 1) % insights.length);
   };
 
-  const activeTestimonial = testimonials[activeIndex];
+  const activeInsight = insights[activeIndex];
+
+  const getPlatformBadge = (platform: string) => {
+    const badges = {
+      reddit: { label: "Reddit", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
+      linkedin: { label: "LinkedIn", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+      event: { label: "In-Person", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+    };
+    return badges[platform as keyof typeof badges] || badges.reddit;
+  };
 
   return (
     <section ref={sectionRef} className="relative py-32 lg:py-40 bg-foreground text-background overflow-hidden">
@@ -88,13 +146,16 @@ export function TestimonialsSection() {
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-background/40 mb-4">
               <span className="w-12 h-px bg-background/20" />
-              Testimonials
+              Market Research
             </span>
             <h2 className={`text-4xl lg:text-5xl font-display transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}>
-              Trusted by teams
-              <span className="text-background/40"> worldwide.</span>
+              What founders are saying
+              <span className="text-background/40"> about LLM costs.</span>
             </h2>
+            <p className="mt-4 text-background/60 text-lg max-w-2xl">
+              Real insights from Reddit, LinkedIn, and in-person conversations with AI engineering teams.
+            </p>
           </div>
 
           {/* Navigation arrows */}
@@ -102,12 +163,14 @@ export function TestimonialsSection() {
             <button
               onClick={goPrev}
               className="p-4 border border-background/20 hover:bg-background/10 transition-colors"
+              aria-label="Previous insight"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <button
               onClick={goNext}
               className="p-4 border border-background/20 hover:bg-background/10 transition-colors"
+              aria-label="Next insight"
             >
               <ArrowRight className="w-5 h-5" />
             </button>
@@ -126,50 +189,54 @@ export function TestimonialsSection() {
             <div className="relative">
               <blockquote
                 key={activeIndex}
-                className="text-3xl lg:text-4xl xl:text-5xl font-display leading-[1.2] tracking-tight animate-fadeSlideIn"
+                className="text-2xl lg:text-3xl xl:text-4xl font-display leading-[1.3] tracking-tight animate-fadeSlideIn"
               >
-                {activeTestimonial.quote}
+                {activeInsight.quote}
               </blockquote>
 
               {/* Author */}
               <div className="mt-12 flex items-center gap-6">
                 <div className="w-14 h-14 rounded-full bg-background/10 flex items-center justify-center">
-                  <span className="font-display text-xl">
-                    {activeTestimonial.author.charAt(0)}
-                  </span>
+                  <MessageSquare className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-lg font-medium">{activeTestimonial.author}</p>
-                  <p className="text-background/60">
-                    {activeTestimonial.role}, {activeTestimonial.company}
-                  </p>
+                  <p className="text-lg font-medium">{activeInsight.author}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs px-2 py-1 rounded-full border ${getPlatformBadge(activeInsight.platform).color}`}>
+                      {getPlatformBadge(activeInsight.platform).label}
+                    </span>
+                    <span className="text-background/60 text-sm">
+                      {activeInsight.source}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Metric cards side */}
+          {/* Insight cards side */}
           <div className="lg:col-span-5 flex flex-col justify-center gap-6">
-            {/* Active metric - Large */}
+            {/* Active insight - Large */}
             <div
-              key={`metric-${activeIndex}`}
+              key={`insight-${activeIndex}`}
               className="p-10 border border-background/20 bg-background/5 animate-fadeSlideIn"
             >
-              <span className="text-7xl lg:text-8xl font-display block mb-4">
-                {activeTestimonial.metric.value}
+              <span className="text-xs font-mono text-background/40 uppercase tracking-widest block mb-4">
+                Key Insight
               </span>
-              <span className="text-lg text-background/60">
-                {activeTestimonial.metric.label}
+              <span className="text-2xl lg:text-3xl font-display block leading-tight">
+                {activeInsight.insight}
               </span>
             </div>
 
             {/* Progress indicators */}
             <div className="flex gap-2">
-              {testimonials.map((_, idx) => (
+              {insights.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
                   className="flex-1 h-1 bg-background/20 overflow-hidden"
+                  aria-label={`Go to insight ${idx + 1}`}
                 >
                   <div
                     className={`h-full bg-background transition-all duration-300 ${idx === activeIndex ? "w-full" : idx < activeIndex ? "w-full opacity-50" : "w-0"
@@ -180,24 +247,40 @@ export function TestimonialsSection() {
               ))}
             </div>
 
-            {/* Company list */}
+            {/* Platform filters */}
             <div className="mt-4 pt-6 border-t border-background/10">
               <span className="text-xs font-mono text-background/30 uppercase tracking-widest block mb-4">
-                Featured companies
+                Sources
               </span>
               <div className="flex flex-wrap gap-3">
-                {testimonials.map((t, idx) => (
-                  <button
-                    key={t.company}
-                    onClick={() => goTo(idx)}
-                    className={`px-4 py-2 text-sm border transition-all ${idx === activeIndex
-                      ? "border-background/40 text-background"
-                      : "border-background/10 text-background/40 hover:border-background/30"
-                      }`}
-                  >
-                    {t.company}
-                  </button>
-                ))}
+                {["reddit", "linkedin", "event"].map((platform) => {
+                  const count = insights.filter(i => i.platform === platform).length;
+                  const badge = getPlatformBadge(platform);
+                  return (
+                    <button
+                      key={platform}
+                      onClick={() => {
+                        const firstIndex = insights.findIndex(i => i.platform === platform);
+                        if (firstIndex !== -1) goTo(firstIndex);
+                      }}
+                      className={`px-4 py-2 text-sm border transition-all ${badge.color}`}
+                    >
+                      {badge.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4 pt-6 border-t border-background/10">
+              <div>
+                <p className="text-3xl font-display">{insights.length}</p>
+                <p className="text-sm text-background/60">Real insights</p>
+              </div>
+              <div>
+                <p className="text-3xl font-display">3</p>
+                <p className="text-sm text-background/60">Platforms</p>
               </div>
             </div>
           </div>
@@ -226,3 +309,5 @@ export function TestimonialsSection() {
     </section>
   );
 }
+
+// Made with Bob

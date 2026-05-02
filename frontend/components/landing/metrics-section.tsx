@@ -4,25 +4,25 @@ import { useEffect, useState, useRef } from "react";
 
 const metrics = [
   {
-    value: 58,
+    value: 100,
     suffix: "%",
     prefix: "",
-    label: "Average Cost Reduction",
-    sublabel: "across analyzed workloads",
+    label: "Local Processing",
+    sublabel: "your data never leaves your device",
   },
   {
-    value: 2.4,
-    suffix: "M",
-    prefix: "$",
-    label: "Total Savings",
-    sublabel: "identified for customers",
-  },
-  {
-    value: 15,
-    suffix: "k+",
+    value: 5,
+    suffix: "",
     prefix: "",
-    label: "Audits Completed",
-    sublabel: "and optimizations delivered",
+    label: "Detection Algorithms",
+    sublabel: "identifying cost inefficiencies",
+  },
+  {
+    value: 10,
+    suffix: "+",
+    prefix: "",
+    label: "LLM Providers",
+    sublabel: "supported out of the box",
   },
 ];
 
@@ -248,7 +248,7 @@ export function MetricsSection() {
             <div className="flex items-center gap-4 mb-6">
               <span className="flex items-center gap-2 px-3 py-1 bg-[#eca8d6]/10 text-[#eca8d6] text-xs font-mono">
                 <span className="w-2 h-2 rounded-full bg-[#eca8d6] animate-pulse" />
-                LIVE
+                BETA
               </span>
               <span className="text-sm font-mono text-muted-foreground">
                 {time ? `${time.toLocaleTimeString("en-GB")} UTC` : ""}
@@ -257,22 +257,13 @@ export function MetricsSection() {
 
             <h2 className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.95] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}>
-              Real-time <span className="text-muted-foreground">insights.</span>
+              Built for <span className="text-muted-foreground">privacy.</span>
             </h2>
+            <p className="mt-6 text-xl text-muted-foreground max-w-2xl">
+              Your sensitive LLM usage data stays on your device. No cloud uploads, no data sharing, no compromises.
+            </p>
           </div>
         </div>
-
-        {/* Organic graph image */}
-        {/* <div className={`w-full mb-0 transition-all duration-1000 delay-200 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}>
-          <img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/real-time-graph-INFmn3u0MlUwvNPynoIhwxtPaPjxM5.png"
-            alt=""
-            aria-hidden="true"
-            className="w-full h-auto object-cover"
-          />
-        </div> */}
 
         {/* Metrics grid */}
         <div className="grid lg:grid-cols-3 gap-6">
@@ -335,6 +326,10 @@ export function MetricsSection() {
               <span>•</span>
               <span>Google Gemini Ultra</span>
               <span>•</span>
+              <span>Cohere Command</span>
+              <span>•</span>
+              <span>Meta Llama</span>
+              <span>•</span>
               <span>OpenAI GPT-4</span>
               <span>•</span>
               <span>OpenAI GPT-3.5</span>
@@ -346,6 +341,10 @@ export function MetricsSection() {
               <span>Google Gemini Pro</span>
               <span>•</span>
               <span>Google Gemini Ultra</span>
+              <span>•</span>
+              <span>Cohere Command</span>
+              <span>•</span>
+              <span>Meta Llama</span>
             </div>
           </div>
         </div>
@@ -367,3 +366,5 @@ export function MetricsSection() {
     </section>
   );
 }
+
+// Made with Bob

@@ -181,7 +181,7 @@ export function HeroSection() {
             </h1>
             <p className={`text-xl text-white/70 mt-8 max-w-2xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}>
-              Analyze your GPT, Claude, and Gemini usage locally. No data leaves your system.
+              AI startups waste 64% of inference spend on redundant prompts, agent loops, and over-provisioned models. Aurix finds the leaks
             </p>
           </div>
         </div>

@@ -56,7 +56,7 @@ export function CtaSection() {
 
             <div className="mb-8 p-4 border border-foreground/10 bg-foreground/[0.02] rounded-lg max-w-2xl mx-auto">
               <p className="text-sm text-muted-foreground mb-2">
-                <span className="font-medium text-foreground">Need deeper optimization?</span>We specialize in prompt optimization, tool definition refinement, and custom model routing.
+                <span className="font-medium text-foreground">Need deeper optimization?  </span>We specialize in prompt optimization, tool definition refinement, and custom model routing.
               </p>
             </div>
 

@@ -9,14 +9,14 @@ export default function TermsAndConditions() {
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">1. Acceptance of Terms</h2>
                         <p>
-                            By accessing and using Lumina's AI cost optimization audit service ("Service"), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our Service.
+                            By accessing and using Aurix's AI cost optimization audit service ("Service"), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our Service.
                         </p>
                     </section>
 
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">2. Description of Service</h2>
                         <p className="mb-4">
-                            Lumina provides a browser-based tool that analyzes your AI usage logs (CSV/JSON files) to identify cost optimization opportunities. The Service includes:
+                            Aurix provides a browser-based tool that analyzes your AI usage logs (CSV/JSON files) to identify cost optimization opportunities. The Service includes:
                         </p>
                         <ul className="list-disc pl-6 space-y-2">
                             <li>Local file analysis (no server upload)</li>
@@ -80,7 +80,7 @@ export default function TermsAndConditions() {
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">7. Intellectual Property</h2>
                         <p className="mb-4">
-                            The Service, including its design, code, algorithms, and content, is owned by Lumina and protected by intellectual property laws. You may not:
+                            The Service, including its design, code, algorithms, and content, is owned by Aurix and protected by intellectual property laws. You may not:
                         </p>
                         <ul className="list-disc pl-6 space-y-2">
                             <li>Copy, modify, or distribute our Service</li>
@@ -98,7 +98,7 @@ export default function TermsAndConditions() {
                             <strong className="text-foreground">Service Availability:</strong> We aim for high availability but do not guarantee uninterrupted access. The Service is provided "as is" without warranties.
                         </p>
                         <p>
-                            <strong className="text-foreground">Limitation of Liability:</strong> To the maximum extent permitted by law, Lumina shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Service.
+                            <strong className="text-foreground">Limitation of Liability:</strong> To the maximum extent permitted by law, Aurix shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Service.
                         </p>
                     </section>
 
@@ -126,7 +126,7 @@ export default function TermsAndConditions() {
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">12. Governing Law</h2>
                         <p>
-                            These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which Lumina operates, without regard to its conflict of law provisions.
+                            These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which Aurix operates, without regard to its conflict of law provisions.
                         </p>
                     </section>
 
@@ -136,8 +136,8 @@ export default function TermsAndConditions() {
                             For questions about these Terms, please contact us at:
                         </p>
                         <p className="mt-4">
-                            Email: legal@lumina.ai<br />
-                            Website: lumina.ai
+                            Email: legal@aurix.ai<br />
+                            Website: aurix.ai
                         </p>
                     </section>
 

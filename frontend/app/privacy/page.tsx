@@ -9,7 +9,7 @@ export default function PrivacyPolicy() {
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">1. Introduction</h2>
                         <p>
-                            Lumina ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we handle your data when you use our AI cost optimization audit service.
+                            Aurix ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we handle your data when you use our AI cost optimization audit service.
                         </p>
                     </section>
 
@@ -103,8 +103,8 @@ export default function PrivacyPolicy() {
                             If you have questions about this Privacy Policy or our data practices, please contact us at:
                         </p>
                         <p className="mt-4">
-                            Email: privacy@lumina.ai<br />
-                            Website: lumina.ai
+                            Email: privacy@aurix.ai<br />
+                            Website: aurix.ai
                         </p>
                     </section>
                 </div>

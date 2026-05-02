@@ -5,7 +5,7 @@ import { CalendlyWidget } from "@/components/booking/calendly-widget";
 import { Clock, Video, CheckCircle2, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
-    title: "Book Optimization Call | Lumina",
+    title: "Book Optimization Call | Aurix",
     description: "Schedule a personalized AI cost optimization consultation with our experts",
 };
 
@@ -135,10 +135,10 @@ export default function BookPage() {
                             Prefer to schedule via email?
                         </p>
                         <a
-                            href="mailto:hello@lumina.ai?subject=Optimization Call Request"
+                            href="mailto:hello@aurix.ai?subject=Optimization Call Request"
                             className="text-[#eca8d6] hover:text-[#eca8d6]/80 transition-colors font-mono text-sm"
                         >
-                            hello@lumina.ai
+                            hello@aurix.ai
                         </a>
                     </div>
                 </div>
