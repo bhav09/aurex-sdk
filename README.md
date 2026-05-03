@@ -1,8 +1,8 @@
-# Aurix
+# Aurex
 
 > **Your AI is bleeding money. We'll show you where.**
 
-Aurix analyzes your LLM usage and finds hidden cost inefficiencies. Upload your CSV, get a Token Credit Score (0-100), and save thousands per month.
+Aurex analyzes your LLM usage and finds hidden cost inefficiencies. Upload your CSV, get a Token Credit Score (0-100), and save thousands per month.
 
 ## The Problem
 
@@ -10,7 +10,7 @@ You're using GPT-4 for everything. Even simple tasks that could run on GPT-3.5 T
 
 **Real example:** $8,000/month → $1,200/month (85% savings)
 
-## What Aurix Does
+## What Aurex Does
 
 1. **Upload** your OpenAI/Anthropic/Bedrock usage CSV
 2. **Analyze** with 5 detection algorithms

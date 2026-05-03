@@ -1,4 +1,4 @@
-// API Client for Aurix Backend
+// API Client for Aurex Backend
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export interface ExecutiveSummary {
@@ -89,7 +89,7 @@ export interface CreateAuditSessionRequest {
     file_type: string;
 }
 
-export class AurixAPI {
+export class AurexAPI {
     private baseUrl: string;
 
     constructor(baseUrl: string = API_BASE_URL) {
@@ -329,6 +329,6 @@ export class AurixAPI {
     }
 }
 
-export const aurixAPI = new AurixAPI();
+export const aurixAPI = new AurexAPI();
 
 // Made with Bob

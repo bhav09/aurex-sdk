@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Aurix - AI Token Usage Auditor',
+  title: 'Aurex - AI Token Usage Auditor',
   description: 'Find and eliminate wasted AI tokens instantly. Analyze your GPT, Claude, and Gemini usage locally. No data leaves your system.',
   generator: 'v0.app',
 }

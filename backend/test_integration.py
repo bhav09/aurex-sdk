@@ -1,6 +1,6 @@
 """
 Integration Test Script
-Tests the complete Aurix backend system
+Tests the complete Aurex backend system
 """
 
 import sys
@@ -206,7 +206,7 @@ def test_ingestion():
 def run_all_tests():
     """Run all integration tests"""
     print("╔═══════════════════════════════════════╗")
-    print("║   Aurix Backend Integration Tests   ║")
+    print("║   Aurex Backend Integration Tests   ║")
     print("╚═══════════════════════════════════════╝\n")
     
     tests = [

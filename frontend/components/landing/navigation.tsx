@@ -52,7 +52,7 @@ export function Navigation() {
               <rect x="50" y="25" width="40" height="70" fill={isScrolled ? "currentColor" : "#d4d4d4"} rx="10" className={isScrolled ? "text-foreground" : ""} />
               <rect x="80" y="20" width="40" height="80" fill={isScrolled ? "currentColor" : "#a3a3a3"} rx="10" className={isScrolled ? "text-foreground" : ""} />
             </svg>
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>AURIX</span>
+            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>AUREX</span>
           </a>
 
           {/* Desktop Navigation */}

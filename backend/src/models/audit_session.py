@@ -3,13 +3,13 @@ Audit Session Model - Stores user information and audit results
 """
 
 from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
 import uuid
 
-Base = declarative_base()
+# Import shared Base from llm_event to ensure all models use the same metadata
+from .llm_event import Base
 
 
 class AuditSession(Base):

@@ -5,7 +5,7 @@ import { CalendlyWidget } from "@/components/booking/calendly-widget";
 import { Clock, Video, CheckCircle2, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
-    title: "Book Optimization Call | Aurix",
+    title: "Book Optimization Call | Aurex",
     description: "Schedule a personalized AI cost optimization consultation with our experts",
 };
 

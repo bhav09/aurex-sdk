@@ -1,5 +1,5 @@
 """
-Aurix Backend - Main Application Entry Point
+Aurex Backend - Main Application Entry Point
 FastAPI application for LLM cost optimization
 """
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     print("Initializing database...")
     init_db()
     print("Database initialized successfully")
-    print("Aurix Backend is ready!")
+    print("Aurex Backend is ready!")
     yield
     # Shutdown (if needed)
     print("Shutting down...")
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Aurix Backend",
+    title="Aurex Backend",
     description="LLM Cost Optimization and Analysis System",
     version="1.0.0",
     docs_url="/docs",
@@ -57,7 +57,7 @@ app.include_router(router, prefix="/api/v1", tags=["api"])
 async def root():
     """Root endpoint"""
     return {
-        "service": "Aurix Backend",
+        "service": "Aurex Backend",
         "version": "1.0.0",
         "status": "running",
         "docs": "/docs"
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     
     print(f"""
     ╔═══════════════════════════════════════╗
-    ║         Aurix Backend v1.0.0         ║
+    ║         Aurex Backend v1.0.0         ║
     ║   LLM Cost Optimization System        ║
     ╚═══════════════════════════════════════╝
     

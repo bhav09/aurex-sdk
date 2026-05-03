@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Aurix Backend Setup Script
+# Aurex Backend Setup Script
 
 echo "╔═══════════════════════════════════════╗"
-echo "║    Aurix Backend Setup Script        ║"
+echo "║    Aurex Backend Setup Script        ║"
 echo "╚═══════════════════════════════════════╝"
 echo ""
 

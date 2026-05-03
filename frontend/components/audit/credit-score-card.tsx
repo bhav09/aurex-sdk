@@ -67,7 +67,7 @@ export function CreditScoreCard({ score, previousScore, className }: CreditScore
 
     const items: TextItem[] = [
         { text: "TOKEN CREDIT SCORE" },
-        { text: "AURIX HUB" },
+        { text: "AUREX HUB" },
         { text: `SCORE/${displayScore}` },
     ];
 

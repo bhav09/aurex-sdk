@@ -1,6 +1,6 @@
-# Aurix Backend
+# Aurex Backend
 
-> **Stop wasting money on LLM API calls.** Aurix finds hidden cost leaks in your AI infrastructure.
+> **Stop wasting money on LLM API calls.** Aurex finds hidden cost leaks in your AI infrastructure.
 
 ## ⚡ Quick Start
 

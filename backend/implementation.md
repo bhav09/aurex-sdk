@@ -1,4 +1,4 @@
-You are building the backend for a product called **Aurix**.
+You are building the backend for a product called **Aurex**.
 
 ## Goal
 

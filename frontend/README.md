@@ -1,4 +1,4 @@
-# Aurix Frontend
+# Aurex Frontend
 
 > **Beautiful. Fast. Insightful.** The UI that makes LLM cost optimization feel like magic.
 

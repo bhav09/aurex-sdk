@@ -3,13 +3,13 @@ export default function PrivacyPolicy() {
         <main className="min-h-screen bg-background text-foreground">
             <div className="max-w-4xl mx-auto px-6 py-20">
                 <h1 className="text-5xl font-display mb-8">Privacy Policy</h1>
-                <p className="text-sm text-muted-foreground mb-12">Last updated: January 2025</p>
+                <p className="text-sm text-muted-foreground mb-12">Last updated: April 2026</p>
 
                 <div className="space-y-8 text-muted-foreground leading-relaxed">
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">1. Introduction</h2>
                         <p>
-                            Aurix ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we handle your data when you use our AI cost optimization audit service.
+                            Aurex ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we handle your data when you use our AI cost optimization audit service.
                         </p>
                     </section>
 

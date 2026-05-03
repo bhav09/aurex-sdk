@@ -1,5 +1,5 @@
 """
-FastAPI Routes for Aurix Backend
+FastAPI Routes for Aurex Backend
 """
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
@@ -31,7 +31,7 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "Aurix Backend",
+        "service": "Aurex Backend",
         "version": "1.0.0"
     }
 
