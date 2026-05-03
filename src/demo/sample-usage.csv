@@ -1,0 +1,33 @@
+timestamp,model,prompt,input_tokens,output_tokens,request_id
+2026-04-01T10:00:01Z,gpt-4o,Summarize the following API error for support staff,420,180,r1
+2026-04-01T10:00:02Z,gpt-4o,Summarize the following API error for support staff,418,175,r2
+2026-04-01T10:00:03Z,gpt-4o,Summarize the following API error for support staff,419,190,r3
+2026-04-01T10:00:04Z,gpt-4o,Summarize the following API error for support staff,420,160,r4
+2026-04-01T10:00:05Z,gpt-4o,Classify this ticket as bug or feature,120,12,r5
+2026-04-01T10:00:06Z,gpt-4o,Classify this ticket as bug or feature,118,10,r6
+2026-04-01T10:00:07Z,gpt-4o,Classify this ticket as bug or feature,121,11,r7
+2026-04-01T10:00:08Z,gpt-4o,Translate greeting to French for email footer,64,22,r8
+2026-04-01T10:00:09Z,gpt-4o,Translate greeting to French for email footer,64,20,r9
+2026-04-01T10:00:10Z,gpt-4o,Translate greeting to French for email footer,65,21,r10
+2026-04-01T10:00:11Z,gpt-4o,Translate greeting to French for email footer,63,19,r11
+2026-04-01T10:00:12Z,gpt-4o,Translate greeting to French for email footer,64,18,r12
+2026-04-01T10:00:13Z,gpt-4o,Translate greeting to French for email footer,64,20,r13
+2026-04-01T10:00:14Z,gpt-4o,Translate greeting to French for email footer,65,22,r14
+2026-04-01T10:00:15Z,gpt-4o,Translate greeting to French for email footer,64,21,r15
+2026-04-01T10:00:16Z,gpt-4o,Translate greeting to French for email footer,64,20,r16
+2026-04-01T10:00:17Z,gpt-4o,Translate greeting to French for email footer,63,19,r17
+2026-04-01T10:00:18Z,gpt-4o,Translate greeting to French for email footer,64,20,r18
+2026-04-01T10:00:19Z,gpt-4o,Translate greeting to French for email footer,64,21,r19
+2026-04-01T10:00:20Z,gpt-4o,Translate greeting to French for email footer,65,22,r20
+2026-04-01T10:00:21Z,gpt-4o,Translate greeting to French for email footer,64,20,r21
+2026-04-01T10:00:22Z,gpt-4o,Translate greeting to French for email footer,64,20,r22
+2026-04-01T10:00:23Z,gpt-4o,Translate greeting to French for email footer,63,19,r23
+2026-04-01T10:00:24Z,gpt-4o,Translate greeting to French for email footer,64,20,r24
+2026-04-01T10:00:25Z,gpt-4o,Translate greeting to French for email footer,64,21,r25
+2026-04-01T10:00:26Z,gpt-4o,Translate greeting to French for email footer,65,22,r26
+2026-04-01T10:00:27Z,gpt-4o,Translate greeting to French for email footer,64,20,r27
+2026-04-01T10:00:28Z,gpt-4o,Translate greeting to French for email footer,64,20,r28
+2026-04-01T10:00:29Z,gpt-4o,Draft one-line changelog from this diff,200,45,r29
+2026-04-01T10:00:30Z,gpt-4o,Draft one-line changelog from this diff,198,48,r30
+2026-04-01T10:00:31Z,gpt-4o,Draft one-line changelog from this diff,201,44,r31
+2026-04-01T10:00:32Z,gpt-4o,Draft one-line changelog from this diff,199,46,r32
