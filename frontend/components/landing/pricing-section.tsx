@@ -5,9 +5,10 @@ import { ArrowRight, Check, Zap } from "lucide-react";
 
 const plans = [
   {
-    name: "Starter",
-    description: "For small teams getting started",
-    price: { monthly: 0, annual: 0 },
+    name: "Audit Edition",
+    description: "For teams getting started with cost optimization",
+    priceDisplay: "$0",
+    billingDisplay: "forever free",
     features: [
       "1 audit per month",
       "Up to 10K tokens analyzed",
@@ -18,40 +19,37 @@ const plans = [
     highlight: false,
   },
   {
-    name: "Professional",
-    description: "For growing AI operations",
-    price: { monthly: 49, annual: 39 },
+    name: "SaaS Subscription",
+    description: "Flat monthly fee for the proxy, observability dashboard, and cost-analytics layer",
+    priceDisplay: "$299",
+    billingDisplay: "per month",
     features: [
       "Unlimited audits",
-      "Up to 1M tokens/month",
-      "Advanced analytics",
+      "Real-time observability dashboard",
+      "Intelligent routing proxy",
+      "Advanced cost analytics",
       "Priority support",
-      "Custom reports",
-      "Team collaboration",
       "API access",
     ],
     highlight: true,
   },
   {
-    name: "Enterprise",
-    description: "For large-scale AI deployments",
-    price: { monthly: null, annual: null },
+    name: "Inference Financing",
+    description: "Extend runway with Net-30 financed inference spend. Your final 3-5% rate is determined entirely by your Token Credit Score—the more efficiently you use AI, the lower your rate.",
+    priceDisplay: "3-5%",
+    billingDisplay: "liquidity fee on financed spend",
     features: [
-      "Unlimited everything",
-      "Dedicated support",
-      "Custom integrations",
-      "SLA guarantee",
-      "On-premise option",
-      "Advanced security",
-      "Custom models",
-      "White-label reports",
+      "Everything in SaaS Subscription",
+      "Net-30 inference financing",
+      "Rate based on your token efficiency",
+      "Dedicated capital partner",
+      "Custom integrations & SLA",
     ],
     highlight: false,
   },
 ];
 
 export function PricingSection() {
-  const [isAnnual, setIsAnnual] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -133,21 +131,14 @@ export function PricingSection() {
 
                   {/* Price */}
                   <div className="mb-8">
-                    {plan.price.monthly !== null ? (
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-5xl lg:text-6xl font-display">
-                          ${isAnnual ? plan.price.annual : plan.price.monthly}
-                        </span>
-                        <span className="text-muted-foreground text-sm">/month</span>
-                      </div>
-                    ) : (
-                      <span className="text-4xl font-display">Custom</span>
-                    )}
-                    {plan.price.monthly !== null && plan.price.monthly > 0 && (
-                      <p className="text-xs text-muted-foreground mt-2 font-mono">
-                        {isAnnual ? "billed annually" : "billed monthly"}
-                      </p>
-                    )}
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl lg:text-6xl font-display">
+                        {plan.priceDisplay}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 font-mono uppercase tracking-wider">
+                      {plan.billingDisplay}
+                    </p>
                   </div>
 
                   {/* Features */}
