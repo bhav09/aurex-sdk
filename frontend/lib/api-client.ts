@@ -60,7 +60,7 @@ export interface LLMEvent {
     response: string | null;
     system_prompt_hash: string | null;
     context_length: number;
-    metadata: Record<string, any>;
+    extra_metadata: Record<string, any>;
 }
 
 export interface AuditSession {

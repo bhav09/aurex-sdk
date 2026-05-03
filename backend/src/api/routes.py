@@ -206,34 +206,12 @@ async def clear_data(
     """
     Clear all LLM events from the database
     
-    WARNING: This will delete ALL data. Use with caution.
-    
-    Query parameters:
-    - confirm: Must be set to true to confirm deletion
+    WARNING: This endpoint is disabled in production for security.
     """
-    if not confirm:
-        raise HTTPException(
-            status_code=400,
-            detail="Must set confirm=true to delete all data"
-        )
-    
-    try:
-        # Count events before deletion
-        count_before = db.query(func.count(LLMEvent.id)).scalar()
-        
-        # Delete all events
-        db.query(LLMEvent).delete()
-        db.commit()
-        
-        return {
-            "status": "success",
-            "message": f"Deleted {count_before} events",
-            "events_deleted": count_before
-        }
-    
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error clearing data: {str(e)}")
+    raise HTTPException(
+        status_code=403,
+        detail="Disabled in production"
+    )
 
 
 @router.post("/upload/csv")
@@ -368,35 +346,12 @@ async def ingest_sessions(
     """
     Ingest all session files from llm-use directory
     
-    Default location: ~/.llm-use/sessions
+    WARNING: This endpoint is disabled in production for security.
     """
-    try:
-        events = ingest_llm_use_sessions(session_dir)
-        
-        if not events:
-            raise HTTPException(
-                status_code=404,
-                detail="No session files found. Check that llm-use has been run and sessions exist."
-            )
-        
-        # Store events in database
-        stored_count = 0
-        for event_data in events:
-            event = LLMEvent(**event_data.dict())
-            db.add(event)
-            stored_count += 1
-        
-        db.commit()
-        
-        return {
-            "status": "success",
-            "events_ingested": stored_count,
-            "session_dir": session_dir or "~/.llm-use/sessions"
-        }
-    
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error ingesting sessions: {str(e)}")
+    raise HTTPException(
+        status_code=403,
+        detail="Disabled in production"
+    )
 
 
 @router.get("/stats")
@@ -633,27 +588,12 @@ async def delete_audit_session(
 ):
     """
     Delete a specific audit session
+    
+    WARNING: This endpoint is disabled in production for security.
     """
-    from src.models import AuditSession
-    
-    try:
-        session = db.query(AuditSession).filter(AuditSession.id == session_id).first()
-        
-        if not session:
-            raise HTTPException(status_code=404, detail="Audit session not found")
-        
-        db.delete(session)
-        db.commit()
-        
-        return {
-            "status": "success",
-            "message": f"Audit session {session_id} deleted"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting audit session: {str(e)}")
+    raise HTTPException(
+        status_code=403,
+        detail="Disabled in production"
+    )
 
 

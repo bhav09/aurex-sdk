@@ -31,3 +31,35 @@ The plan involves significant changes spanning frontend UI, worker threads (addi
 - **Speed vs Features:** Adding WASM embedding models and D3 will significantly increase the bundle size and initial load time, though computation happens locally.
 - **Simplicity vs Automation:** Building a CLI requires maintaining both browser and Node compatibilities, complicating the build process (e.g., PapaParse works differently in Node vs Browser).
 - **Security vs Integration:** Fetching logs directly requires users to input API keys. We will store these securely in `sessionStorage` and never persist them to a backend.
+
+---
+
+# ETB: Security & Quality Fixes (Based on Assessment)
+
+## Original Request
+"Can you fix all of them?" (Referring to the test security assessment plan findings).
+
+## Analysis & Enhanced Prompt
+The user wants to implement the recommended smallest viable fixes from the security assessment.
+1. **Backend Dependencies:** Add `email-validator` to `requirements.txt` and update packages with known vulnerabilities (`fastapi`, `python-multipart`, `python-dotenv`, `starlette`).
+2. **Backend Hardening:** Disable destructive endpoints (`DELETE /clear-data`, `POST /ingest/llm-use-sessions`, `DELETE /audit/sessions/{id}`) by raising 403 Forbidden. Update CORS to restrict wildcard credentials.
+3. **Frontend Contract & Validation:**
+   - Restrict `UploadZone` file validation to just `.csv`.
+   - Fix `LLMEvent` type mismatch (`metadata` -> `extra_metadata`) in `api-client.ts`.
+4. **Frontend CI/Quality:** 
+   - Install `eslint` & `eslint-config-next` so `npm run lint` passes.
+   - Delete `frontend/pnpm-lock.yaml` to resolve lockfile confusion.
+   - Re-enable TS build validation by changing `ignoreBuildErrors` to `false` in `next.config.mjs`.
+5. **Root/Frontend Audit:** Run `npm audit fix` where safe.
+
+## Mode
+`[Production]`
+
+## Scope of Changes
+- **Modifying:** `backend/requirements.txt`, `backend/src/api/routes.py`, `backend/main.py`, `frontend/components/audit/upload-zone.tsx`, `frontend/lib/api-client.ts`, `frontend/next.config.mjs`, `frontend/package.json`
+- **Deleting:** `frontend/pnpm-lock.yaml`
+
+## Trade-offs
+- **Speed vs Safety:** Disabling destructive routes is fast and safe, but requires developers to manage DB resets manually.
+- **Simplicity vs Flexibility:** Removing `pnpm-lock.yaml` strictly enforces `npm` for the frontend, which might disrupt developers using pnpm.
+- **Short-term vs Long-term:** Bumping vulnerable packages addresses immediate CVEs, but might require minor code adjustments if there are breaking changes in minor version updates (e.g., `fastapi`).

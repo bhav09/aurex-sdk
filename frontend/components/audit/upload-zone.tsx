@@ -24,12 +24,12 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     }>({});
 
     const validateFile = (file: File): boolean => {
-        const validExtensions = ['.csv', '.json', '.xlsx', '.xls'];
+        const validExtensions = ['.csv'];
         const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
         const maxSize = 10 * 1024 * 1024; // 10MB
 
         if (!validExtensions.includes(fileExtension)) {
-            setError('Accepted file types: XLSX, XLS, CSV, JSON');
+            setError('Accepted file types: CSV');
             return false;
         }
 
@@ -279,7 +279,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                 </div>
 
                 <p className="mt-2 flex items-center justify-between text-xs leading-5 text-muted-foreground">
-                    Recommended max. size: 10 MB, Accepted file types: XLSX, XLS, CSV, JSON.
+                    Recommended max. size: 10 MB, Accepted file types: CSV.
                 </p>
 
                 {error && (

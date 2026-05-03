@@ -1,7 +1,9 @@
 # FastAPI and server
-fastapi==0.109.0
+fastapi==0.111.0
+starlette==0.37.2
 uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+python-multipart==0.0.26
+email-validator==2.1.1
 
 # Database
 sqlalchemy==2.0.25
@@ -12,7 +14,7 @@ pandas==2.2.0
 numpy==1.26.3
 
 # Utilities
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 pydantic==2.5.3
 pydantic-settings==2.1.0
 

@@ -1,33 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
 import { UploadZone } from "@/components/audit/upload-zone";
 import { CreditScoreCard } from "@/components/audit/credit-score-card";
+import { BentoMetricCard } from "@/components/audit/bento-metric-card";
+import { AgentPlanPanel } from "@/components/audit/agent-plan-panel";
+import { AuditCopilotDock } from "@/components/audit/audit-copilot-dock";
 import { aurixAPI, ExecutiveSummary, Issue, LLMEvent } from "@/lib/api-client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
     AlertCircle,
     TrendingUp,
     DollarSign,
     Zap,
-    Copy,
     CheckCircle2,
     FileText,
     Download,
     AlertTriangle,
-    ArrowRight,
-    TrendingDown,
     Share2,
-    Edit2,
     X,
-    MoreHorizontal,
-    Calendar,
-    Tag
+    ChevronDown,
+    ChevronRight,
+    BarChart3,
 } from "lucide-react";
 import {
     Table,
@@ -36,21 +33,61 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-    TableFooter,
 } from "@/components/ui/table";
 
+function PromptDiffPanel({
+    event,
+    issue,
+}: {
+    event: LLMEvent;
+    issue: Issue | undefined;
+}) {
+    const current =
+        event.prompt?.trim() ||
+        "(No prompt text in this export—many provider CSVs omit message bodies.)";
+    const optimized = issue
+        ? `${issue.cta ? `${issue.cta}\n\n` : ""}${issue.one_line_summary}`
+        : "Route this workload to a smaller model when token count is low; cache static system text; dedupe repeated prefixes.";
+
+    return (
+        <div className="grid gap-6 border-t border-white/10 bg-black/40 p-6 md:grid-cols-2">
+            <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                    Current · from log
+                </p>
+                <div className="max-h-48 overflow-auto rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-white/70">
+                        {current}
+                    </pre>
+                </div>
+            </div>
+            <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+                    Aurex optimized · suggested
+                </p>
+                <div className="max-h-48 overflow-auto rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4">
+                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-emerald-100/90">
+                        {optimized}
+                    </pre>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AuditPage() {
-    const router = useRouter();
     const [analyzing, setAnalyzing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<string[]>([]);
     const [data, setData] = useState<ExecutiveSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"overview" | "data" | "insights">("overview");
-    const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
     const [events, setEvents] = useState<LLMEvent[]>([]);
     const [loadingEvents, setLoadingEvents] = useState(false);
     const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
+    const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+    const [copilotOpen, setCopilotOpen] = useState(false);
+    const [copilotIssue, setCopilotIssue] = useState<Issue | null>(null);
 
     const simulateProgress = () => {
         const steps = [
@@ -64,42 +101,41 @@ export default function AuditPage() {
             "Calculating optimization potential...",
             "Generating recommendations...",
         ];
-
         let currentStep = 0;
         const interval = setInterval(() => {
             if (currentStep < steps.length) {
-                setProgressSteps(prev => [...prev, steps[currentStep]]);
+                setProgressSteps((prev) => [...prev, steps[currentStep]]);
                 setProgress(((currentStep + 1) / steps.length) * 100);
                 currentStep++;
             } else {
                 clearInterval(interval);
             }
         }, 300);
-
         return interval;
     };
 
-    const handleFileSelect = async (file: File, userInfo: { user_name: string; email: string; company_name: string }) => {
+    const handleFileSelect = async (
+        file: File,
+        userInfo: { user_name: string; email: string; company_name: string }
+    ) => {
         setAnalyzing(true);
         setProgress(0);
         setProgressSteps([]);
         setError(null);
         setData(null);
         setEvents([]);
+        setExpandedEventId(null);
+        setCopilotOpen(false);
+        setCopilotIssue(null);
 
         const progressInterval = simulateProgress();
-
         try {
-            // Use the complete audit flow that creates session, uploads, analyzes, and stores results
-            const { session, summary } = await aurixAPI.completeAudit(file, userInfo, true);
-
-            console.log('Audit session created:', session);
-            console.log('Credit score:', session.credit_score);
-
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            const { summary } = await aurixAPI.completeAudit(file, userInfo, true);
+            await new Promise((resolve) => setTimeout(resolve, 3000));
             setData(summary);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Upload failed";
+            setError(message);
             clearInterval(progressInterval);
         } finally {
             setAnalyzing(false);
@@ -117,11 +153,11 @@ export default function AuditPage() {
         try {
             const fetchedEvents = await aurixAPI.getEvents({
                 limit: 1000,
-                workflow_id: workflowFilter
+                workflow_id: workflowFilter,
             });
             setEvents(fetchedEvents);
-        } catch (err: any) {
-            console.error("Failed to load events:", err);
+        } catch (e) {
+            console.error("Failed to load events:", e);
         } finally {
             setLoadingEvents(false);
         }
@@ -133,44 +169,52 @@ export default function AuditPage() {
 
     const getSeverityColor = (severity: string) => {
         const colors: Record<string, string> = {
-            LOW: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-700',
-            MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-700',
-            HIGH: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-700',
-            CRITICAL: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-700',
+            LOW: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-700",
+            MEDIUM: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-700",
+            HIGH: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-700",
+            CRITICAL: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-700",
         };
-        return colors[severity] || 'bg-gray-100 text-gray-800';
+        return colors[severity] || "bg-gray-100 text-gray-800";
     };
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-    };
-
-    // Get issue for a workflow
     const getIssueForWorkflow = (workflowId: string): Issue | undefined => {
-        return data?.top_issues.find(issue => issue.affected_workflow === workflowId);
+        return data?.top_issues.find((issue) => issue.affected_workflow === workflowId);
     };
 
-    // Group events by workflow
-    const groupedEvents = events.reduce((acc, event) => {
-        if (!acc[event.workflow_id]) {
-            acc[event.workflow_id] = [];
-        }
-        acc[event.workflow_id].push(event);
-        return acc;
-    }, {} as Record<string, LLMEvent[]>);
+    const groupedEvents = events.reduce(
+        (acc, event) => {
+            const wid = event.workflow_id ?? "unknown";
+            if (!acc[wid]) acc[wid] = [];
+            acc[wid].push(event);
+            return acc;
+        },
+        {} as Record<string, LLMEvent[]>
+    );
 
     const workflows = Object.keys(groupedEvents);
     const currentWorkflow = selectedWorkflow || workflows[0];
     const currentEvents = currentWorkflow ? groupedEvents[currentWorkflow] : [];
     const currentIssue = currentWorkflow ? getIssueForWorkflow(currentWorkflow) : undefined;
 
-    // Animation variants
+    const openCopilot = (issue: Issue) => {
+        setCopilotIssue(issue);
+        setCopilotOpen(true);
+    };
+
+    const handleViewIssueInData = (issue: Issue) => {
+        if (issue.affected_workflow) {
+            setSelectedWorkflow(issue.affected_workflow);
+        }
+        setActiveTab("data");
+        setExpandedEventId(null);
+    };
+
     const containerVariants = {
         hidden: { opacity: 0 },
         visible: {
             opacity: 1,
-            transition: { staggerChildren: 0.04, delayChildren: 0.06 }
-        }
+            transition: { staggerChildren: 0.04, delayChildren: 0.06 },
+        },
     };
 
     const itemVariants = {
@@ -178,97 +222,86 @@ export default function AuditPage() {
         visible: {
             y: 0,
             opacity: 1,
-            transition: { type: 'spring' as const, stiffness: 100 }
-        }
+            transition: { type: "spring" as const, stiffness: 100 },
+        },
     };
 
-    function GrowthIcon({ growth }: { growth: number }) {
-        return growth >= 0 ? (
-            <TrendingUp className="h-4 w-4 text-green-500" />
-        ) : (
-            <TrendingDown className="h-4 w-4 text-red-500" />
-        );
-    }
+    const resetAudit = () => {
+        setData(null);
+        setError(null);
+        setEvents([]);
+        setExpandedEventId(null);
+        setCopilotOpen(false);
+        setCopilotIssue(null);
+    };
 
     return (
-        <div className="min-h-screen bg-[oklch(0.06_0.008_260)]">
-            {/* Header */}
+        <div className="min-h-screen bg-[oklch(0.06_0.008_260)] text-foreground">
             <div className="border-b border-white/10">
                 <div className="container mx-auto px-4 py-8">
-                    <h1 className="text-4xl lg:text-5xl font-display font-bold tracking-tight">LLM Cost Audit</h1>
-                    <p className="text-muted-foreground mt-3 text-lg">
+                    <h1 className="font-display text-4xl font-bold tracking-tight text-white lg:text-5xl">
+                        LLM Cost Audit
+                    </h1>
+                    <p className="mt-3 text-lg text-white/50">
                         Upload your usage logs to discover optimization opportunities
                     </p>
                 </div>
             </div>
 
             <div className="container mx-auto px-4 py-12">
-                {/* Upload Section */}
-                {!data && !analyzing && (
-                    <UploadZone onFileSelect={handleFileSelect} />
-                )}
+                {!data && !analyzing && <UploadZone onFileSelect={handleFileSelect} />}
 
-                {/* Analyzing Section */}
                 {analyzing && (
-                    <div className="max-w-2xl mx-auto">
-                        <Card className="p-8">
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <Zap className="w-8 h-8 text-primary animate-pulse" />
+                    <div className="mx-auto max-w-2xl">
+                        <Card className="border-white/10 bg-white/[0.04] p-8 backdrop-blur-md">
+                            <div className="mb-6 text-center">
+                                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                                    <Zap className="h-8 w-8 animate-pulse text-primary" />
                                 </div>
-                                <h2 className="text-2xl font-display mb-2">
+                                <h2 className="font-display mb-2 text-2xl text-white">
                                     Analyzing your file
                                 </h2>
-                                <p className="text-muted-foreground">
-                                    {Math.round(progress)}% complete
-                                </p>
+                                <p className="text-white/50">{Math.round(progress)}% complete</p>
                             </div>
-
-                            <div className="w-full bg-muted rounded-full h-2 mb-6">
+                            <div className="mb-6 h-2 w-full rounded-full bg-white/10">
                                 <div
                                     className="bg-primary h-2 rounded-full transition-all duration-300"
                                     style={{ width: `${progress}%` }}
                                 />
                             </div>
-
-                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                            <div className="max-h-64 space-y-2 overflow-y-auto">
                                 {progressSteps.map((step, index) => (
                                     <div key={index} className="flex items-center gap-2 text-sm">
-                                        <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                        <span className="text-green-600">{step}</span>
+                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                                        <span className="text-emerald-200/80">{step}</span>
                                     </div>
                                 ))}
                             </div>
-
-                            <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-muted-foreground/10">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span>100% Local Processing</span>
+                            <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                                <div className="flex items-center gap-2 text-sm text-white/50">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span>Runs on your data via your API—nothing leaves your machine in dev.</span>
                                 </div>
                             </div>
                         </Card>
                     </div>
                 )}
 
-                {/* Error Section */}
                 {error && (
-                    <div className="max-w-2xl mx-auto">
-                        <Card className="p-6 border-red-200 bg-red-50">
+                    <div className="mx-auto max-w-2xl">
+                        <Card className="border-red-500/30 bg-red-500/10 p-6 backdrop-blur-md">
                             <div className="flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
                                 <div>
-                                    <h3 className="font-semibold text-red-900 mb-1">Analysis Failed</h3>
-                                    <p className="text-sm text-red-700">{error}</p>
+                                    <h3 className="mb-1 font-semibold text-red-200">Analysis failed</h3>
+                                    <p className="text-sm text-red-300/90">{error}</p>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="mt-4"
-                                        onClick={() => {
-                                            setError(null);
-                                            setData(null);
-                                        }}
+                                        className="mt-4 border-white/20 text-white hover:bg-white/10"
+                                        onClick={resetAudit}
                                     >
-                                        Try Again
+                                        Try again
                                     </Button>
                                 </div>
                             </div>
@@ -276,7 +309,6 @@ export default function AuditPage() {
                     </div>
                 )}
 
-                {/* Results Section */}
                 {data && !analyzing && (
                     <motion.div
                         initial="hidden"
@@ -284,42 +316,30 @@ export default function AuditPage() {
                         variants={containerVariants}
                         className="space-y-8"
                     >
-                        {/* Score Card */}
-                        <motion.div variants={itemVariants} className="max-w-2xl mx-auto">
+                        <motion.div variants={itemVariants} className="mx-auto max-w-4xl">
                             <CreditScoreCard
                                 score={calculateScore(data.executive_summary.waste_percentage)}
                             />
                         </motion.div>
 
-                        {/* Tab Navigation */}
-                        <motion.div variants={itemVariants} className="flex gap-2 border-b">
-                            <button
-                                onClick={() => setActiveTab("overview")}
-                                className={`px-6 py-3 font-medium transition-colors ${activeTab === "overview"
-                                    ? "border-b-2 border-primary text-primary"
-                                    : "text-muted-foreground hover:text-foreground"
+                        <motion.div
+                            variants={itemVariants}
+                            className="flex flex-wrap gap-2 border-b border-white/10"
+                        >
+                            {(["overview", "data", "insights"] as const).map((tab) => (
+                                <button
+                                    key={tab}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`px-6 py-3 text-sm font-medium capitalize transition-colors ${
+                                        activeTab === tab
+                                            ? "border-b-2 border-violet-400 text-white"
+                                            : "text-white/45 hover:text-white/80"
                                     }`}
-                            >
-                                Overview
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("data")}
-                                className={`px-6 py-3 font-medium transition-colors ${activeTab === "data"
-                                    ? "border-b-2 border-primary text-primary"
-                                    : "text-muted-foreground hover:text-foreground"
-                                    }`}
-                            >
-                                Data View
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("insights")}
-                                className={`px-6 py-3 font-medium transition-colors ${activeTab === "insights"
-                                    ? "border-b-2 border-primary text-primary"
-                                    : "text-muted-foreground hover:text-foreground"
-                                    }`}
-                            >
-                                Insights
-                            </button>
+                                >
+                                    {tab === "data" ? "Data view" : tab}
+                                </button>
+                            ))}
                         </motion.div>
 
                         <AnimatePresence mode="wait">
@@ -330,144 +350,191 @@ export default function AuditPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -20 }}
                                 >
-                                    <Card className="w-full max-w-4xl mx-auto overflow-hidden border-none shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
-                                        <div className="p-4 border-b bg-muted/30">
-                                            <div className="flex items-center justify-between">
-                                                <div className="text-sm text-muted-foreground">
-                                                    <span>Audit Report</span>
-                                                    <span className="mx-2">/</span>
-                                                    <span>{new Date().toLocaleDateString()}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant="ghost" size="icon"><Share2 className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => {
-                                                        setData(null);
-                                                        setError(null);
-                                                    }}><X className="h-4 w-4" /></Button>
-                                                </div>
+                                    <Card className="mx-auto max-w-5xl overflow-hidden border-white/10 bg-white/[0.03] shadow-2xl backdrop-blur-md">
+                                        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                                            <div className="text-sm text-white/45">
+                                                <span className="text-white/70">Audit report</span>
+                                                <span className="mx-2">/</span>
+                                                <span>{new Date().toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10">
+                                                    <Share2 className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10">
+                                                    <Download className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-white/60 hover:bg-white/10"
+                                                    onClick={resetAudit}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
                                             </div>
                                         </div>
 
-                                        <div className="p-6 md:p-8 space-y-8">
-                                            <h1 className="text-3xl font-bold tracking-tight">Cost Optimization Report</h1>
+                                        <div className="space-y-8 p-6 md:p-8">
+                                            <h2 className="font-display text-3xl font-bold tracking-tight text-white">
+                                                Cost optimization report
+                                            </h2>
 
-                                            {/* Meta Info Grid */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                                                <div className="flex items-start gap-3">
-                                                    <MoreHorizontal className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="text-muted-foreground">Status</p>
-                                                        <Badge variant="outline" className={`mt-1 font-semibold ${getSeverityColor(data.executive_summary.severity)}`}>
-                                                            <span className="mr-2 h-2 w-2 rounded-full bg-current animate-pulse"></span>
-                                                            {data.executive_summary.severity}
-                                                        </Badge>
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                                <BentoMetricCard className="md:col-span-2 lg:col-span-1">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                                                                Status
+                                                            </p>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`mt-2 font-semibold ${getSeverityColor(data.executive_summary.severity)}`}
+                                                            >
+                                                                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
+                                                                {data.executive_summary.severity}
+                                                            </Badge>
+                                                        </div>
+                                                        <BarChart3 className="h-8 w-8 text-violet-400/50" />
                                                     </div>
-                                                </div>
-                                                <div className="flex items-start gap-3">
-                                                    <DollarSign className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="text-muted-foreground">Weekly Waste</p>
-                                                        <p className="font-bold text-red-600 mt-1">
-                                                            ${data.executive_summary.wasted_amount.toFixed(2)}
-                                                        </p>
+                                                    <p className="mt-4 text-sm text-white/55">
+                                                        Severity from wasted spend vs baseline for the observed window.
+                                                    </p>
+                                                </BentoMetricCard>
+
+                                                <BentoMetricCard>
+                                                    <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                                                        Weekly waste
+                                                    </p>
+                                                    <p className="mt-2 font-display text-3xl font-bold text-red-400">
+                                                        ${data.executive_summary.wasted_amount.toFixed(2)}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-white/40">Approx. recurring leakage</p>
+                                                </BentoMetricCard>
+
+                                                <BentoMetricCard>
+                                                    <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                                                        Annual savings projection
+                                                    </p>
+                                                    <p className="mt-2 font-display text-3xl font-bold text-emerald-400">
+                                                        ${data.executive_summary.annual_savings_projection.toLocaleString()}
+                                                    </p>
+                                                    <div className="mt-2 flex items-center gap-1 text-xs text-emerald-300/70">
+                                                        <TrendingUp className="h-3 w-3" />
+                                                        If fixes ship
                                                     </div>
-                                                </div>
-                                                <div className="flex items-start gap-3">
-                                                    <TrendingUp className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="text-muted-foreground">Annual Savings</p>
-                                                        <p className="font-bold text-green-600 mt-1">
-                                                            ${data.executive_summary.annual_savings_projection.toLocaleString()}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-3">
-                                                    <AlertCircle className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="text-muted-foreground">Waste Rate</p>
-                                                        <p className="font-bold text-orange-600 mt-1">
-                                                            {data.executive_summary.waste_percentage.toFixed(1)}%
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-3 col-span-1 md:col-span-2">
-                                                    <FileText className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="text-muted-foreground">Summary</p>
-                                                        <p className="mt-1 text-foreground/80">
-                                                            Current: ${data.executive_summary.current_weekly_spend.toFixed(2)}/week
-                                                            {' → '}
-                                                            Optimized: ${data.executive_summary.optimized_spend.toFixed(2)}/week
-                                                        </p>
-                                                    </div>
-                                                </div>
+                                                </BentoMetricCard>
+
+                                                <BentoMetricCard>
+                                                    <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                                                        Waste rate
+                                                    </p>
+                                                    <p className="mt-2 font-display text-3xl font-bold text-amber-300">
+                                                        {data.executive_summary.waste_percentage.toFixed(1)}%
+                                                    </p>
+                                                </BentoMetricCard>
+
+                                                <BentoMetricCard className="md:col-span-2">
+                                                    <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+                                                        Spend trajectory
+                                                    </p>
+                                                    <p className="mt-2 text-lg text-white/85">
+                                                        <span className="text-white/50">Current </span>
+                                                        <span className="font-mono font-semibold">
+                                                            ${data.executive_summary.current_weekly_spend.toFixed(2)}/wk
+                                                        </span>
+                                                        <span className="mx-2 text-white/35">→</span>
+                                                        <span className="text-white/50">Optimized </span>
+                                                        <span className="font-mono font-semibold text-emerald-300">
+                                                            ${data.executive_summary.optimized_spend.toFixed(2)}/wk
+                                                        </span>
+                                                    </p>
+                                                </BentoMetricCard>
                                             </div>
 
-                                            {/* Top Issues */}
                                             <div className="space-y-4">
-                                                <div className="flex justify-between items-center">
-                                                    <h3 className="font-semibold flex items-center gap-2">
-                                                        <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-                                                        Top Issues
-                                                        <Badge variant="secondary">{data.top_issues.length}</Badge>
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="flex items-center gap-2 font-semibold text-white">
+                                                        <AlertTriangle className="h-5 w-5 text-amber-400/80" />
+                                                        Top issues
+                                                        <Badge variant="secondary" className="bg-white/10 text-white">
+                                                            {data.top_issues.length}
+                                                        </Badge>
                                                     </h3>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        className="text-violet-300 hover:bg-violet-500/10 hover:text-violet-200"
                                                         onClick={() => setActiveTab("insights")}
                                                     >
-                                                        View Details →
+                                                        Agent plan →
                                                     </Button>
                                                 </div>
                                                 <div className="space-y-3">
                                                     {data.top_issues.slice(0, 3).map((issue) => (
-                                                        <div key={issue.rank} className="flex items-center gap-3 p-3 border rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer" onClick={() => {
-                                                            setSelectedIssue(issue);
-                                                            setActiveTab("data");
-                                                        }}>
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="text-lg font-bold text-gray-400">#{issue.rank}</span>
-                                                                    <p className="font-medium text-sm">{issue.title}</p>
-                                                                    <Badge className={getSeverityColor(issue.severity)} variant="outline">
+                                                        <button
+                                                            key={issue.rank}
+                                                            type="button"
+                                                            onClick={() => handleViewIssueInData(issue)}
+                                                            className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left transition-colors hover:border-white/20 hover:bg-white/[0.07]"
+                                                        >
+                                                            <span className="font-mono text-lg font-bold text-white/25">
+                                                                #{issue.rank}
+                                                            </span>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <p className="font-medium text-white">{issue.title}</p>
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className={getSeverityColor(issue.severity)}
+                                                                    >
                                                                         {issue.severity}
                                                                     </Badge>
                                                                 </div>
-                                                                <p className="text-xs text-muted-foreground">{issue.one_line_summary}</p>
+                                                                <p className="mt-1 text-xs text-white/50">
+                                                                    {issue.one_line_summary}
+                                                                </p>
                                                             </div>
-                                                            <div className="text-right">
-                                                                <p className="font-bold text-red-600 text-sm">${issue.weekly_cost.toFixed(2)}</p>
-                                                                <p className="text-xs text-muted-foreground">/week</p>
+                                                            <div className="shrink-0 text-right">
+                                                                <p className="text-sm font-bold text-red-400">
+                                                                    ${issue.weekly_cost.toFixed(2)}
+                                                                </p>
+                                                                <p className="text-[10px] text-white/35">/week</p>
                                                             </div>
-                                                        </div>
+                                                        </button>
                                                     ))}
                                                 </div>
                                             </div>
 
-                                            {/* Workflow Breakdown */}
                                             <div className="space-y-4">
-                                                <h3 className="font-semibold">Workflow Breakdown</h3>
+                                                <h3 className="font-semibold text-white">Workflow breakdown</h3>
                                                 <div className="space-y-3">
                                                     {data.workflow_breakdown.slice(0, 5).map((workflow) => {
-                                                        const maxCost = Math.max(...data.workflow_breakdown.map(w => w.total_cost));
+                                                        const maxCost = Math.max(
+                                                            ...data.workflow_breakdown.map((w) => w.total_cost)
+                                                        );
                                                         const percentage = (workflow.total_cost / maxCost) * 100;
-
                                                         return (
                                                             <div key={workflow.workflow_id} className="space-y-2">
-                                                                <div className="flex justify-between items-center">
+                                                                <div className="flex items-center justify-between">
                                                                     <div>
-                                                                        <span className="font-semibold text-sm">{workflow.workflow_id}</span>
-                                                                        <span className="text-xs text-gray-500 ml-2">
+                                                                        <span className="text-sm font-semibold text-white">
+                                                                            {workflow.workflow_id}
+                                                                        </span>
+                                                                        <span className="ml-2 text-xs text-white/40">
                                                                             {workflow.request_count.toLocaleString()} requests
                                                                         </span>
                                                                     </div>
-                                                                    <span className="font-bold text-sm">${workflow.total_cost.toFixed(2)}</span>
+                                                                    <span className="font-mono text-sm font-bold text-white">
+                                                                        ${workflow.total_cost.toFixed(2)}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
-                                                                    <div
-                                                                        className="bg-blue-600 h-2 rounded-full transition-all"
-                                                                        style={{ width: `${percentage}%` }}
+                                                                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                                                                    <motion.div
+                                                                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-sky-400"
+                                                                        initial={{ width: 0 }}
+                                                                        animate={{ width: `${percentage}%` }}
+                                                                        transition={{ duration: 0.8, ease: "easeOut" }}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -486,48 +553,60 @@ export default function AuditPage() {
                                     exit={{ opacity: 0, y: -20 }}
                                     className="space-y-6"
                                 >
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <h2 className="text-3xl font-display font-bold tracking-tight">Data View</h2>
-                                            <p className="text-sm text-white/60 mt-2">
-                                                {loadingEvents ? "Loading..." : `${events.length} events across ${workflows.length} workflows`}
+                                            <h2 className="font-display text-3xl font-bold tracking-tight text-white">
+                                                Data view
+                                            </h2>
+                                            <p className="mt-2 text-sm text-white/50">
+                                                {loadingEvents
+                                                    ? "Loading…"
+                                                    : `${events.length} events · ${workflows.length} workflows`}
                                             </p>
                                         </div>
-                                        <Button variant="outline" size="sm" className="gap-2 bg-white/5 border-white/10 hover:bg-white/10">
-                                            <Download className="w-4 h-4" />
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                                        >
+                                            <Download className="h-4 w-4" />
                                             Export CSV
                                         </Button>
                                     </div>
 
                                     {loadingEvents ? (
-                                        <div className="text-center py-20">
-                                            <Zap className="w-12 h-12 mx-auto mb-4 text-primary animate-pulse" />
-                                            <p className="text-white/60 text-lg">Loading event data...</p>
+                                        <div className="py-20 text-center">
+                                            <Zap className="mx-auto mb-4 h-12 w-12 animate-pulse text-violet-400" />
+                                            <p className="text-white/50">Loading event data…</p>
                                         </div>
                                     ) : workflows.length === 0 ? (
-                                        <div className="text-center py-20">
-                                            <FileText className="w-12 h-12 mx-auto mb-4 text-white/40" />
-                                            <p className="text-white/60 text-lg">No data available</p>
+                                        <div className="py-20 text-center">
+                                            <FileText className="mx-auto mb-4 h-12 w-12 text-white/25" />
+                                            <p className="text-white/50">No data available</p>
                                         </div>
                                     ) : (
                                         <>
-                                            {/* Workflow Tabs */}
-                                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                                            <div className="flex gap-3 overflow-x-auto pb-2">
                                                 {workflows.map((workflow) => {
                                                     const issue = getIssueForWorkflow(workflow);
                                                     const isActive = workflow === currentWorkflow;
                                                     return (
                                                         <button
                                                             key={workflow}
-                                                            onClick={() => setSelectedWorkflow(workflow)}
-                                                            className={`relative px-6 py-3 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${isActive
-                                                                ? "bg-white text-black"
-                                                                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80"
-                                                                }`}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedWorkflow(workflow);
+                                                                setExpandedEventId(null);
+                                                            }}
+                                                            className={`relative whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-medium transition-all ${
+                                                                isActive
+                                                                    ? "bg-white text-black shadow-lg"
+                                                                    : "bg-white/5 text-white/55 hover:bg-white/10"
+                                                            }`}
                                                         >
-                                                            <span className="relative z-10">{workflow}</span>
+                                                            {workflow}
                                                             {issue && (
-                                                                <Badge variant="destructive" className="ml-2 text-[10px] px-1.5 py-0 bg-red-500">
+                                                                <Badge className="ml-2 bg-red-500 text-[10px] text-white">
                                                                     Issue
                                                                 </Badge>
                                                             )}
@@ -536,75 +615,93 @@ export default function AuditPage() {
                                                 })}
                                             </div>
 
-                                            {/* Issue Alert */}
                                             {currentIssue && (
-                                                <div className="p-5 rounded-xl bg-red-500/10 border border-red-500/20">
-                                                    <div className="flex items-start gap-4">
-                                                        <div className="p-2 rounded-lg bg-red-500/20">
-                                                            <AlertTriangle className="w-5 h-5 text-red-400" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-3 mb-2">
-                                                                <h3 className="font-semibold text-red-400 text-lg">
+                                                <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 backdrop-blur-sm">
+                                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                                                        <AlertTriangle className="h-6 w-6 shrink-0 text-red-400" />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <h3 className="text-lg font-semibold text-red-200">
                                                                     {currentIssue.title}
                                                                 </h3>
-                                                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs uppercase">
+                                                                <Badge className="border-red-400/40 bg-red-500/20 text-red-300">
                                                                     {currentIssue.severity}
                                                                 </Badge>
                                                             </div>
-                                                            <p className="text-sm text-red-300/80 mb-3">
+                                                            <p className="mt-2 text-sm text-red-200/75">
                                                                 {currentIssue.one_line_summary}
                                                             </p>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-red-400 text-lg">
-                                                                    ${currentIssue.weekly_cost.toFixed(2)}/week wasted
-                                                                </span>
-                                                            </div>
+                                                            <p className="mt-2 font-mono text-lg font-bold text-red-300">
+                                                                ${currentIssue.weekly_cost.toFixed(2)}/week wasted
+                                                            </p>
                                                         </div>
+                                                        <Button
+                                                            size="sm"
+                                                            className="shrink-0 bg-violet-600 hover:bg-violet-500"
+                                                            onClick={() => openCopilot(currentIssue)}
+                                                        >
+                                                            Fix with agent
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* Data Table */}
-                                            <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden backdrop-blur-sm">
-                                                <div className="overflow-x-auto">
-                                                    <Table>
-                                                        <TableHeader>
-                                                            <TableRow className="border-white/10 hover:bg-transparent">
-                                                                <TableHead className="text-white/60 font-medium">No</TableHead>
-                                                                <TableHead className="text-white/60 font-medium">Timestamp</TableHead>
-                                                                <TableHead className="text-white/60 font-medium">Model</TableHead>
-                                                                <TableHead className="text-right text-white/60 font-medium">Input Tokens</TableHead>
-                                                                <TableHead className="text-right text-white/60 font-medium">Output Tokens</TableHead>
-                                                                <TableHead className="text-right text-white/60 font-medium">Cost</TableHead>
-                                                                <TableHead className="text-white/60 font-medium">Status</TableHead>
-                                                            </TableRow>
-                                                        </TableHeader>
-                                                        <TableBody>
-                                                            {currentEvents.slice(0, 50).map((event, idx) => {
-                                                                const hasIssue = currentIssue !== undefined;
-                                                                const isHighCost = event.cost > 0.01;
-                                                                const rowClass = hasIssue && isHighCost
-                                                                    ? "bg-red-500/10 border-l-4 border-l-red-500 hover:bg-red-500/15"
+                                            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow className="border-white/10 hover:bg-transparent">
+                                                            <TableHead className="w-10 text-white/50" />
+                                                            <TableHead className="text-white/55">#</TableHead>
+                                                            <TableHead className="text-white/55">Time</TableHead>
+                                                            <TableHead className="text-white/55">Model</TableHead>
+                                                            <TableHead className="text-right text-white/55">In</TableHead>
+                                                            <TableHead className="text-right text-white/55">Out</TableHead>
+                                                            <TableHead className="text-right text-white/55">Cost</TableHead>
+                                                            <TableHead className="text-white/55">Status</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {currentEvents.slice(0, 50).map((event, idx) => {
+                                                            const hasIssue = currentIssue !== undefined;
+                                                            const isHighCost = event.cost > 0.01;
+                                                            const isExpanded = expandedEventId === event.id;
+                                                            const rowClass =
+                                                                hasIssue && isHighCost
+                                                                    ? "bg-red-500/10 border-l-4 border-l-red-500"
                                                                     : hasIssue
-                                                                        ? "bg-yellow-500/10 border-l-4 border-l-yellow-500 hover:bg-yellow-500/15"
-                                                                        : "hover:bg-white/5";
+                                                                      ? "bg-amber-500/10 border-l-4 border-l-amber-500"
+                                                                      : "hover:bg-white/[0.04]";
 
-                                                                return (
-                                                                    <TableRow key={event.id} className={`border-white/5 ${rowClass}`}>
-                                                                        <TableCell className="text-white/40 font-mono text-xs">{idx + 1}</TableCell>
-                                                                        <TableCell className="text-white/60 font-mono text-xs">
+                                                            return (
+                                                                <Fragment key={event.id}>
+                                                                    <TableRow
+                                                                        className={`cursor-pointer border-white/5 ${rowClass}`}
+                                                                        onClick={() =>
+                                                                            setExpandedEventId(isExpanded ? null : event.id)
+                                                                        }
+                                                                    >
+                                                                        <TableCell className="text-white/40">
+                                                                            {isExpanded ? (
+                                                                                <ChevronDown className="h-4 w-4" />
+                                                                            ) : (
+                                                                                <ChevronRight className="h-4 w-4" />
+                                                                            )}
+                                                                        </TableCell>
+                                                                        <TableCell className="font-mono text-xs text-white/40">
+                                                                            {idx + 1}
+                                                                        </TableCell>
+                                                                        <TableCell className="font-mono text-xs text-white/60">
                                                                             {new Date(event.timestamp).toLocaleTimeString()}
                                                                         </TableCell>
                                                                         <TableCell>
-                                                                            <div className="inline-flex px-2 py-1 rounded-md bg-white/10 border border-white/10">
-                                                                                <span className="text-xs font-mono text-white/80">{event.model}</span>
-                                                                            </div>
+                                                                            <span className="rounded-md border border-white/10 bg-white/10 px-2 py-1 font-mono text-xs text-white/85">
+                                                                                {event.model}
+                                                                            </span>
                                                                         </TableCell>
-                                                                        <TableCell className="text-right font-mono text-sm text-white/80">
+                                                                        <TableCell className="text-right font-mono text-sm text-white/75">
                                                                             {event.input_tokens.toLocaleString()}
                                                                         </TableCell>
-                                                                        <TableCell className="text-right font-mono text-sm text-white/80">
+                                                                        <TableCell className="text-right font-mono text-sm text-white/75">
                                                                             {event.output_tokens.toLocaleString()}
                                                                         </TableCell>
                                                                         <TableCell className="text-right font-bold text-white">
@@ -612,24 +709,34 @@ export default function AuditPage() {
                                                                         </TableCell>
                                                                         <TableCell>
                                                                             {hasIssue && isHighCost && (
-                                                                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                                                                                <Badge className="border-red-400/30 bg-red-500/15 text-xs text-red-300">
                                                                                     Critical
                                                                                 </Badge>
                                                                             )}
                                                                             {hasIssue && !isHighCost && (
-                                                                                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
-                                                                                    Warning
+                                                                                <Badge className="border-amber-400/30 bg-amber-500/15 text-xs text-amber-200">
+                                                                                    Watch
                                                                                 </Badge>
                                                                             )}
                                                                         </TableCell>
                                                                     </TableRow>
-                                                                );
-                                                            })}
-                                                        </TableBody>
-                                                    </Table>
-                                                </div>
+                                                                    {isExpanded && (
+                                                                        <TableRow className="border-0 hover:bg-transparent">
+                                                                            <TableCell colSpan={8} className="p-0">
+                                                                                <PromptDiffPanel
+                                                                                    event={event}
+                                                                                    issue={currentIssue}
+                                                                                />
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    )}
+                                                                </Fragment>
+                                                            );
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
                                                 {currentEvents.length > 50 && (
-                                                    <div className="p-4 text-center text-sm text-white/40 border-t border-white/5 font-mono">
+                                                    <div className="border-t border-white/10 p-4 text-center font-mono text-xs text-white/40">
                                                         Showing 50 of {currentEvents.length} events
                                                     </div>
                                                 )}
@@ -644,119 +751,46 @@ export default function AuditPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -20 }}
                                 >
-                                    <div className="bg-background overflow-x-auto">
-                                        <Table className="min-w-[600px]">
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="w-[5%]">#</TableHead>
-                                                    <TableHead className="w-[30%]">
-                                                        <div className="flex flex-col">
-                                                            <span>Issue</span>
-                                                            <Progress value={70} className="h-1 mt-1" />
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead className="w-[15%]">
-                                                        <div className="flex flex-col">
-                                                            <span>Severity</span>
-                                                            <Progress value={60} className="h-1 mt-1" />
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead className="w-[15%]">
-                                                        <div className="flex flex-col">
-                                                            <span>Weekly Cost</span>
-                                                            <Progress value={80} className="h-1 mt-1" />
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead className="w-[15%]">
-                                                        <div className="flex flex-col">
-                                                            <span>Fix Effort</span>
-                                                            <Progress value={50} className="h-1 mt-1" />
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead className="text-center w-[10%]">Trend</TableHead>
-                                                    <TableHead className="w-[10%]">Action</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data.top_issues.map((issue) => (
-                                                    <TableRow key={issue.rank} className="hover:bg-muted/50">
-                                                        <TableCell className="font-bold text-gray-400">
-                                                            #{issue.rank}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div>
-                                                                <p className="font-medium">{issue.title}</p>
-                                                                <p className="text-xs text-muted-foreground mt-1">
-                                                                    {issue.one_line_summary}
-                                                                </p>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge className={getSeverityColor(issue.severity)}>
-                                                                {issue.severity}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="font-bold text-red-600">
-                                                            ${issue.weekly_cost.toFixed(2)}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-muted-foreground">
-                                                            {issue.fix_effort}
-                                                        </TableCell>
-                                                        <TableCell className="text-center">
-                                                            <GrowthIcon growth={-issue.weekly_cost} />
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    setSelectedIssue(issue);
-                                                                    setActiveTab("data");
-                                                                }}
-                                                            >
-                                                                View
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                            <TableFooter>
-                                                <TableRow>
-                                                    <TableCell colSpan={3}>Total Weekly Waste</TableCell>
-                                                    <TableCell className="font-bold text-red-600">
-                                                        ${data.top_issues.reduce((acc, issue) => acc + issue.weekly_cost, 0).toFixed(2)}
-                                                    </TableCell>
-                                                    <TableCell colSpan={3}></TableCell>
-                                                </TableRow>
-                                            </TableFooter>
-                                        </Table>
-                                        <p className="mt-4 text-center text-sm text-muted-foreground">
-                                            Comprehensive cost analysis with actionable insights
-                                        </p>
-                                    </div>
+                                    <AgentPlanPanel
+                                        issues={data.top_issues}
+                                        getSeverityClass={getSeverityColor}
+                                        onOpenCopilot={openCopilot}
+                                        onViewInData={handleViewIssueInData}
+                                    />
+                                    <p className="mt-8 text-center text-sm text-white/40">
+                                        Total weekly waste in ranked issues:{" "}
+                                        <span className="font-mono text-red-400">
+                                            $
+                                            {data.top_issues
+                                                .reduce((acc, issue) => acc + issue.weekly_cost, 0)
+                                                .toFixed(2)}
+                                        </span>
+                                    </p>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        {/* Upload Another */}
                         <div className="text-center">
                             <Button
                                 variant="outline"
-                                onClick={() => {
-                                    setData(null);
-                                    setError(null);
-                                    setSelectedIssue(null);
-                                    setEvents([]);
-                                }}
+                                className="border-white/15 text-white hover:bg-white/10"
+                                onClick={resetAudit}
                             >
-                                Analyze Another File
+                                Analyze another file
                             </Button>
                         </div>
                     </motion.div>
                 )}
             </div>
+
+            <AuditCopilotDock
+                open={copilotOpen}
+                issue={copilotIssue}
+                onClose={() => {
+                    setCopilotOpen(false);
+                    setCopilotIssue(null);
+                }}
+            />
         </div>
     );
 }
-
-// Made with Bob

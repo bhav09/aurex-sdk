@@ -1,41 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface CreditScoreCardProps {
-    score: number; // 0-100
+    score: number;
     previousScore?: number;
     className?: string;
 }
 
-interface TextItem {
-    text: string;
-}
-
-const sizeConfig = {
-    container: 'h-[400px] w-[400px]',
-    fontSize: 'text-sm',
-    tracking: 'tracking-[0.3em]',
-    radius: 160,
-    gap: 30,
-    textStyle: 'font-medium',
-};
-
 export function CreditScoreCard({ score, previousScore, className }: CreditScoreCardProps) {
     const [displayScore, setDisplayScore] = useState(0);
 
-    // Animate score on mount
     useEffect(() => {
         const duration = 2000;
         const steps = 60;
         const increment = score / steps;
         let current = 0;
-
         const timer = setInterval(() => {
             current += increment;
             if (current >= score) {
@@ -45,15 +29,21 @@ export function CreditScoreCard({ score, previousScore, className }: CreditScore
                 setDisplayScore(Math.floor(current));
             }
         }, duration / steps);
-
         return () => clearInterval(timer);
     }, [score]);
 
     const getScoreColor = (s: number): string => {
-        if (s >= 80) return "#22c55e"; // green-500
-        if (s >= 60) return "#eab308"; // yellow-500
-        if (s >= 40) return "#f97316"; // orange-500
-        return "#ef4444"; // red-500
+        if (s >= 80) return "rgb(34 197 94)";
+        if (s >= 60) return "rgb(234 179 8)";
+        if (s >= 40) return "rgb(249 115 22)";
+        return "rgb(239 68 68)";
+    };
+
+    const getScoreGlow = (s: number): string => {
+        if (s >= 80) return "rgba(34, 197, 94, 0.45)";
+        if (s >= 60) return "rgba(234, 179, 8, 0.4)";
+        if (s >= 40) return "rgba(249, 115, 22, 0.45)";
+        return "rgba(239, 68, 68, 0.5)";
     };
 
     const getScoreLabel = (s: number): string => {
@@ -64,197 +54,124 @@ export function CreditScoreCard({ score, previousScore, className }: CreditScore
     };
 
     const scoreDiff = previousScore !== undefined ? score - previousScore : null;
-
-    const items: TextItem[] = [
-        { text: "TOKEN CREDIT SCORE" },
-        { text: "AUREX HUB" },
-        { text: `SCORE/${displayScore}` },
-    ];
-
-    const createTextSegments = () => {
-        const totalItems = items.length;
-        const totalGapDegrees = sizeConfig.gap * totalItems;
-        const availableDegrees = 360 - totalGapDegrees;
-        const segmentDegrees = availableDegrees / totalItems;
-
-        return items.map((item, index) => {
-            const startPosition = index * (segmentDegrees + sizeConfig.gap);
-            const startOffset = `${(startPosition / 360) * 100}%`;
-            return (
-                <g key={index}>
-                    <text
-                        className={cn(
-                            sizeConfig.fontSize,
-                            sizeConfig.tracking,
-                            sizeConfig.textStyle,
-                            "uppercase transition-all duration-300"
-                        )}
-                        style={{
-                            transition: 'all 0.3s ease'
-                        }}
-                    >
-                        <textPath
-                            href="#curve"
-                            className="fill-[url(#textGradient)]"
-                            startOffset={startOffset}
-                            textLength={`${segmentDegrees * 1.8}`}
-                            lengthAdjust="spacingAndGlyphs"
-                        >
-                            {item.text}
-                        </textPath>
-                    </text>
-                </g>
-            );
-        });
-    };
+    const circumference = 2 * Math.PI * 118;
+    const strokeDashoffset = circumference - (displayScore / 100) * circumference;
 
     return (
-        <Card className={`p-8 ${className}`}>
-            <div className="flex flex-col items-center">
-                {/* Circular Score Display */}
+        <Card
+            className={cn(
+                "relative overflow-hidden border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-2xl shadow-black/40",
+                className
+            )}
+        >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(120,119,198,0.35),transparent)]" />
+            <div className="pointer-events-none absolute -right-20 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full blur-3xl opacity-30" style={{ backgroundColor: getScoreGlow(score) }} />
+
+            <div className="relative flex flex-col items-center px-6 py-10 md:flex-row md:items-center md:justify-center md:gap-12 md:py-12">
                 <motion.div
-                    whileHover={{
-                        boxShadow: "20px 20px 40px #bebebe, -20px -20px 40px #ffffff"
-                    }}
-                    whileTap={{ scale: 0.98 }}
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{
-                        duration: 5,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                    }}
-                    className={cn(
-                        "relative overflow-hidden mb-6",
-                        sizeConfig.container,
-                        "rounded-full bg-[#e6e6e6]",
-                        "shadow-[16px_16px_32px_#bebebe,-16px_-16px_32px_#ffffff]",
-                        "transition-all duration-500 ease-out"
-                    )}
+                    className="relative mb-8 flex h-[280px] w-[280px] shrink-0 items-center justify-center md:mb-0 md:h-[320px] md:w-[320px]"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 >
-                    <motion.div
-                        className="absolute inset-[2px] rounded-full bg-[#e6e6e6]"
+                    <div
+                        className="absolute inset-0 rounded-full opacity-60 blur-xl"
                         style={{
-                            boxShadow: "inset 6px 6px 12px #d1d1d1, inset -6px -6px 12px #ffffff"
+                            background: `radial-gradient(circle, ${getScoreGlow(score)} 0%, transparent 70%)`,
                         }}
                     />
+                    <svg className="relative h-full w-full -rotate-90" viewBox="0 0 260 260">
+                        <defs>
+                            <linearGradient id="scoreRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor={getScoreColor(score)} stopOpacity={0.2} />
+                                <stop offset="50%" stopColor={getScoreColor(score)} stopOpacity={1} />
+                                <stop offset="100%" stopColor={getScoreColor(score)} stopOpacity={0.35} />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="130" cy="130" r="118" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                        <motion.circle
+                            cx="130"
+                            cy="130"
+                            r="118"
+                            fill="none"
+                            stroke="url(#scoreRingGrad)"
+                            strokeWidth="10"
+                            strokeLinecap="round"
+                            initial={{ strokeDashoffset: circumference }}
+                            animate={{ strokeDashoffset }}
+                            transition={{ duration: 1.8, ease: [0.22, 1, 0.36, 1] }}
+                            style={{ strokeDasharray: circumference }}
+                        />
+                    </svg>
 
-                    <motion.div
-                        className="absolute inset-[12px] rounded-full bg-[#e6e6e6]"
-                        style={{
-                            boxShadow: "inset 4px 4px 8px #d1d1d1, inset -4px -4px 8px #ffffff"
-                        }}
-                    />
-
-                    {/* Center Score */}
-                    <motion.div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <motion.div
-                            initial={{ opacity: 1 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.3 }}
-                            className="relative z-10 p-6 rounded-3xl bg-[#e6e6e6] flex flex-col items-center"
-                            whileHover={{
-                                boxShadow: "inset 3px 3px 6px #d1d1d1, inset -3px -3px 6px #ffffff"
-                            }}
+                            className="rounded-3xl border border-white/10 bg-black/40 px-8 py-6 shadow-inner backdrop-blur-md"
+                            whileHover={{ scale: 1.02 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
                         >
+                            <p className="text-center text-[10px] font-semibold uppercase tracking-[0.35em] text-white/45">
+                                Token Credit Score
+                            </p>
                             <div
-                                className="text-7xl font-display font-bold"
+                                className="mt-2 text-center font-display text-7xl font-bold tabular-nums"
                                 style={{ color: getScoreColor(displayScore) }}
                             >
                                 {displayScore}
                             </div>
-                            <div className="text-sm text-muted-foreground mt-2">out of 100</div>
+                            <p className="mt-1 text-center text-xs text-white/40">out of 100</p>
                         </motion.div>
-                    </motion.div>
-
-                    {/* Rotating Text */}
-                    <motion.div
-                        className="absolute inset-0"
-                        initial={{ rotate: 0 }}
-                        animate={{ rotate: 360 }}
-                        transition={{
-                            duration: 30,
-                            repeat: Infinity,
-                            ease: "linear"
-                        }}
-                    >
-                        <svg viewBox="0 0 400 400" className="w-full h-full">
-                            <defs>
-                                <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stopColor="#666666" />
-                                    <stop offset="100%" stopColor="#444444" />
-                                </linearGradient>
-                            </defs>
-                            <path
-                                id="curve"
-                                fill="none"
-                                d={`M 200,200 m -${sizeConfig.radius},0 a ${sizeConfig.radius},${sizeConfig.radius} 0 1,1 ${sizeConfig.radius * 2},0 a ${sizeConfig.radius},${sizeConfig.radius} 0 1,1 -${sizeConfig.radius * 2},0`}
-                            />
-                            {createTextSegments()}
-                        </svg>
-                    </motion.div>
+                    </div>
                 </motion.div>
 
-                {/* Score Label */}
-                <div className="text-2xl font-display mb-2">
-                    {getScoreLabel(score)}
-                </div>
+                <div className="max-w-md flex-1 text-center md:text-left">
+                    <h2 className="font-display text-2xl font-bold text-white md:text-3xl">{getScoreLabel(score)}</h2>
+                    {scoreDiff !== null && (
+                        <div className="mt-3 flex items-center justify-center gap-2 text-sm md:justify-start">
+                            {scoreDiff > 0 ? (
+                                <>
+                                    <TrendingUp className="h-4 w-4 text-emerald-400" />
+                                    <span className="text-emerald-400">+{scoreDiff} points</span>
+                                </>
+                            ) : scoreDiff < 0 ? (
+                                <>
+                                    <TrendingDown className="h-4 w-4 text-red-400" />
+                                    <span className="text-red-400">{scoreDiff} points</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Minus className="h-4 w-4 text-white/40" />
+                                    <span className="text-white/50">No change</span>
+                                </>
+                            )}
+                            <span className="text-white/40">from last audit</span>
+                        </div>
+                    )}
 
-                {/* Score Change */}
-                {scoreDiff !== null && (
-                    <div className="flex items-center gap-2 text-sm mb-6">
-                        {scoreDiff > 0 ? (
-                            <>
-                                <TrendingUp className="w-4 h-4 text-green-500" />
-                                <span className="text-green-500">+{scoreDiff} points</span>
-                            </>
-                        ) : scoreDiff < 0 ? (
-                            <>
-                                <TrendingDown className="w-4 h-4 text-red-500" />
-                                <span className="text-red-500">{scoreDiff} points</span>
-                            </>
-                        ) : (
-                            <>
-                                <Minus className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">No change</span>
-                            </>
-                        )}
-                        <span className="text-muted-foreground">from last audit</span>
-                    </div>
-                )}
-
-                {/* Benchmark Context */}
-                <div className="mt-6 pt-6 border-t border-muted-foreground/10 w-full">
-                    <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="mt-6 grid grid-cols-3 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                         <div>
-                            <div className="text-xs text-muted-foreground mb-1">Poor</div>
-                            <div className="text-sm font-mono text-red-500">0-39</div>
+                            <div className="text-[10px] uppercase tracking-wider text-white/40">Poor</div>
+                            <div className="mt-1 font-mono text-sm text-red-400">0–39</div>
                         </div>
                         <div>
-                            <div className="text-xs text-muted-foreground mb-1">Average</div>
-                            <div className="text-sm font-mono text-yellow-500">40-79</div>
+                            <div className="text-[10px] uppercase tracking-wider text-white/40">Average</div>
+                            <div className="mt-1 cursor-default font-mono text-sm text-amber-300">40–79</div>
                         </div>
                         <div>
-                            <div className="text-xs text-muted-foreground mb-1">Excellent</div>
-                            <div className="text-sm font-mono text-green-500">80-100</div>
+                            <div className="text-[10px] uppercase tracking-wider text-white/40">Excellent</div>
+                            <div className="mt-1 font-mono text-sm text-emerald-400">80–100</div>
                         </div>
                     </div>
+
+                    <div className="mt-6 rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-4">
+                        <p className="text-center text-sm leading-relaxed text-white/55 md:text-left">
+                            {score >= 80 && "Your token usage is highly optimized. Keep shipping the great patterns you already have."}
+                            {score >= 60 && score < 80 && "Solid baseline with clear upside. Dive into the agent plan below for the fastest wins."}
+                            {score >= 40 && score < 60 && "Meaningful waste detected. Prioritize the top-ranked issues—they compound weekly."}
+                            {score < 40 && "Large optimization headroom. Fixing the critical issues first moves your burn curve the most."}
+                        </p>
+                    </div>
                 </div>
-
-                {/* What This Means */}
-                <div className="mt-6 p-4 rounded-lg bg-muted/50 w-full">
-                    <p className="text-sm text-muted-foreground text-center">
-                        {score >= 80 && "Your token usage is highly optimized. Keep up the great work!"}
-                        {score >= 60 && score < 80 && "Good token efficiency with room for improvement. Check recommendations below."}
-                        {score >= 40 && score < 60 && "Moderate token waste detected. Follow recommendations to improve your score."}
-                        {score < 40 && "Significant optimization opportunities found. Implementing recommendations could save substantial costs."}
-                    </p>
-                </div>
-
-                {/* Action Button */}
-
             </div>
         </Card>
     );
 }
-
-// Made with Bob
