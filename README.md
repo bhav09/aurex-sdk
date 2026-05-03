@@ -19,6 +19,12 @@ If you have a CSV of API logs, you might wonder why you can't just upload it dir
 4. **Proactive Automation**: A chatbot is reactive—you have to remember to ask it. Lumina provides a Node CLI that plugs directly into GitHub Actions, automatically warning developers on Pull Requests if their prompt changes will spike the monthly bill.
 5. **No Token Waste to Measure Token Waste**: Having Claude analyze a massive CSV costs a significant amount of input tokens. Lumina does it for free on your own local CPU.
 
+## GitHub (clone & collaborators)
+
+- **Repository:** [github.com/bhav09/lumina-token](https://github.com/bhav09/lumina-token)
+- **Private access:** If the repo is private, use an account that has **accepted a collaborator invite**. Authenticate Git with **SSH** (`git@github.com:bhav09/lumina-token.git`) or **HTTPS** with a [personal access token](https://docs.github.com/en/authentication) or GitHub CLI (`gh auth login`). Unauthenticated `git fetch` will show “repository not found” even for collaborators who are not logged in.
+- **Layout note:** Upstream `main` may include a monorepo layout (`frontend/`, `backend/`). This branch or checkout might use a **Vite SPA at the repo root** instead. Before merging or resetting to `origin/main`, confirm with the team which layout should win.
+
 ## Run locally
 
 ```bash
