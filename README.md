@@ -1,130 +1,292 @@
 # Lumina / Aurex
 
-**Your AI usage, cost signals, and savings paths — in one repo.**
+**Analyze LLM usage, surface waste, and estimate savings — two complementary stacks in one repository.**
 
-Canonical remote: **[github.com/bhav09/lumina-token](https://github.com/bhav09/lumina-token)**
-
-| Stack | Path | Default URL | Role |
-|--------|------|-------------|------|
-| **Aurex** | `frontend/` + `backend/` | [http://localhost:3000](http://localhost:3000) | Next.js UI + FastAPI analysis |
-| **Lumina** | repo root (`src/`, `cli/`, …) | [http://localhost:5173](http://localhost:5173) | Local-first Vite SPA + CLI |
+| | |
+|---|---|
+| **Canonical GitHub** | [github.com/bhav09/lumina-token](https://github.com/bhav09/lumina-token) |
+| **Maintainer** | [@bhav09](https://github.com/bhav09) (repository owner; collaborators push via their own accounts or shared CI) |
 
 ---
 
-## Clone & authenticate
+## Table of contents
 
-```bash
-git clone https://github.com/bhav09/lumina-token.git
-cd lumina-token
+1. [What’s in this repo](#whats-in-this-repo)  
+2. [Repository layout](#repository-layout)  
+3. [Prerequisites](#prerequisites)  
+4. [Aurex — Next.js + FastAPI](#aurex--nextjs--fastapi)  
+5. [Lumina — Vite SPA + CLI (repo root)](#lumina--vite-spa--cli-repo-root)  
+6. [How the two stacks differ](#how-the-two-stacks-differ)  
+7. [Security & data handling](#security--data-handling)  
+8. [CI (Lumina CLI)](#ci-lumina-cli)  
+9. [Contributing & Git](#contributing--git)  
+10. [Pushing as @bhav09 (owner)](#pushing-as-bhav09-owner)  
+
+---
+
+## What’s in this repo
+
+This monorepo hosts:
+
+1. **Aurex** — A **Next.js** marketing/audit UI (`frontend/`) backed by a **FastAPI** service (`backend/`) that ingests usage CSV/JSON, runs detection heuristics, and exposes REST APIs (Token Credit Score, executive summary, recommendations).
+2. **Lumina (Token Waste Auditor)** — A **local-first Vite + TypeScript** single-page app at the **repository root** plus a small **Node CLI**: parsing and most analysis run entirely in the browser (or in CI via the CLI) without sending your log rows to an LLM provider for “reasoning over the file.”
+
+Use **Aurex** when you want a full-stack product experience with a persistent backend and API docs. Use **Lumina** when you want maximum privacy, static hosting, and deterministic in-browser math on large exports.
+
+---
+
+## Repository layout
+
+```
+lumina-token/
+├── backend/                 # Aurex — FastAPI, SQLAlchemy, Pandas
+│   ├── main.py              # App entry (uvicorn); default API port 8000
+│   ├── requirements.txt
+│   └── src/
+│       ├── api/             # REST routes (/api/v1/...)
+│       ├── detection/       # Cost / waste heuristics
+│       ├── ingestion/       # CSV / JSON parsers
+│       └── models/          # ORM models
+├── frontend/                # Aurex — Next.js App Router, Tailwind, shadcn-style UI
+│   ├── app/
+│   ├── components/
+│   └── lib/api-client.ts    # Uses NEXT_PUBLIC_API_URL → backend
+├── cli/                     # Lumina — headless audit (Markdown summary)
+├── src/                     # Lumina — Vite app (main.ts, audit.ts, workers, integrations)
+├── test/                    # Lumina — Vitest
+├── examples/                # Sample CSV for Lumina
+├── .github/workflows/       # e.g. Lumina audit workflow template
+├── project.md               # Lumina product / ETB notes
+├── package.json             # Lumina (root) — Vite, Vitest, tsx
+└── README.md                # This file
 ```
 
-If the repo is **private**, sign in with GitHub (**SSH**, **HTTPS + PAT**, or `gh auth login`). Unauthenticated `git clone` / `git fetch` can return “repository not found.” Collaborators need an accepted invite on the owning account.
+---
+
+## Prerequisites
+
+| Tool | Aurex | Lumina (root) |
+|------|--------|----------------|
+| **Node.js** | Yes (`frontend/`) | Yes (18+ recommended) |
+| **Python** | **3.10+** (`backend/`) | Optional (only if you run `backend/`) |
+| **npm** | Yes | Yes |
 
 ---
 
-## Quick start — Aurex (Next.js + FastAPI)
+## Aurex — Next.js + FastAPI
+
+### 1. Backend (FastAPI)
+
+From `backend/`:
 
 ```bash
-# Terminal 1 — backend
 cd backend
 pip install -r requirements.txt
+cp .env.example .env   # if you use env files; adjust DATABASE_URL etc.
 python main.py
+```
 
-# Terminal 2 — frontend
+**Defaults (see `main.py`):**
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `API_HOST` | `0.0.0.0` | Bind address |
+| `API_PORT` | `8000` | HTTP port |
+| `DEBUG` | `True` | Uvicorn reload |
+| `DATABASE_URL` | SQLite (see `backend/README.md`) | Optional PostgreSQL for production |
+
+**Useful URLs:**
+
+- API root: [http://localhost:8000](http://localhost:8000)  
+- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)  
+- ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+**Example endpoints** (prefix `/api/v1`; see `backend/README.md` for the full list):
+
+- `POST /api/v1/upload/csv` — upload usage data  
+- `GET /api/v1/executive-summary` — aggregated analysis  
+- `GET /api/v1/audit/history/{email}` — past audits (when enabled)
+
+**Sample data:** e.g. `backend/supportbot_ai_usage.csv`, `backend/datapulse_usage.csv` — upload via the UI or API as documented in `backend/README.md`.
+
+### 2. Frontend (Next.js)
+
+From `frontend/`:
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open **http://localhost:3000** and upload your usage data.
+Open **http://localhost:3000** (default Next dev server).
 
-### Aurex architecture
+**Backend URL:** The client uses `lib/api-client.ts`:
 
-```
-frontend/          Next.js 14 + TypeScript + Tailwind
-backend/           FastAPI + SQLAlchemy + Pandas
-├── ingestion/     CSV/JSON parsers
-├── detection/     Cost detection algorithms
-└── api/           REST endpoints
+```text
+NEXT_PUBLIC_API_URL  →  default http://localhost:8000/api/v1
 ```
 
-**Detections include:** agent loops, context explosion, redundant prompts, model misuse (e.g. premium model for tiny tasks), cost-driver concentration.
+For a non-default API host/port, create `frontend/.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+### 3. Production-style commands (Aurex)
+
+```bash
+# Frontend
+cd frontend && npm run build && npm run start
+
+# Backend — use a production ASGI server / container; see backend docs
+```
+
+**Stack summary:** Next.js (React, Tailwind, Radix-based components), FastAPI, SQLAlchemy, Pandas; ingestion and detection packages under `backend/src/`.
 
 ---
 
-## Quick start — Lumina (Vite SPA, repo root)
+## Lumina — Vite SPA + CLI (repo root)
+
+### Dev server
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL Vite prints (default **http://localhost:5173**). **Live demo** on home; **Upload** at **`#/upload`**.
+Default dev URL: **http://localhost:5173** (Vite). Routes: home + **`#/upload`** for file upload.
 
-All parsing and analysis run **in the browser** as deterministic TypeScript — **not** an LLM over your log rows. Optional network: public **LiteLLM** pricing JSON (and an optional **lead webhook**: email + score only).
+### What runs where
 
-### Lumina features
+- **Main thread:** UI, routing (hash), report rendering, D3 charts, optional integration fetches.  
+- **`src/worker.ts`:** Streams/parses large CSV in chunks; runs `AuditTracker`; optional semantic clustering step.  
+- **`src/embedding-worker.ts`:** Local embedding model (WASM) for similarity clustering — **does not** send prompts to OpenAI/Anthropic for that step.
 
-- **D3.js** — timeline and model-spend visualizations.
-- **Integrations** — LangSmith / Helicone via API keys (browser-only; optional).
-- **Semantic clustering (WASM)** — local embeddings via `@xenova/transformers`.
-- **CLI** — `npx tsx cli/index.ts path/to/usage.csv` for markdown summary / CI.
-- **A/B replay** — optional OpenAI call to compare a cheaper model on a flagged prompt.
+### Scripts (root `package.json`)
 
-### Why not only ChatGPT / a Claude skill?
+| Script | Command | Purpose |
+|--------|---------|---------|
+| `dev` | `vite` | Local development |
+| `build` | `tsc --noEmit && vite build` | Production bundle → `dist/` |
+| `preview` | `vite preview` | Preview production build locally |
+| `sync-model-catalog` | `node scripts/sync-model-catalog.mjs` | Refresh `public/model-catalog.json` for offline/air-gapped pricing |
 
-1. **Privacy** — sensitive logs stay local in the tab (or in your CI runner for the CLI).
-2. **Scale** — full-file CSV/stream processing without chat context limits.
-3. **Math** — deterministic aggregates and cost math, not LLM guessing.
-4. **Automation** — GitHub Actions + CLI vs. manual upload to chat every time.
-
-### Model pricing (Lumina)
-
-Loads **[LiteLLM `model_prices_and_context_window.json`](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)** when available. Fallback order: `public/model-catalog.json` (after `npm run sync-model-catalog`) → remote fetch → embedded table in `src/pricing.ts`.
-
-### Build & deploy (Lumina)
+### CLI (CI / local)
 
 ```bash
-npm run build
-npm run preview   # local production preview
+npx tsx cli/index.ts path/to/usage.csv
 ```
 
-Ship the `dist/` folder to any static host.
+Emits a **Markdown** audit summary to stdout (useful in GitHub Actions).
 
-### Lead webhook (Lumina, optional)
+### Environment variables (Lumina build-time)
 
-```bash
-VITE_LEAD_WEBHOOK_URL=https://your.endpoint.example/lead npm run build
-```
+| Variable | Purpose |
+|----------|---------|
+| `VITE_LEAD_WEBHOOK_URL` | Optional: on “unlock”, POST JSON with `email`, `tokenCreditScore`, `source`, `at` — **not** the usage file |
 
-Unlock flow may POST `{ email, tokenCreditScore, source, at }` — **not** the usage file.
-
-### Tests (Lumina)
+### Tests
 
 ```bash
 npx vitest run
 ```
 
-### Export format (Lumina)
+### Deploying Lumina
 
-CSV or JSON array of rows. Headers are normalized (e.g. `timestamp`, `model`, `prompt`, `input_tokens`, `output_tokens`, `request_id`). If only `total_tokens` exists, input/output are estimated heuristically.
+Build static assets:
 
-### Limitations (Lumina)
+```bash
+npm run build
+```
 
-- Redundancy: exact match by default; semantic groups are similarity-based heuristics.
-- Model downgrade hints are heuristics — validate quality before changing routing.
-- USD uses community list prices — not your enterprise rates.
+Deploy the **`dist/`** directory to any static host (S3, Cloudflare Pages, Netlify, GitHub Pages, etc.).
 
-More product detail: [`project.md`](project.md).
+### Features (high level)
+
+- **Exact + semantic redundancy** (semantic via local embeddings).  
+- **Time-bucket “runaway”** spend signals, model-mismatch heuristics, Token Credit Score-style readout.  
+- **D3** timeline and donut charts.  
+- **LangSmith / Helicone** optional pull via user-supplied keys in the browser.  
+- **A/B replay** (optional user OpenAI key): replay a flagged prompt against a cheaper model and compare output in the UI.
+
+### Pricing data (Lumina)
+
+Loads community **[LiteLLM `model_prices_and_context_window.json`](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)** when allowed by network/CORS. Fallback: bundled `public/model-catalog.json` (after sync script) → fetch → embedded table in `src/pricing.ts`. **Not** your negotiated enterprise rates — validate before finance use.
+
+### Export shape (Lumina)
+
+CSV or JSON arrays; headers normalized (`timestamp`, `model`, `prompt`, token columns, `request_id`, etc.). See table in earlier sections of app docs / `project.md`.
 
 ---
 
-## Push your changes
+## How the two stacks differ
 
-With `origin` set to this repo and branch tracking `main`:
+| Topic | Aurex | Lumina |
+|--------|--------|--------|
+| **Runtime** | Browser + Python API + DB | Browser-only for analysis (plus optional static fetches) |
+| **Primary UX** | Next.js app at `:3000` | Vite SPA at `:5173` (Vite default) |
+| **Best for** | Productized API, history, executive summary | Privacy-first, static deploy, huge single-file audits |
+| **LLM on your logs?** | No — heuristics / engine in backend code | No — deterministic TS + optional **your** API key only for A/B replay |
+
+---
+
+## Security & data handling
+
+- **Aurex:** Usage files go to **your** FastAPI instance and configured database; lock down CORS and `DATABASE_URL` in production.  
+- **Lumina:** By design, **usage rows are not sent** to Anthropic/OpenAI for the core audit. Optional: LiteLLM catalog fetch, lead webhook, integration APIs (user-initiated keys), A/B replay (user-initiated OpenAI key).  
+- Never commit real **API keys**, `.env` with secrets, or production CSVs containing PII. Use `.env.example` patterns only.
+
+---
+
+## CI (Lumina CLI)
+
+See **`.github/workflows/lumina-audit.yml`** for an example of running the CLI against a checked-in sample (adjust paths and triggers to match your governance).
+
+---
+
+## Contributing & Git
+
+1. Fork or clone [bhav09/lumina-token](https://github.com/bhav09/lumina-token).  
+2. For **private** repos: authenticate with **SSH** or **HTTPS + [fine-grained / classic PAT](https://docs.github.com/en/authentication)**.  
+3. Prefer **feature branches** and pull requests if `main` is protected.
+
+---
+
+## Pushing as @bhav09 (owner)
+
+Git does not store “which GitHub user” inside the commit; **who appears as the pusher** depends on **credentials on the machine** (or SSH key + GitHub account mapping).
+
+**To push commits that GitHub attributes to @bhav09:**
+
+1. Log in as **bhav09** on that machine, **or**  
+2. Use **SSH**: add an SSH key to the **bhav09** GitHub account and set remote to `git@github.com:bhav09/lumina-token.git`, **or**  
+3. Use **HTTPS** with a **Personal Access Token** created while logged in as **bhav09**, **or**  
+4. Run `gh auth login` and choose the **bhav09** account.
+
+Then:
 
 ```bash
+git add README.md
+git commit -m "docs: ..."
 git push origin main
 ```
 
-Use a feature branch + PR if `main` is protected.
+Verify on GitHub: **commit author** vs **pusher** may differ; for open-source hygiene, set local Git identity to match the contributing account:
+
+```bash
+git config user.name "Your Name"
+git config user.email "your-bhav09-noreply-or-verified-email@users.noreply.github.com"
+```
+
+---
+
+## More documentation
+
+- **Lumina product brief / ETB:** [`project.md`](project.md)  
+- **Aurex backend API & DB:** [`backend/README.md`](backend/README.md)  
+- **Frontend (Aurex) notes:** [`frontend/README.md`](frontend/README.md)
+
+---
+
+**License / governance:** Refer to repository settings and any `LICENSE` file added by the owner; this README is documentation only.
