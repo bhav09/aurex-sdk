@@ -19,8 +19,6 @@
 6. [How the two stacks differ](#how-the-two-stacks-differ)  
 7. [Security & data handling](#security--data-handling)  
 8. [CI (Lumina CLI)](#ci-lumina-cli)  
-9. [Contributing & Git](#contributing--git)  
-10. [Pushing as @bhav09 (owner)](#pushing-as-bhav09-owner)  
 
 ---
 
@@ -242,42 +240,6 @@ CSV or JSON arrays; headers normalized (`timestamp`, `model`, `prompt`, token co
 ## CI (Lumina CLI)
 
 See **`.github/workflows/lumina-audit.yml`** for an example of running the CLI against a checked-in sample (adjust paths and triggers to match your governance).
-
----
-
-## Contributing & Git
-
-1. Fork or clone [bhav09/lumina-token](https://github.com/bhav09/lumina-token).  
-2. For **private** repos: authenticate with **SSH** or **HTTPS + [fine-grained / classic PAT](https://docs.github.com/en/authentication)**.  
-3. Prefer **feature branches** and pull requests if `main` is protected.
-
----
-
-## Pushing as @bhav09 (owner)
-
-Git does not store “which GitHub user” inside the commit; **who appears as the pusher** depends on **credentials on the machine** (or SSH key + GitHub account mapping).
-
-**To push commits that GitHub attributes to @bhav09:**
-
-1. Log in as **bhav09** on that machine, **or**  
-2. Use **SSH**: add an SSH key to the **bhav09** GitHub account and set remote to `git@github.com:bhav09/lumina-token.git`, **or**  
-3. Use **HTTPS** with a **Personal Access Token** created while logged in as **bhav09**, **or**  
-4. Run `gh auth login` and choose the **bhav09** account.
-
-Then:
-
-```bash
-git add README.md
-git commit -m "docs: ..."
-git push origin main
-```
-
-Verify on GitHub: **commit author** vs **pusher** may differ; for open-source hygiene, set local Git identity to match the contributing account:
-
-```bash
-git config user.name "Your Name"
-git config user.email "your-bhav09-noreply-or-verified-email@users.noreply.github.com"
-```
 
 ---
 
