@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Canonical GitHub** | [github.com/bhav09/lumina-token](https://github.com/bhav09/lumina-token) |
-| **Maintainer** | [@bhav09](https://github.com/bhav09) (repository owner; collaborators push via their own accounts or shared CI) |
+| **Maintainer** | [@bhav09](https://github.com/bhav09), [@aakriti1318](https://github.com/aakriti1318) (repository owner; collaborators push via their own accounts or shared CI) |
 
 ---
 
