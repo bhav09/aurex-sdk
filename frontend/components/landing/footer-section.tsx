@@ -5,14 +5,14 @@ import { useEffect, useRef } from "react";
 
 const footerLinks = {
   Product: [
-    { name: "Features", href: "#features" },
-    { name: "How it works", href: "#how-it-works" },
-    { name: "Pricing", href: "#pricing" },
+    { name: "Features", href: "/#features" },
+    { name: "How it works", href: "/#how-it-works" },
+    { name: "Pricing", href: "/#pricing" },
   ],
   Resources: [
     { name: "Documentation", href: "#" },
-    { name: "Support", href: "#" },
-    { name: "Contact", href: "#" },
+    { name: "Support", href: "mailto:contact@heyaurex.com" },
+    { name: "Contact", href: "mailto:contact@heyaurex.com" },
   ],
   Legal: [
     { name: "Privacy", href: "/privacy" },
@@ -21,8 +21,8 @@ const footerLinks = {
 };
 
 const socialLinks = [
-  { name: "LinkedIn", href: "#" },
-  { name: "Twitter", href: "#" },
+  { name: "LinkedIn", href: "https://www.linkedin.com/company/heyaurex" },
+  { name: "Twitter", href: "https://www.x.com/heyaurex" },
 ];
 
 function AnimatedWaveCanvas() {
