@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function CalendlyWidget() {
     const [selectedDate, setSelectedDate] = useState<string>("");
@@ -13,13 +13,19 @@ export function CalendlyWidget() {
         message: ""
     });
 
-    const availableDates = [
-        "2026-04-28",
-        "2026-04-29",
-        "2026-04-30",
-        "2026-05-01",
-        "2026-05-02"
-    ];
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
+
+    const [availableDates, setAvailableDates] = useState<string[]>([]);
+
+    useEffect(() => {
+        const dates = Array.from({ length: 5 }).map((_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            return d.toISOString().split("T")[0];
+        });
+        setAvailableDates(dates);
+    }, []);
 
     const availableTimes = [
         "09:00 AM",
@@ -27,13 +33,48 @@ export function CalendlyWidget() {
         "11:00 AM",
         "02:00 PM",
         "03:00 PM",
-        "04:00 PM"
+        "04:00 PM",
+        "09:00 PM",
+        "10:00 PM"
     ];
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Booking submitted:", { selectedDate, selectedTime, ...formData });
-        // Handle booking submission
+        setIsSubmitting(true);
+        
+        try {
+            // Replace mnjwznyb with process.env.NEXT_PUBLIC_FORMSPREE_ID or hardcode it once you have it
+            const formId = process.env.NEXT_PUBLIC_FORMSPREE_ID || "mnjwznyb";
+            const response = await fetch(`https://formspree.io/f/${formId}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: JSON.stringify({
+                    name: formData.name,
+                    email: formData.email,
+                    company: formData.company || 'N/A',
+                    date: selectedDate,
+                    time: selectedTime,
+                    message: formData.message || 'N/A',
+                    _subject: `New Booking Request from ${formData.name}`
+                }),
+            });
+
+            if (response.ok) {
+                setIsSuccess(true);
+                setFormData({ name: "", email: "", company: "", message: "" });
+            } else {
+                console.error("Form submission failed");
+                alert("Something went wrong. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error submitting form", error);
+            alert("Something went wrong. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -98,7 +139,7 @@ export function CalendlyWidget() {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label htmlFor="name" className="block text-sm font-mono text-white/60 mb-2">
-                        Full Name
+                        Full Name <span className="text-[#eca8d6]">*</span>
                     </label>
                     <input
                         type="text"
@@ -113,7 +154,7 @@ export function CalendlyWidget() {
 
                 <div>
                     <label htmlFor="email" className="block text-sm font-mono text-white/60 mb-2">
-                        Email Address
+                        Email Address <span className="text-[#eca8d6]">*</span>
                     </label>
                     <input
                         type="email"
@@ -128,7 +169,7 @@ export function CalendlyWidget() {
 
                 <div>
                     <label htmlFor="company" className="block text-sm font-mono text-white/60 mb-2">
-                        Company
+                        Company <span className="text-white/40">(Optional)</span>
                     </label>
                     <input
                         type="text"
@@ -142,7 +183,7 @@ export function CalendlyWidget() {
 
                 <div>
                     <label htmlFor="message" className="block text-sm font-mono text-white/60 mb-2">
-                        What would you like to discuss?
+                        What would you like to discuss? <span className="text-white/40">(Optional)</span>
                     </label>
                     <textarea
                         id="message"
@@ -156,15 +197,16 @@ export function CalendlyWidget() {
 
                 <button
                     type="submit"
-                    disabled={!selectedDate || !selectedTime}
+                    disabled={!selectedDate || !selectedTime || isSubmitting || isSuccess}
                     className={cn(
                         "w-full py-4 font-medium transition-all duration-200",
-                        selectedDate && selectedTime
+                        selectedDate && selectedTime && !isSuccess
                             ? "bg-white text-black hover:bg-white/90"
-                            : "bg-white/10 text-white/30 cursor-not-allowed"
+                            : "bg-white/10 text-white/30 cursor-not-allowed",
+                        isSuccess && "bg-green-500/20 text-green-400 border border-green-500/30"
                     )}
                 >
-                    Confirm Booking
+                    {isSubmitting ? "Submitting..." : isSuccess ? "Booking Confirmed!" : "Confirm Booking"}
                 </button>
 
                 {selectedDate && selectedTime && (

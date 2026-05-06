@@ -135,10 +135,10 @@ export default function BookPage() {
                             Prefer to schedule via email?
                         </p>
                         <a
-                            href="mailto:hello@aurix.ai?subject=Optimization Call Request"
+                            href="mailto:contact@heyaurex.com?subject=Optimization Call Request"
                             className="text-[#eca8d6] hover:text-[#eca8d6]/80 transition-colors font-mono text-sm"
                         >
-                            hello@aurix.ai
+                            contact@heyaurex.com
                         </a>
                     </div>
                 </div>

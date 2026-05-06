@@ -70,7 +70,7 @@ export function HowItWorksSection() {
         </div>
 
         {/* Supported integrations */}
-        <div className={`mt-16 transition-all duration-1000 delay-400 ${isVisible ? "opacity-100" : "opacity-0"}`}>
+        {/* <div className={`mt-16 transition-all duration-1000 delay-400 ${isVisible ? "opacity-100" : "opacity-0"}`}>
           <p className="text-sm text-white/40 mb-4 text-center">
             Works with exports from:
           </p>
@@ -84,7 +84,7 @@ export function HowItWorksSection() {
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
       </div>
     </section>
   );
