@@ -1,5 +1,5 @@
 // API Client for Aurex Backend
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://aurex-backend-858789082997.us-central1.run.app/api/v1';
 
 export interface ExecutiveSummary {
     executive_summary: {
