@@ -2,7 +2,9 @@ import { pipeline, TextGenerationPipeline, env } from '@huggingface/transformers
 
 // Skip local model check since we are running in browser
 env.allowLocalModels = false;
-env.backends.onnx.wasm.numThreads = 1; // Sometimes helps with stability in browsers
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.numThreads = 1; // Sometimes helps with stability in browsers
+}
 
 let generator: TextGenerationPipeline | null = null;
 let isModelLoading = false;
@@ -75,7 +77,7 @@ self.addEventListener('message', async (event) => {
         }
       });
 
-      const finalOutput = Array.isArray(output) ? output[0].generated_text : output.generated_text;
+      const finalOutput = Array.isArray(output) ? (output[0] as any).generated_text : (output as any).generated_text;
       
       self.postMessage({ 
         status: 'complete', 
