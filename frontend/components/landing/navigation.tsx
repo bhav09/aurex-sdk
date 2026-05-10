@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
@@ -40,19 +41,15 @@ export function Navigation() {
             }`}
         >
           {/* Logo */}
-          <a href="/" className="flex items-center gap-3 group">
-            <svg
-              width="35"
-              height="30"
-              viewBox="0 0 140 120"
-              xmlns="http://www.w3.org/2000/svg"
-              className="transition-all duration-500"
-            >
-              <rect x="20" y="30" width="40" height="60" fill={isScrolled ? "currentColor" : "#e5e5e5"} rx="10" className={isScrolled ? "text-foreground" : ""} />
-              <rect x="50" y="25" width="40" height="70" fill={isScrolled ? "currentColor" : "#d4d4d4"} rx="10" className={isScrolled ? "text-foreground" : ""} />
-              <rect x="80" y="20" width="40" height="80" fill={isScrolled ? "currentColor" : "#a3a3a3"} rx="10" className={isScrolled ? "text-foreground" : ""} />
-            </svg>
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>AUREX</span>
+          <a href="/" className="flex items-center group">
+            <Image
+              src="/heyaurex_logo/1.png"
+              alt="AUREX logo"
+              width={140}
+              height={120}
+              className={`w-auto transition-all duration-500 ${isScrolled ? "h-10" : "h-12"}`}
+              priority
+            />
           </a>
 
           {/* Desktop Navigation */}
