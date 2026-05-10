@@ -21,27 +21,27 @@ export function CalendlyWidget() {
     useEffect(() => {
         const dates = Array.from({ length: 5 }).map((_, i) => {
             const d = new Date();
-            d.setDate(d.getDate() + i);
+            d.setDate(d.getDate() + i + 2);
             return d.toISOString().split("T")[0];
         });
         setAvailableDates(dates);
     }, []);
 
     const availableTimes = [
-        "09:00 AM",
-        "10:00 AM",
-        "11:00 AM",
-        "02:00 PM",
-        "03:00 PM",
-        "04:00 PM",
-        "09:00 PM",
-        "10:00 PM"
+        "02:30 PM",
+        "03:30 PM",
+        "04:30 PM",
+        "07:30 PM",
+        "08:30 PM",
+        "09:30 PM",
+        "02:30 AM",
+        "03:30 AM"
     ];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        
+
         try {
             // Replace mnjwznyb with process.env.NEXT_PUBLIC_FORMSPREE_ID or hardcode it once you have it
             const formId = process.env.NEXT_PUBLIC_FORMSPREE_ID || "mnjwznyb";
@@ -111,7 +111,7 @@ export function CalendlyWidget() {
 
                 <div>
                     <label className="block text-sm font-mono text-white/60 mb-3">
-                        Select Time (UTC)
+                        Select Time (IST)
                     </label>
                     <div className="grid grid-cols-3 gap-3">
                         {availableTimes.map((time) => (
