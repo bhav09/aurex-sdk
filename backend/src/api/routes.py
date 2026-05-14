@@ -430,11 +430,10 @@ async def create_audit_session(
     import uuid
     from src.api.auth import otp_store
     
-    # Temporary bypass of OTP verification
-    # email = session_data.email.lower()
-    # otp_data = otp_store.get(email)
-    # if not otp_data or not otp_data.get("verified"):
-    #     raise HTTPException(status_code=403, detail="Email verification required")
+    email = session_data.email.lower()
+    otp_data = otp_store.get(email)
+    if not otp_data or not otp_data.get("verified"):
+        raise HTTPException(status_code=403, detail="Email verification required")
     
     try:
         # Create new audit session

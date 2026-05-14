@@ -131,23 +131,16 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             return;
         }
 
-        // Temporary bypass of OTP
-        // try {
-        //     setOtpLoading(true);
-        //     setError(null);
-        //     await aurixAPI.requestOTP(email);
-        //     setIsOtpStep(true);
-        // } catch (err: any) {
-        //     setError(err.message || "Failed to send verification code. Please try again.");
-        // } finally {
-        //     setOtpLoading(false);
-        // }
-        
-        onFileSelect(selectedFile!, {
-            user_name: userName,
-            email: email,
-            company_name: companyName
-        });
+        try {
+            setOtpLoading(true);
+            setError(null);
+            await aurixAPI.requestOTP(email);
+            setIsOtpStep(true);
+        } catch (err: any) {
+            setError(err.message || "Failed to send verification code. Please try again.");
+        } finally {
+            setOtpLoading(false);
+        }
     };
 
     const handleOtpSubmit = async (e: React.FormEvent) => {
