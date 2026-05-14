@@ -23,7 +23,10 @@ from src.detection import analyze_workflow, analyze_all
 from src.detection.enhanced_engine import EnhancedDetectionEngine
 from sqlalchemy import func, desc
 
+from . import auth
+
 router = APIRouter()
+router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 
 @router.get("/")
@@ -157,7 +160,10 @@ async def get_insights(db: Session = Depends(get_db)):
 
 
 @router.get("/executive-summary")
-async def get_executive_summary(db: Session = Depends(get_db)):
+async def get_executive_summary(
+    email: Optional[str] = Query(None, description="Filter by user email"),
+    db: Session = Depends(get_db)
+):
     """
     Get executive-level summary with C-suite friendly formatting
     
@@ -168,7 +174,7 @@ async def get_executive_summary(db: Session = Depends(get_db)):
     - ROI projections
     """
     try:
-        engine = EnhancedDetectionEngine(db)
+        engine = EnhancedDetectionEngine(db, email=email)
         analysis = engine.analyze_complete()
         
         return analysis
@@ -219,6 +225,7 @@ async def upload_csv(
     file: UploadFile = File(...),
     csv_type: Optional[str] = Query(None, description="CSV type: anthropic, openai, or bedrock"),
     clear_existing: bool = Query(False, description="Clear existing data before upload"),
+    session_id: Optional[str] = Query(None, description="Existing AuditSession ID"),
     db: Session = Depends(get_db)
 ):
     """
@@ -233,8 +240,8 @@ async def upload_csv(
     - csv_type: Specify CSV format (auto-detected if not provided)
     - clear_existing: If true, clears all existing data before upload
     """
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="File must be a CSV")
+    if not (file.filename.endswith('.csv') or file.filename.endswith('.json')):
+        raise HTTPException(status_code=400, detail="File must be a CSV or JSON")
     
     try:
         # Clear existing data if requested
@@ -252,10 +259,29 @@ async def upload_csv(
         import uuid
         file_obj = BytesIO(content)
         
-        # Generate upload session ID
-        upload_session_id = str(uuid.uuid4())
+        # Generate or use provided upload session ID
+        upload_session_id = session_id if session_id else str(uuid.uuid4())
         
-        events = ingest_csv_file(file_obj, csv_type)
+        if file.filename.endswith('.json'):
+            import json
+            from src.ingestion.json_ingestion import parse_llm_use_session_data
+            
+            # Read JSON content
+            try:
+                session_data = json.loads(content.decode('utf-8'))
+                
+                # Check if it's an array of sessions or a single session
+                if isinstance(session_data, list):
+                    events = []
+                    for item in session_data:
+                        events.extend(parse_llm_use_session_data(item, "json-upload"))
+                else:
+                    events = parse_llm_use_session_data(session_data, "json-upload")
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON format")
+        else:
+            # Process as CSV
+            events = ingest_csv_file(file_obj, csv_type)
         
         if not events:
             raise HTTPException(status_code=400, detail="No events found in CSV")
@@ -402,6 +428,13 @@ async def create_audit_session(
     """
     from src.models import AuditSession
     import uuid
+    from src.api.auth import otp_store
+    
+    # Temporary bypass of OTP verification
+    # email = session_data.email.lower()
+    # otp_data = otp_store.get(email)
+    # if not otp_data or not otp_data.get("verified"):
+    #     raise HTTPException(status_code=403, detail="Email verification required")
     
     try:
         # Create new audit session

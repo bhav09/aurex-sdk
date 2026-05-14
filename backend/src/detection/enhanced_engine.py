@@ -133,17 +133,30 @@ class EnhancedIssue:
 class EnhancedDetectionEngine:
     """Production-grade detection engine with executive insights"""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, email: Optional[str] = None):
         self.db = db
+        self.email = email
         self.issues: List[EnhancedIssue] = []
         self.workflow_analyses: Dict[str, WorkflowAnalysis] = {}
+    
+    def _get_events_query(self):
+        query = self.db.query(LLMEvent)
+        if self.email:
+            from src.models import AuditSession
+            sessions = self.db.query(AuditSession.id).filter(func.lower(AuditSession.email) == func.lower(self.email)).all()
+            session_ids = [s[0] for s in sessions]
+            if session_ids:
+                query = query.filter(LLMEvent.upload_session_id.in_(session_ids))
+            else:
+                query = query.filter(LLMEvent.id == 'no-match')
+        return query
     
     def analyze_complete(self) -> Dict[str, Any]:
         """
         Complete analysis with executive summary
         """
         # Get all events
-        events = self.db.query(LLMEvent).all()
+        events = self._get_events_query().all()
         
         if not events:
             return {
@@ -215,7 +228,7 @@ class EnhancedDetectionEngine:
         # Group events by workflow
         workflow_events = defaultdict(list)
         
-        for event in self.db.query(LLMEvent).all():
+        for event in self._get_events_query().all():
             wf_id = event.workflow_id or "unknown"
             workflow_events[wf_id].append(event)
         
@@ -231,7 +244,7 @@ class EnhancedDetectionEngine:
         # Find events with system_prompt_hash in metadata
         events_with_prompts = []
         
-        for event in self.db.query(LLMEvent).all():
+        for event in self._get_events_query().all():
             if event.extra_metadata:
                 prompt_hash = event.extra_metadata.get("system_prompt_hash")
                 prompt_tokens = event.extra_metadata.get("system_prompt_tokens")
@@ -295,7 +308,7 @@ class EnhancedDetectionEngine:
         """Enhanced agent loop detection with exponential pattern recognition"""
         # Group by session_id (not workflow_id) to detect loops within agent sessions
         sessions = defaultdict(list)
-        for event in self.db.query(LLMEvent).order_by(LLMEvent.timestamp).all():
+        for event in self._get_events_query().order_by(LLMEvent.timestamp).all():
             # Extract session_id from metadata
             session_id = None
             if event.extra_metadata:
@@ -370,7 +383,7 @@ class EnhancedDetectionEngine:
         # Group by workflow and model
         workflow_model_events = defaultdict(lambda: defaultdict(list))
         
-        for event in self.db.query(LLMEvent).all():
+        for event in self._get_events_query().all():
             is_expensive = any(exp in event.model.lower() for exp in expensive_models)
             
             # User's criteria: <500 input tokens AND <100 output tokens = simple task
@@ -438,7 +451,7 @@ class EnhancedDetectionEngine:
     def detect_context_explosion_enhanced(self):
         """Enhanced context explosion detection"""
         workflows = defaultdict(list)
-        for event in self.db.query(LLMEvent).order_by(LLMEvent.timestamp).all():
+        for event in self._get_events_query().order_by(LLMEvent.timestamp).all():
             if event.workflow_id and event.context_length:
                 workflows[event.workflow_id].append(event)
         

@@ -103,6 +103,7 @@ export default function AuditPage() {
             "Evaluating model selection...",
             "Calculating optimization potential...",
             "Generating recommendations...",
+            "Finalizing analysis..."
         ];
         let currentStep = 0;
         const interval = setInterval(() => {
@@ -143,6 +144,37 @@ export default function AuditPage() {
         } finally {
             setAnalyzing(false);
         }
+    };
+
+    const handleExportCSV = () => {
+        if (!events || events.length === 0) return;
+        
+        const headers = ["Timestamp", "Workflow ID", "Provider", "Model", "Cost", "Total Tokens", "Input Tokens", "Output Tokens", "Context Length", "Latency (ms)"];
+        
+        const csvRows = events.map(e => {
+            return [
+                e.timestamp || "",
+                e.workflow_id || "",
+                e.provider || "",
+                e.model || "",
+                e.cost?.toFixed(6) || "0",
+                e.total_tokens || "0",
+                e.input_tokens || "0",
+                e.output_tokens || "0",
+                e.context_length || "0",
+                e.latency_ms || "0"
+            ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(",");
+        });
+        
+        const csvContent = [headers.join(","), ...csvRows].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `aurex-audit-export.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     useEffect(() => {
@@ -253,7 +285,9 @@ export default function AuditPage() {
             </div>
 
             <div className="container mx-auto px-4 py-12">
-                {!data && !analyzing && <UploadZone onFileSelect={handleFileSelect} />}
+                <div className={data || analyzing ? "hidden" : ""}>
+                    <UploadZone onFileSelect={handleFileSelect} />
+                </div>
 
                 {analyzing && (
                     <div className="mx-auto max-w-2xl">
@@ -571,7 +605,9 @@ export default function AuditPage() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="gap-2 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                                            onClick={handleExportCSV}
+                                            disabled={events.length === 0}
+                                            className="gap-2 border-white/15 bg-white/5 text-white hover:bg-white/10 disabled:opacity-50"
                                         >
                                             <Download className="h-4 w-4" />
                                             Export CSV

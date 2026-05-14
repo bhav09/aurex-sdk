@@ -66,7 +66,7 @@ export function CtaSection() {
                 asChild
                 className="bg-foreground hover:bg-foreground/90 text-background px-8 h-12 text-base group"
               >
-                <a href="#how-it-works">
+                <a href="/audit">
                   Try free audit now
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                 </a>

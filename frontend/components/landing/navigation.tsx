@@ -68,7 +68,7 @@ export function Navigation() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <a href="#how-it-works">
+            <a href="/audit">
               <Button
                 size="sm"
                 className={`rounded-full transition-all duration-500 ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"}`}
@@ -128,7 +128,7 @@ export function Navigation() {
             }`}
             style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
           >
-            <a href="#how-it-works" className="w-full">
+            <a href="/audit" className="w-full">
               <Button
                 className="w-full bg-foreground text-background rounded-full h-14 text-base"
                 onClick={() => setIsMobileMenuOpen(false)}

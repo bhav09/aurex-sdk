@@ -27,11 +27,19 @@ def parse_anthropic_csv(file: BinaryIO) -> List[LLMEventCreate]:
     events = []
     
     for _, row in df.iterrows():
-        # Extract timestamp
-        timestamp_str = row.get("timestamp") or row.get("created_at") or row.get("created")
-        try:
-            timestamp = pd.to_datetime(timestamp_str)
-        except:
+        # Extract timestamp, avoiding NaT errors
+        timestamp = None
+        for key in ["timestamp", "created_at", "created"]:
+            val = row.get(key)
+            if pd.notna(val):
+                try:
+                    ts = pd.to_datetime(val)
+                    if pd.notna(ts):
+                        timestamp = ts
+                        break
+                except:
+                    pass
+        if timestamp is None:
             timestamp = datetime.utcnow()
         
         # Extract model and provider
@@ -96,11 +104,19 @@ def parse_openai_csv(file: BinaryIO) -> List[LLMEventCreate]:
     events = []
     
     for _, row in df.iterrows():
-        # Extract timestamp
-        timestamp_str = row.get("timestamp") or row.get("created") or row.get("created_at")
-        try:
-            timestamp = pd.to_datetime(timestamp_str)
-        except:
+        # Extract timestamp, avoiding NaT errors
+        timestamp = None
+        for key in ["timestamp", "created", "created_at"]:
+            val = row.get(key)
+            if pd.notna(val):
+                try:
+                    ts = pd.to_datetime(val)
+                    if pd.notna(ts):
+                        timestamp = ts
+                        break
+                except:
+                    pass
+        if timestamp is None:
             timestamp = datetime.utcnow()
         
         # Extract model and provider
