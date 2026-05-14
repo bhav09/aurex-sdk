@@ -163,7 +163,7 @@ export default function AuditPage() {
                 e.input_tokens || "0",
                 e.output_tokens || "0",
                 e.context_length || "0",
-                e.latency_ms || "0"
+                e.extra_metadata?.latency_ms || "0"
             ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(",");
         });
         
