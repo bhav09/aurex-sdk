@@ -22,10 +22,12 @@ from src.ingestion import ingest_csv_file, ingest_llm_use_sessions, ingest_singl
 from src.detection import analyze_workflow, analyze_all
 from src.detection.enhanced_engine import EnhancedDetectionEngine
 from sqlalchemy import func, desc
+from src.utils.logger import get_logger
 
 from . import auth
 
 router = APIRouter()
+logger = get_logger(__name__)
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 
@@ -308,10 +310,12 @@ async def upload_csv(
         if clear_existing:
             response["events_deleted"] = deleted_count
         
+        logger.info("CSV uploaded", filename=file.filename, events_count=stored_count)
         return response
     
     except Exception as e:
         db.rollback()
+        logger.exception("Error processing CSV upload", error=str(e), filename=file.filename)
         raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
 
 
@@ -353,6 +357,7 @@ async def ingest_json(
         import os
         os.unlink(tmp_path)
         
+        logger.info("JSON session uploaded", filename=file.filename, events_count=stored_count)
         return {
             "status": "success",
             "events_ingested": stored_count,
@@ -361,6 +366,7 @@ async def ingest_json(
     
     except Exception as e:
         db.rollback()
+        logger.exception("Error processing JSON session upload", error=str(e), filename=file.filename)
         raise HTTPException(status_code=500, detail=f"Error processing JSON: {str(e)}")
 
 
@@ -450,10 +456,12 @@ async def create_audit_session(
         db.commit()
         db.refresh(audit_session)
         
+        logger.info("Audit session created", session_id=audit_session.id, email=session_data.email)
         return audit_session
     
     except Exception as e:
         db.rollback()
+        logger.exception("Error creating audit session", error=str(e), email=session_data.email)
         raise HTTPException(status_code=500, detail=f"Error creating audit session: {str(e)}")
 
 
@@ -490,12 +498,14 @@ async def update_audit_session(
         db.commit()
         db.refresh(session)
         
+        logger.info("Audit session updated", session_id=session_id)
         return session
     
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
+        logger.exception("Error updating audit session", error=str(e), session_id=session_id)
         raise HTTPException(status_code=500, detail=f"Error updating audit session: {str(e)}")
 
 
