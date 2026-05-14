@@ -5,6 +5,7 @@ import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { aurixAPI } from "@/lib/api-client";
 
 interface UploadZoneProps {
     onFileSelect: (file: File, userInfo: { user_name: string; email: string; company_name: string }) => void;
@@ -22,19 +23,23 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
         email?: string;
         companyName?: string;
     }>({});
+    const [isOtpStep, setIsOtpStep] = useState(false);
+    const [otp, setOtp] = useState("");
+    const [otpError, setOtpError] = useState<string | null>(null);
+    const [otpLoading, setOtpLoading] = useState(false);
 
     const validateFile = (file: File): boolean => {
-        const validExtensions = ['.csv'];
+        const validExtensions = ['.csv', '.json'];
         const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        const maxSize = 100 * 1024 * 1024; // 100MB
 
         if (!validExtensions.includes(fileExtension)) {
-            setError('Accepted file types: CSV');
+            setError('Accepted file types: CSV, JSON');
             return false;
         }
 
         if (file.size > maxSize) {
-            setError('File size must be less than 10MB');
+            setError('File size must be less than 100MB');
             return false;
         }
 
@@ -45,10 +50,6 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     const validateEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            return false;
-        }
-        // Block Gmail addresses
-        if (email.toLowerCase().includes('@gmail.com')) {
             return false;
         }
         return true;
@@ -64,11 +65,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
         if (!email.trim()) {
             errors.email = "Email is required";
         } else if (!validateEmail(email)) {
-            if (email.toLowerCase().includes('@gmail.com')) {
-                errors.email = "Gmail addresses are not allowed";
-            } else {
-                errors.email = "Please enter a valid email address";
-            }
+            errors.email = "Please enter a valid email address";
         }
 
         if (!companyName.trim()) {
@@ -122,7 +119,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!selectedFile) {
@@ -134,12 +131,48 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             return;
         }
 
-        // All validations passed, proceed with upload
-        onFileSelect(selectedFile, {
+        // Temporary bypass of OTP
+        // try {
+        //     setOtpLoading(true);
+        //     setError(null);
+        //     await aurixAPI.requestOTP(email);
+        //     setIsOtpStep(true);
+        // } catch (err: any) {
+        //     setError(err.message || "Failed to send verification code. Please try again.");
+        // } finally {
+        //     setOtpLoading(false);
+        // }
+        
+        onFileSelect(selectedFile!, {
             user_name: userName,
             email: email,
             company_name: companyName
         });
+    };
+
+    const handleOtpSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!otp || otp.length !== 6) {
+            setOtpError("Please enter a valid 6-digit code");
+            return;
+        }
+
+        try {
+            setOtpLoading(true);
+            setOtpError(null);
+            await aurixAPI.verifyOTP(email, otp);
+            // OTP verified! Proceed with upload
+            onFileSelect(selectedFile!, {
+                user_name: userName,
+                email: email,
+                company_name: companyName
+            });
+        } catch (err: any) {
+            setOtpError(err.message || "Invalid verification code. Please try again.");
+        } finally {
+            setOtpLoading(false);
+        }
     };
 
     const handleCancel = () => {
@@ -156,6 +189,62 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
+
+    if (isOtpStep) {
+        return (
+            <div className="sm:mx-auto sm:max-w-lg flex items-center justify-center p-10 w-full max-w-lg">
+                <form onSubmit={handleOtpSubmit} className="w-full space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground">Verify your email</h3>
+                    <p className="text-sm text-muted-foreground">
+                        We've sent a 6-digit code to <strong>{email}</strong>. The code will expire in 10 minutes.
+                    </p>
+                    
+                    <div>
+                        <Label htmlFor="otp" className="text-sm font-medium">Verification Code</Label>
+                        <Input
+                            id="otp"
+                            type="text"
+                            maxLength={6}
+                            value={otp}
+                            onChange={(e) => {
+                                setOtp(e.target.value.replace(/\D/g, ''));
+                                setOtpError(null);
+                            }}
+                            placeholder="123456"
+                            className={`mt-1 text-center text-lg tracking-widest ${otpError ? 'border-red-500' : ''}`}
+                            required
+                        />
+                        {otpError && (
+                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {otpError}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="mt-8 flex items-center justify-end space-x-3">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsOtpStep(false)}
+                            className="whitespace-nowrap rounded-sm px-4 py-2 text-sm"
+                            disabled={otpLoading}
+                        >
+                            Back
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="default"
+                            disabled={otpLoading || otp.length !== 6}
+                            className="whitespace-nowrap rounded-sm bg-primary px-4 py-2 text-sm text-primary-foreground"
+                        >
+                            {otpLoading ? "Verifying..." : "Verify & Analyze"}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        );
+    }
 
     return (
         <div className="sm:mx-auto sm:max-w-lg flex items-center justify-center p-10 w-full max-w-lg">
@@ -214,9 +303,6 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                                 {formErrors.email}
                             </p>
                         )}
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Gmail addresses are not allowed
-                        </p>
                     </div>
 
                     <div>
@@ -278,9 +364,14 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                     </div>
                 </div>
 
-                <p className="mt-2 flex items-center justify-between text-xs leading-5 text-muted-foreground">
-                    Recommended max. size: 10 MB, Accepted file types: CSV.
-                </p>
+                <div className="mt-2 text-xs leading-5 text-muted-foreground">
+                    <p className="flex items-center justify-between">
+                        Recommended max. size: 100 MB, Accepted file types: CSV, JSON.
+                    </p>
+                    <p className="mt-1">
+                        <strong>Note:</strong> Ensure your file contains LLM usage data with columns for <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">timestamp</code>, <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">model</code>, and token counts (e.g., <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">input_tokens</code> / <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">output_tokens</code>).
+                    </p>
+                </div>
 
                 {error && (
                     <div className="mt-2 flex items-center gap-2 text-red-500 text-sm">
@@ -337,10 +428,10 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                     <Button
                         type="submit"
                         variant="default"
-                        disabled={!selectedFile}
+                        disabled={!selectedFile || otpLoading}
                         className="whitespace-nowrap rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Upload & Analyze
+                        {otpLoading ? "Sending OTP..." : "Upload & Analyze"}
                     </Button>
                 </div>
             </form>

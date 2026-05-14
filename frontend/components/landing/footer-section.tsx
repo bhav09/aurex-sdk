@@ -10,7 +10,7 @@ const footerLinks = {
     { name: "Pricing", href: "/#pricing" },
   ],
   Resources: [
-    { name: "Documentation", href: "#" },
+    { name: "Documentation", href: "/" },
     { name: "Support", href: "mailto:contact@heyaurex.com" },
     { name: "Contact", href: "mailto:contact@heyaurex.com" },
   ],
@@ -104,7 +104,7 @@ export function FooterSection() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-12 lg:gap-8">
             {/* Brand Column */}
             <div className="col-span-2">
-              <a href="#" className="inline-flex items-center gap-2 mb-6">
+              <a href="/" className="inline-flex items-center gap-2 mb-6">
                 <span className="text-2xl font-display text-white">AUREX</span>
                 <span className="text-xs text-white/40 font-mono">TM</span>
               </a>

@@ -97,7 +97,7 @@ export class AurexAPI {
     }
 
     // Upload CSV with optional clear
-    async uploadCSV(file: File, clearExisting: boolean = true): Promise<{
+    async uploadCSV(file: File, clearExisting: boolean = true, sessionId?: string): Promise<{
         status: string;
         events_ingested: number;
         upload_session_id: string;
@@ -106,13 +106,15 @@ export class AurexAPI {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(
-            `${this.baseUrl}/upload/csv?clear_existing=${clearExisting}`,
-            {
-                method: 'POST',
-                body: formData,
-            }
-        );
+        let url = `${this.baseUrl}/upload/csv?clear_existing=${clearExisting}`;
+        if (sessionId) {
+            url += `&session_id=${encodeURIComponent(sessionId)}`;
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+        });
 
         if (!response.ok) {
             const error = await response.json();
@@ -123,8 +125,12 @@ export class AurexAPI {
     }
 
     // Get executive summary
-    async getExecutiveSummary(): Promise<ExecutiveSummary> {
-        const response = await fetch(`${this.baseUrl}/executive-summary`);
+    async getExecutiveSummary(email?: string): Promise<ExecutiveSummary> {
+        const url = email 
+            ? `${this.baseUrl}/executive-summary?email=${encodeURIComponent(email)}`
+            : `${this.baseUrl}/executive-summary`;
+            
+        const response = await fetch(url);
 
         if (!response.ok) {
             throw new Error('Failed to fetch executive summary');
@@ -168,6 +174,40 @@ export class AurexAPI {
             throw new Error('Failed to clear data');
         }
 
+        return response.json();
+    }
+
+    // ============================================================================
+    // AUTH ENDPOINTS
+    // ============================================================================
+
+    async requestOTP(email: string): Promise<{ status: string; message: string }> {
+        const response = await fetch(`${this.baseUrl}/auth/request-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to request OTP');
+        }
+        
+        return response.json();
+    }
+
+    async verifyOTP(email: string, otp: string): Promise<{ status: string; message: string }> {
+        const response = await fetch(`${this.baseUrl}/auth/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, otp }),
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to verify OTP');
+        }
+        
         return response.json();
     }
 
@@ -277,8 +317,8 @@ export class AurexAPI {
             file_type: fileExtension,
         });
 
-        // Step 2: Upload file
-        const uploadResult = await this.uploadCSV(file, clearExisting);
+        // Step 2: Upload file and pass the session ID to link the events
+        const uploadResult = await this.uploadCSV(file, clearExisting, session.id);
 
         return {
             session,
@@ -302,8 +342,8 @@ export class AurexAPI {
         // Upload with user info
         const { session } = await this.uploadCSVWithUserInfo(file, userInfo, clearExisting);
 
-        // Get analysis
-        const summary = await this.getExecutiveSummary();
+        // Get analysis scoped to the user's email
+        const summary = await this.getExecutiveSummary(userInfo.email);
 
         // Calculate credit score (0-100 based on waste percentage)
         const creditScore = Math.max(0, Math.min(100,
