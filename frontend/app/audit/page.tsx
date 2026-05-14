@@ -19,6 +19,7 @@ import {
     DollarSign,
     Zap,
     CheckCircle2,
+    ShieldCheck,
     FileText,
     Download,
     AlertTriangle,
@@ -310,14 +311,20 @@ export default function AuditPage() {
                             <div className="max-h-64 space-y-2 overflow-y-auto">
                                 {progressSteps.map((step, index) => (
                                     <div key={index} className="flex items-center gap-2 text-sm">
-                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                                        <span className="text-emerald-200/80">{step}</span>
+                                        {index === progressSteps.length - 1 && progress < 100 ? (
+                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
+                                        ) : (
+                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                                        )}
+                                        <span className={index === progressSteps.length - 1 && progress < 100 ? "text-violet-200" : "text-emerald-200/80"}>
+                                            {step}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
                             <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.03] p-4">
                                 <div className="flex items-center gap-2 text-sm text-white/50">
-                                    <CheckCircle2 className="h-4 w-4" />
+                                    <ShieldCheck className="h-4 w-4" />
                                     <span>Runs on your data via your API—nothing leaves your machine in dev.</span>
                                 </div>
                             </div>
