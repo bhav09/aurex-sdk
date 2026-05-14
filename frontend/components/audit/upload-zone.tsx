@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { aurixAPI } from "@/lib/api-client";
+import { DataExportGuide } from "@/components/audit/data-export-guide";
 
 interface UploadZoneProps {
     onFileSelect: (file: File, userInfo: { user_name: string; email: string; company_name: string }) => void;
@@ -326,11 +327,14 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                 </div>
 
                 {/* File Upload Area */}
+                <div className="mt-4 flex justify-end">
+                    <DataExportGuide />
+                </div>
                 <div
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
-                    className={`mt-4 flex justify-center space-x-4 rounded-md border border-dashed border-input px-6 py-10 transition-colors ${isDragging ? 'border-primary bg-primary/5' : ''
+                    className={`mt-2 flex justify-center space-x-4 rounded-md border border-dashed border-input px-6 py-10 transition-colors ${isDragging ? 'border-primary bg-primary/5' : ''
                         }`}
                 >
                     <div className="sm:flex sm:items-center sm:gap-x-3">
