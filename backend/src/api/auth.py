@@ -1,15 +1,46 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel, EmailStr
-import os
-import random
+import secrets
 import time
 import httpx
 import resend
-from typing import Dict
+import jwt
+from datetime import datetime, timedelta
+from typing import Dict, Optional
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr
 from src.utils.logger import get_logger
+
+from app.config import settings
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+# JWT Configuration
+JWT_SECRET = settings.jwt_secret
+JWT_ALGORITHM = settings.jwt_algorithm
+JWT_EXPIRATION_MINUTES = settings.jwt_expiration_minutes
+
+security = HTTPBearer()
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Could not validate credentials")
+        return email
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 # Note: resend.api_key will be set inside the request_otp function to ensure env vars are loaded
 
@@ -77,8 +108,8 @@ async def request_otp(data: OTPRequest):
         logger.warning("Rate limit exceeded", email=email, attempts=len(history))
         raise HTTPException(status_code=429, detail="Too many OTP requests. Please try again later.")
 
-    # Generate OTP
-    otp_code = f"{random.randint(0, 999999):06d}"
+    # Generate OTP securely
+    otp_code = f"{secrets.randbelow(1000000):06d}"
     
     # Store OTP (10 mins TTL)
     otp_store[email] = {
@@ -93,9 +124,9 @@ async def request_otp(data: OTPRequest):
     rate_limit_store[email] = history
     
     # Send email
-    resend.api_key = os.environ.get("RESEND_API_KEY", "")
+    resend.api_key = settings.resend_api_key
     if not resend.api_key:
-        logger.debug("RESEND_API_KEY is NOT set", current_env=os.environ.get('RESEND_API_KEY'))
+        logger.debug("RESEND_API_KEY is NOT set")
         logger.warning("RESEND_API_KEY not set. Falling back to local OTP.", email=email)
     else:
         try:
@@ -136,5 +167,14 @@ async def verify_otp(data: OTPVerify):
         
     # Mark as verified
     otp_data["verified"] = True
+    
+    # Generate JWT token
+    access_token = create_access_token(data={"sub": email})
+    
     logger.info("OTP verified successfully", email=email)
-    return {"status": "success", "message": "Email verified successfully"}
+    return {
+        "status": "success", 
+        "message": "Email verified successfully",
+        "access_token": access_token,
+        "token_type": "bearer"
+    }

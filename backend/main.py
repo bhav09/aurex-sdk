@@ -8,10 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import os
-from dotenv import load_dotenv
 
-# Load environment variables as early as possible
-load_dotenv()
+# Create app/config.py directory structure if it doesn't exist
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+
+from app.config import settings
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from src.api import router
 from src.database import init_db
@@ -47,20 +55,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Configure rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 # Configure CORS
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-allowed_origins = [
-    frontend_url,
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "https://heyaurex.com",
-    "https://www.heyaurex.com",
-]
+origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys(allowed_origins)),
+    allow_origins=list(dict.fromkeys(origins)),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -102,10 +107,10 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    # Get configuration from environment
-    host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
-    debug = os.getenv("DEBUG", "True").lower() == "true"
+    # Get configuration from settings singleton
+    host = settings.api_host
+    port = settings.api_port
+    debug = settings.debug
     
     print(f"""
     ╔═══════════════════════════════════════╗

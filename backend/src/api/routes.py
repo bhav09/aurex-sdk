@@ -2,7 +2,8 @@
 FastAPI Routes for Aurex Backend
 """
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+import os
+from fastapi import APIRouter, Depends, UploadFile, File, Request, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -25,6 +26,7 @@ from sqlalchemy import func, desc
 from src.utils.logger import get_logger
 
 from . import auth
+from .auth import get_current_user
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -48,7 +50,8 @@ async def get_events(
     workflow_id: Optional[str] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Get LLM events with optional filtering
@@ -60,7 +63,18 @@ async def get_events(
     - provider: Filter by provider (openai, anthropic, ollama)
     - model: Filter by model name
     """
+    from src.models import AuditSession
+    
     query = db.query(LLMEvent)
+    
+    # Enforce tenant isolation (only see events uploaded in sessions owned by current_user)
+    sessions = db.query(AuditSession.id).filter(func.lower(AuditSession.email) == func.lower(current_user)).all()
+    session_ids = [s[0] for s in sessions]
+    if session_ids:
+        query = query.filter(LLMEvent.upload_session_id.in_(session_ids))
+    else:
+        # Return empty if user has no sessions
+        return []
     
     if workflow_id:
         query = query.filter(LLMEvent.workflow_id == workflow_id)
@@ -75,10 +89,21 @@ async def get_events(
 
 
 @router.get("/workflows")
-async def get_workflows(db: Session = Depends(get_db)):
+async def get_workflows(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     """
     Get list of all workflows with summary statistics
     """
+    from src.models import AuditSession
+    
+    # Enforce tenant isolation
+    sessions = db.query(AuditSession.id).filter(func.lower(AuditSession.email) == func.lower(current_user)).all()
+    session_ids = [s[0] for s in sessions]
+    if not session_ids:
+        return []
+        
     # Group by workflow_id and get aggregates
     workflows = db.query(
         LLMEvent.workflow_id,
@@ -88,7 +113,8 @@ async def get_workflows(db: Session = Depends(get_db)):
         func.min(LLMEvent.timestamp).label('start_time'),
         func.max(LLMEvent.timestamp).label('end_time')
     ).filter(
-        LLMEvent.workflow_id.isnot(None)
+        LLMEvent.workflow_id.isnot(None),
+        LLMEvent.upload_session_id.in_(session_ids)
     ).group_by(
         LLMEvent.workflow_id
     ).all()
@@ -108,19 +134,36 @@ async def get_workflows(db: Session = Depends(get_db)):
 
 
 @router.get("/insights")
-async def get_insights(db: Session = Depends(get_db)):
+async def get_insights(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     """
     Get overall insights and detected issues across all events
     """
-    analysis = analyze_all(db)
+    from src.models import AuditSession
     
-    # Add additional aggregations
-    total_events = db.query(func.count(LLMEvent.id)).scalar()
+    # Analyze with enhanced engine for the specific user
+    engine = EnhancedDetectionEngine(db, email=current_user)
+    analysis = engine.analyze_complete()
+    
+    sessions = db.query(AuditSession.id).filter(func.lower(AuditSession.email) == func.lower(current_user)).all()
+    session_ids = [s[0] for s in sessions]
+    
+    if not session_ids:
+        return analysis
+    
+    # Add additional aggregations for the user's data
+    total_events = db.query(func.count(LLMEvent.id)).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar()
     
     # Cost by provider
     provider_costs = db.query(
         LLMEvent.provider,
         func.sum(LLMEvent.cost).label('total_cost')
+    ).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
     ).group_by(LLMEvent.provider).all()
     
     # Cost by model
@@ -128,33 +171,37 @@ async def get_insights(db: Session = Depends(get_db)):
         LLMEvent.model,
         func.sum(LLMEvent.cost).label('total_cost'),
         func.count(LLMEvent.id).label('count')
+    ).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
     ).group_by(LLMEvent.model).order_by(desc('total_cost')).limit(10).all()
     
     # Daily costs
     daily_costs = db.query(
         func.date(LLMEvent.timestamp).label('date'),
         func.sum(LLMEvent.cost).label('total_cost')
+    ).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
     ).group_by(func.date(LLMEvent.timestamp)).order_by('date').all()
     
     analysis["aggregations"] = {
         "total_events": total_events,
         "provider_breakdown": {
-            p.provider: round(p.total_cost, 4) for p in provider_costs
+            p.provider: round(p.total_cost, 4) if p.total_cost else 0 for p in provider_costs if p.provider
         },
         "top_models": [
             {
                 "model": m.model,
-                "cost": round(m.total_cost, 4),
+                "cost": round(m.total_cost, 4) if m.total_cost else 0,
                 "count": m.count
             }
-            for m in model_costs
+            for m in model_costs if m.model
         ],
         "daily_costs": [
             {
                 "date": str(d.date),
-                "cost": round(d.total_cost, 4)
+                "cost": round(d.total_cost, 4) if d.total_cost else 0
             }
-            for d in daily_costs
+            for d in daily_costs if d.date
         ]
     }
     
@@ -163,8 +210,9 @@ async def get_insights(db: Session = Depends(get_db)):
 
 @router.get("/executive-summary")
 async def get_executive_summary(
-    email: Optional[str] = Query(None, description="Filter by user email"),
-    db: Session = Depends(get_db)
+    email: str = Query(..., description="User email"),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Get executive-level summary with C-suite friendly formatting
@@ -175,6 +223,10 @@ async def get_executive_summary(
     - Workflow cost breakdown
     - ROI projections
     """
+    # Enforce resource ownership
+    if current_user != email:
+        raise HTTPException(status_code=403, detail="Not authorized to access this data")
+        
     try:
         engine = EnhancedDetectionEngine(db, email=email)
         analysis = engine.analyze_complete()
@@ -226,9 +278,9 @@ async def clear_data(
 async def upload_csv(
     file: UploadFile = File(...),
     csv_type: Optional[str] = Query(None, description="CSV type: anthropic, openai, or bedrock"),
-    clear_existing: bool = Query(False, description="Clear existing data before upload"),
     session_id: Optional[str] = Query(None, description="Existing AuditSession ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Upload and process CSV file from LLM providers
@@ -240,21 +292,31 @@ async def upload_csv(
     
     Query parameters:
     - csv_type: Specify CSV format (auto-detected if not provided)
-    - clear_existing: If true, clears all existing data before upload
     """
     if not (file.filename.endswith('.csv') or file.filename.endswith('.json')):
         raise HTTPException(status_code=400, detail="File must be a CSV or JSON")
     
+    # Verify session ownership if provided
+    if session_id:
+        from src.models import AuditSession
+        session = db.query(AuditSession).filter(AuditSession.id == session_id).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Audit session not found")
+        if session.email.lower() != current_user.lower():
+            raise HTTPException(status_code=403, detail="Not authorized to use this session")
+            
+    # 50MB file size limit to prevent DoS
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File size exceeds the 50MB limit")
+    
     try:
-        # Clear existing data if requested
-        deleted_count = 0
-        if clear_existing:
-            deleted_count = db.query(func.count(LLMEvent.id)).scalar()
-            db.query(LLMEvent).delete()
-            db.commit()
-        
         # Read file content
         content = await file.read()
+        
+        # Double check size after reading
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File size exceeds the 50MB limit")
         
         # Parse CSV
         from io import BytesIO
@@ -289,15 +351,25 @@ async def upload_csv(
             raise HTTPException(status_code=400, detail="No events found in CSV")
         
         # Store events in database with upload_session_id
+        # Optimize insertions using bulk_save_objects with chunking
+        batch_size = 5000
         stored_count = 0
+        current_batch = []
+        
         for event_data in events:
             event_dict = event_data.dict()
             event_dict['upload_session_id'] = upload_session_id
-            event = LLMEvent(**event_dict)
-            db.add(event)
+            current_batch.append(LLMEvent(**event_dict))
             stored_count += 1
-        
-        db.commit()
+            
+            if len(current_batch) >= batch_size:
+                db.bulk_save_objects(current_batch)
+                db.commit()
+                current_batch = []
+                
+        if current_batch:
+            db.bulk_save_objects(current_batch)
+            db.commit()
         
         response = {
             "status": "success",
@@ -307,12 +379,11 @@ async def upload_csv(
             "upload_session_id": upload_session_id
         }
         
-        if clear_existing:
-            response["events_deleted"] = deleted_count
-        
         logger.info("CSV uploaded", filename=file.filename, events_count=stored_count)
         return response
     
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.exception("Error processing CSV upload", error=str(e), filename=file.filename)
@@ -322,7 +393,8 @@ async def upload_csv(
 @router.post("/ingest/json")
 async def ingest_json(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Upload and process JSON session file from llm-use
@@ -330,11 +402,20 @@ async def ingest_json(
     if not file.filename.endswith('.json'):
         raise HTTPException(status_code=400, detail="File must be a JSON")
     
+    # 50MB file size limit
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File size exceeds the 50MB limit")
+    
     try:
         # Save temporarily
         import tempfile
+        import os
         with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tmp:
             content = await file.read()
+            if len(content) > MAX_FILE_SIZE:
+                os.unlink(tmp.name)
+                raise HTTPException(status_code=413, detail="File size exceeds the 50MB limit")
             tmp.write(content)
             tmp_path = tmp.name
         
@@ -342,19 +423,33 @@ async def ingest_json(
         events = ingest_single_json_file(tmp_path)
         
         if not events:
+            os.unlink(tmp_path)
             raise HTTPException(status_code=400, detail="No events found in JSON")
         
-        # Store events in database
-        stored_count = 0
-        for event_data in events:
-            event = LLMEvent(**event_data.dict())
-            db.add(event)
-            stored_count += 1
+        # Store events in database using bulk insert
+        import uuid
+        upload_session_id = str(uuid.uuid4())
         
-        db.commit()
+        batch_size = 5000
+        stored_count = 0
+        current_batch = []
+        
+        for event_data in events:
+            event_dict = event_data.dict()
+            event_dict['upload_session_id'] = upload_session_id
+            current_batch.append(LLMEvent(**event_dict))
+            stored_count += 1
+            
+            if len(current_batch) >= batch_size:
+                db.bulk_save_objects(current_batch)
+                db.commit()
+                current_batch = []
+                
+        if current_batch:
+            db.bulk_save_objects(current_batch)
+            db.commit()
         
         # Clean up temp file
-        import os
         os.unlink(tmp_path)
         
         logger.info("JSON session uploaded", filename=file.filename, events_count=stored_count)
@@ -364,8 +459,12 @@ async def ingest_json(
             "filename": file.filename
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
         logger.exception("Error processing JSON session upload", error=str(e), filename=file.filename)
         raise HTTPException(status_code=500, detail=f"Error processing JSON: {str(e)}")
 
@@ -387,20 +486,59 @@ async def ingest_sessions(
 
 
 @router.get("/stats")
-async def get_stats(db: Session = Depends(get_db)):
+async def get_stats(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     """
     Get overall statistics
     """
-    total_events = db.query(func.count(LLMEvent.id)).scalar()
-    total_cost = db.query(func.sum(LLMEvent.cost)).scalar() or 0
-    total_tokens = db.query(func.sum(LLMEvent.total_tokens)).scalar() or 0
+    from src.models import AuditSession
     
-    unique_workflows = db.query(func.count(func.distinct(LLMEvent.workflow_id))).scalar()
-    unique_models = db.query(func.count(func.distinct(LLMEvent.model))).scalar()
+    sessions = db.query(AuditSession.id).filter(func.lower(AuditSession.email) == func.lower(current_user)).all()
+    session_ids = [s[0] for s in sessions]
+    
+    if not session_ids:
+        return {
+            "total_events": 0,
+            "total_cost": 0,
+            "total_tokens": 0,
+            "unique_workflows": 0,
+            "unique_models": 0,
+            "date_range": {
+                "first_event": None,
+                "last_event": None
+            }
+        }
+        
+    total_events = db.query(func.count(LLMEvent.id)).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar()
+    
+    total_cost = db.query(func.sum(LLMEvent.cost)).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar() or 0
+    
+    total_tokens = db.query(func.sum(LLMEvent.total_tokens)).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar() or 0
+    
+    unique_workflows = db.query(func.count(func.distinct(LLMEvent.workflow_id))).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar()
+    
+    unique_models = db.query(func.count(func.distinct(LLMEvent.model))).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar()
     
     # Date range
-    first_event = db.query(func.min(LLMEvent.timestamp)).scalar()
-    last_event = db.query(func.max(LLMEvent.timestamp)).scalar()
+    first_event = db.query(func.min(LLMEvent.timestamp)).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar()
+    
+    last_event = db.query(func.max(LLMEvent.timestamp)).filter(
+        LLMEvent.upload_session_id.in_(session_ids)
+    ).scalar()
     
     return {
         "total_events": total_events,
@@ -469,7 +607,8 @@ async def create_audit_session(
 async def update_audit_session(
     session_id: str,
     update_data: AuditSessionUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Update audit session with analysis results
@@ -487,6 +626,10 @@ async def update_audit_session(
         
         if not session:
             raise HTTPException(status_code=404, detail="Audit session not found")
+            
+        # IDOR check: Verify ownership
+        if session.email.lower() != current_user.lower():
+            raise HTTPException(status_code=403, detail="Not authorized to modify this session")
         
         # Update fields
         update_dict = update_data.dict(exclude_unset=True)
@@ -512,7 +655,8 @@ async def update_audit_session(
 @router.get("/audit/sessions/{session_id}", response_model=AuditSessionResponse)
 async def get_audit_session(
     session_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Get a specific audit session by ID
@@ -523,6 +667,10 @@ async def get_audit_session(
     
     if not session:
         raise HTTPException(status_code=404, detail="Audit session not found")
+        
+    # IDOR check: Verify ownership
+    if session.email.lower() != current_user.lower():
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
     
     return session
 
@@ -532,13 +680,17 @@ async def get_audit_history(
     email: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Get audit history for a specific email address
     
     Returns all past audits for the user, sorted by most recent first.
     """
+    if current_user != email:
+        raise HTTPException(status_code=403, detail="Not authorized to access this data")
+        
     from src.models import AuditSession
     
     try:
@@ -568,7 +720,8 @@ async def get_company_audits(
     company_name: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     """
     Get all audits for a specific company
@@ -576,6 +729,19 @@ async def get_company_audits(
     Useful for company-level analytics and tracking.
     """
     from src.models import AuditSession
+    
+    # Simple check: current user must have the company domain in their email
+    # A robust check would look at user's actual registered company in DB
+    domain = current_user.split("@")[1] if "@" in current_user else ""
+    # We verify if they are allowed by checking if they've had any sessions with this company
+    user_sessions = db.query(func.count(AuditSession.id)).filter(
+        AuditSession.email == current_user,
+        AuditSession.company_name == company_name
+    ).scalar()
+    
+    if not user_sessions and domain.lower() not in company_name.lower():
+        raise HTTPException(status_code=403, detail="Not authorized to access company data")
+        
     
     try:
         # Get total count
