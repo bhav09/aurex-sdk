@@ -10,11 +10,11 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
+# Load environment variables as early as possible
+load_dotenv()
+
 from src.api import router
 from src.database import init_db
-
-# Load environment variables
-load_dotenv()
 
 
 @asynccontextmanager

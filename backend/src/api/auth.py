@@ -9,7 +9,7 @@ from typing import Dict
 
 router = APIRouter()
 
-resend.api_key = os.environ.get("RESEND_API_KEY", "")
+# Note: resend.api_key will be set inside the request_otp function to ensure env vars are loaded
 
 # In-memory storage
 # otp_store[email] = {"otp": "123456", "expiry": timestamp, "attempts": 0, "verified": bool}
@@ -89,12 +89,14 @@ async def request_otp(data: OTPRequest):
     rate_limit_store[email] = history
     
     # Send email
+    resend.api_key = os.environ.get("RESEND_API_KEY", "")
     if not resend.api_key:
+        print(f"DEBUG: RESEND_API_KEY is NOT set. Current ENV: {os.environ.get('RESEND_API_KEY')}")
         print(f"WARNING: RESEND_API_KEY not set. OTP for {email} is {otp_code}")
     else:
         try:
             resend.Emails.send({
-                "from": "Aurex <noreply@heyaurex.com>",
+                "from": "Aurex <otp@noreply.heyaurex.com>",
                 "to": [email],
                 "subject": "Your Aurex verification code",
                 "text": f"Your Aurex verification code is: {otp_code}\n\nThis code expires in 10 minutes."
