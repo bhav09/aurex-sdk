@@ -248,6 +248,8 @@ See **`.github/workflows/lumina-audit.yml`** for an example of running the CLI a
 - **Lumina product brief / ETB:** [`project.md`](project.md)  
 - **Aurex backend API & DB:** [`backend/README.md`](backend/README.md)  
 - **Frontend (Aurex) notes:** [`frontend/README.md`](frontend/README.md)
+- **Privacy Policy:** See [`frontend/app/privacy/page.tsx`](frontend/app/privacy/page.tsx) or `/privacy` in the Aurex app.
+- **Terms & Conditions:** See [`frontend/app/terms/page.tsx`](frontend/app/terms/page.tsx) or `/terms` in the Aurex app.
 
 ---
 
