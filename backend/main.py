@@ -15,6 +15,13 @@ load_dotenv()
 
 from src.api import router
 from src.database import init_db
+from src.middleware.logging_middleware import LoggingMiddleware
+from src.utils.logger import get_logger
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -56,6 +63,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add structured logging middleware
+app.add_middleware(LoggingMiddleware)
+
+# Global exception handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled server error", error=str(exc), path=request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.warning("HTTP Exception", status_code=exc.status_code, detail=exc.detail, path=request.url.path)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 # Include API routes
 app.include_router(router, prefix="/api/v1", tags=["api"])

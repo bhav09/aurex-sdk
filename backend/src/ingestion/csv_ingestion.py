@@ -10,6 +10,9 @@ import hashlib
 
 from src.models import LLMEventCreate
 from src.utils import calculate_cost, extract_provider_from_model
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def parse_anthropic_csv(file: BinaryIO) -> List[LLMEventCreate]:
@@ -264,7 +267,7 @@ def parse_bedrock_csv(file: BinaryIO) -> List[LLMEventCreate]:
                 events.append(event)
         
         except (ValueError, IndexError) as e:
-            print(f"Error parsing row: {e}")
+            logger.warning("Error parsing row in Bedrock CSV", error=str(e), row_data=str(row.tolist()))
             continue
     
     return events
@@ -315,7 +318,7 @@ def ingest_csv_file(file: BinaryIO, csv_type: Optional[str] = None) -> List[LLME
     else:
         raise ValueError(f"Unknown CSV type: {csv_type}")
     
-    print(f"Parsed {len(events)} events from {csv_type} CSV")
+    logger.info("CSV parsed successfully", events_count=len(events), csv_type=csv_type)
     
     return events
 

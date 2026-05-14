@@ -11,6 +11,9 @@ from sqlalchemy import func, desc
 import json
 
 from src.models import LLMEvent
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExecutiveSummary:
@@ -210,6 +213,15 @@ class EnhancedDetectionEngine:
         # Assign ranks
         for i, issue in enumerate(self.issues, 1):
             issue.rank = i
+        
+        logger.info(
+            "Detection engine complete",
+            workflow_count=len(self.workflow_analyses),
+            issues_found=len(self.issues),
+            wasted_amount=wasted_cost,
+            total_cost=total_cost,
+            email=self.email
+        )
         
         return {
             "executive_summary": exec_summary.to_dict(),

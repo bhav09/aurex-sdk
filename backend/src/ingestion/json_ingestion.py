@@ -12,6 +12,9 @@ import hashlib
 
 from src.models import LLMEventCreate
 from src.utils import calculate_cost, extract_provider_from_model
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def hash_text(text: str) -> str:
@@ -124,7 +127,7 @@ def parse_llm_use_session_data(session_data: dict, default_workflow_id: str = "u
             events.append(event)
     
     except Exception as e:
-        print(f"Error parsing session data: {e}")
+        logger.error("Error parsing session data", error=str(e), session_id=session_data.get("session_id", default_workflow_id))
     
     return events
 
@@ -136,7 +139,7 @@ def parse_llm_use_session(session_file: Path) -> List[LLMEventCreate]:
             session_data = json.load(f)
         return parse_llm_use_session_data(session_data, str(session_file.stem))
     except Exception as e:
-        print(f"Error parsing session file {session_file}: {e}")
+        logger.error("Error parsing session file", error=str(e), file_path=str(session_file))
         return []
 
 
@@ -156,7 +159,7 @@ def ingest_llm_use_sessions(session_dir: Optional[str] = None) -> List[LLMEventC
     session_path = Path(session_dir)
     
     if not session_path.exists():
-        print(f"Session directory not found: {session_path}")
+        logger.warning("Session directory not found", directory=str(session_path))
         return []
     
     all_events = []
@@ -164,14 +167,14 @@ def ingest_llm_use_sessions(session_dir: Optional[str] = None) -> List[LLMEventC
     # Find all JSON files in the session directory
     json_files = list(session_path.glob("**/*.json"))
     
-    print(f"Found {len(json_files)} session files in {session_path}")
+    logger.info("Found session files", count=len(json_files), directory=str(session_path))
     
     for json_file in json_files:
         events = parse_llm_use_session(json_file)
         all_events.extend(events)
-        print(f"Parsed {len(events)} events from {json_file.name}")
+        logger.debug("Parsed events from file", events_count=len(events), filename=json_file.name)
     
-    print(f"Total events ingested: {len(all_events)}")
+    logger.info("Total JSON events ingested", count=len(all_events))
     
     return all_events
 
