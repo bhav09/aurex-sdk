@@ -5,4 +5,5 @@ dist
 venv/
 sample_data/
 # Optional ~1.3MB LiteLLM mirror for air-gapped builds: run `npm run sync-model-catalog`
-public/model-catalog.jsonaurix.db
+public/model-catalog.json
+aurix.db
