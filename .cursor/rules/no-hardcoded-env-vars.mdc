@@ -1,0 +1,121 @@
+---
+description: No hardcoded environment variables — all configurable values must be defined once in the Settings class (app/config.py) or settings.yaml, and accessed via the settings singleton everywhere else
+alwaysApply: true
+---
+
+# No Hardcoded Variables — Environment Configuration Rules
+
+All configurable values (URLs, project IDs, credentials, model names, database identifiers) MUST be defined once in the configuration layer and referenced via the `settings` singleton. Never duplicate config values across files.
+
+## Config Precedence (highest wins)
+
+1. **Process environment variables** (Cloud Run, CI, shell)
+2. **`.env` files** (local dev only, NEVER committed — use `.env.example` as template)
+3. **`config/settings.yaml`** (checked-in defaults keyed by `ENVIRONMENT`: dev/prod/test)
+4. **`Field(default=...)` in Settings** (safe fallbacks for dev ergonomics)
+
+## The One Rule
+
+**Define once in `app/config.py`, access via `settings.<field>` everywhere else.**
+
+```python
+# app/config.py — the ONLY place config values are defined
+from pydantic_settings import BaseSettings
+from pydantic import Field
+
+class Settings(BaseSettings):
+    model_config = {
+        "env_prefix": "",
+        "case_sensitive": False,
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+    }
+
+    google_cloud_project: str = Field(default="dev-lmp")
+    gemini_model: str = Field(default="gemini-2.5-flash")
+    mcp_buddy_url: str = Field(default="https://mcp-buddy-606896166090.us-central1.run.app/mcp")
+    allowed_origins: str = Field(default="http://localhost:3000,http://localhost:5173")
+
+settings = Settings()
+```
+
+```python
+# Anywhere else in the service — ALWAYS use the singleton
+from app.config import settings
+
+url = settings.mcp_buddy_url
+project = settings.google_cloud_project
+```
+
+## What MUST live in Settings or settings.yaml
+
+| Category | Examples |
+|----------|----------|
+| GCP Project IDs | `dev-lmp`, `cb-prod-data-lake` |
+| Service / Cloud Run URLs | `https://*-606896166090.*.run.app/*` |
+| Localhost URLs | `http://localhost:8001` |
+| Model names | `gemini-2.5-flash`, `gemini-2.5-pro` |
+| Database identifiers | Spanner instance/database IDs |
+| API keys / secrets | OAuth client IDs, service account emails |
+| Bucket names | GCS bucket identifiers |
+| CORS origins | Comma-separated origin lists |
+
+## What is NOT allowed
+
+```python
+# WRONG: get_settings() function — do NOT define or use this pattern
+def get_settings() -> Settings:
+    return Settings()
+
+# WRONG: aliasing the settings import
+from app.config import settings as _settings
+from app.config import settings as default_settings
+
+# WRONG: os.getenv() with hardcoded fallback outside config.py
+project = os.getenv("GOOGLE_CLOUD_PROJECT", "dev-lmp")
+
+# WRONG: same URL as a default in config.py AND repeated in client code
+class McpClient:
+    def __init__(self, url="https://mcp-buddy-606896166090.us-central1.run.app/mcp"):
+
+# WRONG: hardcoded CORS list in main.py
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http://localhost:5173"])
+
+# WRONG: hardcoded model name in logic
+response = model.generate_content(prompt, model="gemini-2.5-flash")
+```
+
+```python
+# RIGHT: always flow through settings
+from app.config import settings
+
+class McpClient:
+    def __init__(self, url: str = None):
+        self.url = url or settings.mcp_buddy_url
+
+origins = [o.strip() for o in settings.allowed_origins.split(",")]
+app.add_middleware(CORSMiddleware, allow_origins=origins)
+
+response = model.generate_content(prompt, model=settings.gemini_model)
+```
+
+## `.env.example` required for every service
+
+Every service MUST include a `.env.example` with all available config vars documented:
+
+```bash
+# .env.example — copy to .env for local development
+GOOGLE_CLOUD_PROJECT=dev-lmp
+GOOGLE_CLOUD_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.5-flash
+SPANNER_INSTANCE_ID=development
+SPANNER_DATABASE_ID=mainframe
+```
+
+## Review Checklist
+
+- [ ] No `os.getenv()` or `os.environ.get()` calls outside `app/config.py`
+- [ ] No URLs, project IDs, model names, or database IDs as string literals outside config
+- [ ] No config values duplicated between `config.py` and other files
+- [ ] New config values added to both `app/config.py` AND `.env.example`
+- [ ] All config accessed via `settings.<field>` — no `get_settings()`, no aliases

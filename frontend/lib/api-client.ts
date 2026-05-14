@@ -91,28 +91,47 @@ export interface CreateAuditSessionRequest {
 
 export class AurexAPI {
     private baseUrl: string;
+    private token: string | null = null;
 
     constructor(baseUrl: string = API_BASE_URL) {
         this.baseUrl = baseUrl;
+        if (typeof window !== 'undefined') {
+            this.token = localStorage.getItem('aurex_token');
+        }
     }
 
-    // Upload CSV with optional clear
-    async uploadCSV(file: File, clearExisting: boolean = true, sessionId?: string): Promise<{
+    setToken(token: string) {
+        this.token = token;
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('aurex_token', token);
+        }
+    }
+
+    private getHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
+        const headers: Record<string, string> = { ...customHeaders };
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+        return headers;
+    }
+
+    // Upload CSV
+    async uploadCSV(file: File, sessionId?: string): Promise<{
         status: string;
         events_ingested: number;
         upload_session_id: string;
-        events_deleted?: number;
     }> {
         const formData = new FormData();
         formData.append('file', file);
 
-        let url = `${this.baseUrl}/upload/csv?clear_existing=${clearExisting}`;
+        let url = `${this.baseUrl}/upload/csv`;
         if (sessionId) {
-            url += `&session_id=${encodeURIComponent(sessionId)}`;
+            url += `?session_id=${encodeURIComponent(sessionId)}`;
         }
 
         const response = await fetch(url, {
             method: 'POST',
+            headers: this.getHeaders(),
             body: formData,
         });
 
@@ -130,7 +149,7 @@ export class AurexAPI {
             ? `${this.baseUrl}/executive-summary?email=${encodeURIComponent(email)}`
             : `${this.baseUrl}/executive-summary`;
             
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
             throw new Error('Failed to fetch executive summary');
@@ -297,8 +316,7 @@ export class AurexAPI {
             user_name: string;
             email: string;
             company_name: string;
-        },
-        clearExisting: boolean = true
+        }
     ): Promise<{
         session: AuditSession;
         upload_result: {
@@ -318,7 +336,7 @@ export class AurexAPI {
         });
 
         // Step 2: Upload file and pass the session ID to link the events
-        const uploadResult = await this.uploadCSV(file, clearExisting, session.id);
+        const uploadResult = await this.uploadCSV(file, session.id);
 
         return {
             session,
@@ -333,14 +351,13 @@ export class AurexAPI {
             user_name: string;
             email: string;
             company_name: string;
-        },
-        clearExisting: boolean = true
+        }
     ): Promise<{
         session: AuditSession;
         summary: ExecutiveSummary;
     }> {
         // Upload with user info
-        const { session } = await this.uploadCSVWithUserInfo(file, userInfo, clearExisting);
+        const { session } = await this.uploadCSVWithUserInfo(file, userInfo);
 
         // Get analysis scoped to the user's email
         const summary = await this.getExecutiveSummary(userInfo.email);

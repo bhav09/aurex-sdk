@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Issue } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { Bot, MessageSquare, Send, X } from "lucide-react";
+import { Bot, Mail, CheckCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ChatLine = { role: "assistant" | "user"; text: string };
@@ -12,38 +12,31 @@ type ChatLine = { role: "assistant" | "user"; text: string };
 type AuditCopilotDockProps = {
     open: boolean;
     issue: Issue | null;
+    userEmail?: string | null;
     onClose: () => void;
 };
 
-export function AuditCopilotDock({ open, issue, onClose }: AuditCopilotDockProps) {
+export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopilotDockProps) {
     const [messages, setMessages] = useState<ChatLine[]>([]);
-    const [draft, setDraft] = useState("");
+    const [joinedWaitlist, setJoinedWaitlist] = useState(false);
 
     useEffect(() => {
         if (open && issue) {
             setMessages([
                 {
                     role: "assistant",
-                    text: `I’m focused on **${issue.title}** (${issue.severity}). Weekly burn: **$${issue.weekly_cost.toFixed(2)}**.\n\n${issue.one_line_summary}\n\nTell me your stack (Python/TS, OpenAI SDK version, framework) and I’ll draft a concrete change list. *This panel is a product demo—wire your model or agent here for real codegen.*`,
+                    text: `Hi! I'm the Aurex Agent. Soon, you'll be able to chat directly with your audit logs, ask for code snippets to fix leaks like **${issue.title}**, and optimize your stack.\n\nThis feature is currently in development. Join the waitlist to get early access!`,
                 },
             ]);
+            setJoinedWaitlist(false);
         }
     }, [open, issue?.rank, issue?.title]);
 
-    const handleSend = () => {
-        const t = draft.trim();
-        if (!t) return;
-        setMessages((m) => [...m, { role: "user", text: t }]);
-        setDraft("");
-        setTimeout(() => {
-            setMessages((m) => [
-                ...m,
-                {
-                    role: "assistant",
-                    text: "Got it. Next: paste the code path where you construct the chat payload, and I’ll suggest a minimal diff (cache policy, model routing, or batching) aligned with this issue.",
-                },
-            ]);
-        }, 400);
+    const handleJoinWaitlist = () => {
+        setJoinedWaitlist(true);
+        // In a real app, this would make an API call to record the interest
+        const emailParam = userEmail ? `&body=Please add ${encodeURIComponent(userEmail)} to the waitlist.` : "";
+        window.location.href = `mailto:contact@heyaurex.com?subject=Aurex Agent Waitlist${emailParam}`;
     };
 
     return (
@@ -64,12 +57,17 @@ export function AuditCopilotDock({ open, issue, onClose }: AuditCopilotDockProps
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/40 to-sky-500/30">
                                 <Bot className="h-5 w-5 text-white" />
                             </div>
-                            <div>
-                                <p className="text-sm font-semibold text-white">
-                                    Aurex agent
-                                </p>
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-semibold text-white">
+                                        Aurex agent
+                                    </p>
+                                    <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium text-violet-300 border border-violet-500/30">
+                                        Coming Soon
+                                    </span>
+                                </div>
                                 <p className="text-[10px] text-white/45">
-                                    Message dock · demo UX
+                                    Chat with your logs
                                 </p>
                             </div>
                         </div>
@@ -109,29 +107,29 @@ export function AuditCopilotDock({ open, issue, onClose }: AuditCopilotDockProps
                         ))}
                     </div>
 
-                    <div className="border-t border-white/10 p-3">
-                        <div className="flex gap-2 rounded-xl border border-white/10 bg-black/30 p-1">
-                            <MessageSquare className="mt-2.5 ml-2 h-4 w-4 shrink-0 text-white/35" />
-                            <textarea
-                                value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                                placeholder="Describe your stack or paste a snippet…"
-                                className="min-h-[44px] flex-1 resize-none bg-transparent py-2 text-sm text-white placeholder:text-white/35 focus:outline-none"
-                            />
-                            <Button
-                                size="icon"
-                                className="h-10 w-10 shrink-0 rounded-lg bg-violet-600 hover:bg-violet-500"
-                                onClick={handleSend}
-                            >
-                                <Send className="h-4 w-4" />
-                            </Button>
-                        </div>
+                    <div className="border-t border-white/10 p-4 bg-black/20">
+                        <Button
+                            onClick={handleJoinWaitlist}
+                            disabled={joinedWaitlist}
+                            className={cn(
+                                "w-full transition-all duration-300",
+                                joinedWaitlist 
+                                    ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30" 
+                                    : "bg-violet-600 hover:bg-violet-500 text-white"
+                            )}
+                        >
+                            {joinedWaitlist ? (
+                                <>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Thanks for your interest!
+                                </>
+                            ) : (
+                                <>
+                                    <Mail className="mr-2 h-4 w-4" />
+                                    Join Waitlist
+                                </>
+                            )}
+                        </Button>
                     </div>
                 </motion.div>
             )}

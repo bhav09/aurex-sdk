@@ -1,0 +1,207 @@
+---
+description: Test-driven development — write failing tests before implementation code for all features, bug fixes, and behavior changes
+alwaysApply: true
+---
+
+# Test-Driven Development (TDD)
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask the developer):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+## The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+## Red-Green-Refactor Cycle
+
+### RED — Write Failing Test
+
+Write one minimal test showing what should happen.
+
+**Requirements:**
+- One behavior per test
+- Clear descriptive name
+- Real code (no mocks unless unavoidable)
+
+**Good:**
+```python
+def test_rejects_empty_email():
+    result = submit_form({"email": ""})
+    assert result["error"] == "Email required"
+```
+
+**Bad:**
+```python
+def test_email():  # Vague name
+    mock = MagicMock(return_value="success")  # Tests mock, not code
+    assert mock() == "success"
+```
+
+### Verify RED — Watch It Fail (MANDATORY)
+
+```bash
+pytest path/to/test_file.py::test_name -v
+```
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature is missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix the test.
+**Test errors?** Fix the error, re-run until it fails correctly.
+
+### GREEN — Minimal Code
+
+Write the simplest code to pass the test. Don't add features, refactor other code, or "improve" beyond what the test requires.
+
+### Verify GREEN — Watch It Pass (MANDATORY)
+
+```bash
+pytest path/to/test_file.py -v
+```
+
+Confirm:
+- Test passes
+- Other tests still pass
+- No errors or warnings
+
+**Test fails?** Fix code, not test.
+**Other tests fail?** Fix now.
+
+### REFACTOR — Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+## Testing Anti-Patterns — DO NOT DO THESE
+
+### 1. Testing Mock Behavior
+
+```python
+# ❌ BAD: Testing that the mock exists
+def test_calls_service():
+    mock_service = MagicMock()
+    handler(mock_service)
+    mock_service.process.assert_called_once()  # Tests mock, not behavior
+```
+
+```python
+# ✅ GOOD: Test real behavior
+def test_processes_input():
+    result = handler(real_service, input_data)
+    assert result.status == "processed"
+```
+
+### 2. Test-Only Methods in Production Code
+
+```python
+# ❌ BAD: destroy() only used in tests
+class Session:
+    def destroy(self):  # Pollutes production API
+        self._cleanup()
+```
+
+```python
+# ✅ GOOD: Test utilities handle test cleanup
+# In tests/conftest.py
+def cleanup_session(session):
+    # Test-only cleanup logic here
+    pass
+```
+
+### 3. Mocking Without Understanding Dependencies
+
+Before mocking any method:
+1. Ask: "What side effects does the real method have?"
+2. Ask: "Does this test depend on any of those side effects?"
+3. If yes: mock at a lower level, not the high-level method the test depends on
+
+### 4. Incomplete Mocks
+
+Mock the COMPLETE data structure as it exists in reality, not just fields your immediate test uses. Partial mocks hide structural assumptions and fail silently when downstream code depends on omitted fields.
+
+### 5. Integration Tests as Afterthought
+
+Testing is part of implementation, not optional follow-up. You cannot claim work is complete without tests.
+
+## LMP-Specific Testing Standards
+
+Following the project's testing strategy and service layout:
+
+| Test Type | Location | Focus |
+|-----------|----------|-------|
+| **Unit** | `tests/unit/test_logic.py` | `app/core/logic.py` — mock all clients |
+| **Client** | `tests/unit/test_*_client.py` | `clients/*_client.py` — verify external calls |
+| **Integration** | `tests/integration/test_routes.py` | End-to-end route tests via `TestClient` |
+
+**Tools:** `pytest` + `pytest-asyncio` + `pytest-mock` + FastAPI `TestClient`
+
+**Patterns:**
+- Each test file mirrors the source file it tests
+- Use `unittest.mock.patch` or `pytest-mock` to mock clients in unit tests
+- Test both happy paths AND error/edge cases for every public function
+
+## Common Rationalizations — All Mean "Start Over"
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests passing immediately prove nothing. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test is hard to write" | Hard to test = hard to use. Fix the design. |
+| "TDD will slow me down" | TDD is faster than debugging. |
+| "I already manually tested" | Ad-hoc ≠ systematic. No record, can't re-run. |
+| "Existing code has no tests" | You're improving it. Add tests for what you touch. |
+
+## Red Flags — STOP and Start Over
+
+- Code written before test
+- Test written after implementation
+- Test passes immediately on first run
+- Can't explain why test failed
+- Asserting on mock elements rather than real behavior
+- Mock setup is >50% of the test
+- Methods only called in test files (test-only production code)
+
+## Verification Checklist
+
+Before marking work complete:
+
+- [ ] Every new function/method has a test
+- [ ] Watched each test fail before implementing
+- [ ] Each test failed for the expected reason
+- [ ] Wrote minimal code to pass each test
+- [ ] All tests pass
+- [ ] Output is clean (no errors, warnings)
+- [ ] Tests use real code (mocks only if unavoidable)
+- [ ] Edge cases and errors covered
+- [ ] No test-only methods in production classes

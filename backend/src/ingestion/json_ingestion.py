@@ -50,7 +50,7 @@ def parse_llm_use_session(session_file: Path) -> List[LLMEventCreate]:
         "total_tokens": 5000
     }
     """
-def parse_llm_use_session_data(session_data: dict, default_workflow_id: str = "unknown") -> List[LLMEventCreate]:
+def parse_llm_use_session_data(session_data: dict, default_workflow_id: str = "unknown", session_file_name: str = "unknown") -> List[LLMEventCreate]:
     """
     Parse a loaded JSON dict containing llm-use session data
     """
@@ -120,7 +120,7 @@ def parse_llm_use_session_data(session_data: dict, default_workflow_id: str = "u
                 extra_metadata={
                     "step_type": step_type,
                     "task": session_data.get("task"),
-                    "session_file": str(session_file)
+                    "session_file": session_file_name
                 }
             )
             
@@ -137,7 +137,7 @@ def parse_llm_use_session(session_file: Path) -> List[LLMEventCreate]:
     try:
         with open(session_file, 'r') as f:
             session_data = json.load(f)
-        return parse_llm_use_session_data(session_data, str(session_file.stem))
+        return parse_llm_use_session_data(session_data, str(session_file.stem), str(session_file))
     except Exception as e:
         logger.error("Error parsing session file", error=str(e), file_path=str(session_file))
         return []

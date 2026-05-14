@@ -92,6 +92,7 @@ export default function AuditPage() {
     const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
     const [copilotOpen, setCopilotOpen] = useState(false);
     const [copilotIssue, setCopilotIssue] = useState<Issue | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
 
     const simulateProgress = () => {
         const steps = [
@@ -103,14 +104,13 @@ export default function AuditPage() {
             "Checking for burst patterns...",
             "Evaluating model selection...",
             "Calculating optimization potential...",
-            "Generating recommendations...",
-            "Finalizing analysis..."
+            "Generating recommendations..."
         ];
         let currentStep = 0;
         const interval = setInterval(() => {
             if (currentStep < steps.length) {
                 setProgressSteps((prev) => [...prev, steps[currentStep]]);
-                setProgress(((currentStep + 1) / steps.length) * 100);
+                setProgress(((currentStep + 1) / (steps.length + 1)) * 100);
                 currentStep++;
             } else {
                 clearInterval(interval);
@@ -135,8 +135,12 @@ export default function AuditPage() {
 
         const progressInterval = simulateProgress();
         try {
-            const { summary } = await aurixAPI.completeAudit(file, userInfo, true);
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+            setUserEmail(userInfo.email);
+            const { summary } = await aurixAPI.completeAudit(file, userInfo);
+            clearInterval(progressInterval);
+            setProgressSteps((prev) => [...prev, "Finalizing analysis..."]);
+            setProgress(100);
+            await new Promise((resolve) => setTimeout(resolve, 500));
             setData(summary);
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Upload failed";
@@ -833,6 +837,7 @@ export default function AuditPage() {
             <AuditCopilotDock
                 open={copilotOpen}
                 issue={copilotIssue}
+                userEmail={userEmail}
                 onClose={() => {
                     setCopilotOpen(false);
                     setCopilotIssue(null);
