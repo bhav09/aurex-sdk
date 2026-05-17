@@ -95,16 +95,12 @@ export class AurexAPI {
 
     constructor(baseUrl: string = API_BASE_URL) {
         this.baseUrl = baseUrl;
-        if (typeof window !== 'undefined') {
-            this.token = localStorage.getItem('aurex_token');
-        }
+        // Token is intentionally kept only in memory to prevent XSS attacks
+        // from stealing the token via localStorage or sessionStorage.
     }
 
     setToken(token: string) {
         this.token = token;
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('aurex_token', token);
-        }
     }
 
     private getHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
@@ -174,7 +170,7 @@ export class AurexAPI {
         if (params?.model) queryParams.append('model', params.model);
 
         const url = `${this.baseUrl}/events${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
             throw new Error('Failed to fetch events');
@@ -187,6 +183,7 @@ export class AurexAPI {
     async clearData(): Promise<{ status: string; events_deleted: number }> {
         const response = await fetch(`${this.baseUrl}/clear-data?confirm=true`, {
             method: 'DELETE',
+            headers: this.getHeaders(),
         });
 
         if (!response.ok) {
@@ -215,7 +212,7 @@ export class AurexAPI {
         return response.json();
     }
 
-    async verifyOTP(email: string, otp: string): Promise<{ status: string; message: string }> {
+    async verifyOTP(email: string, otp: string): Promise<{ status: string; message: string; access_token?: string; token_type?: string }> {
         const response = await fetch(`${this.baseUrl}/auth/verify-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -227,7 +224,13 @@ export class AurexAPI {
             throw new Error(error.detail || 'Failed to verify OTP');
         }
         
-        return response.json();
+        const data = await response.json();
+        
+        if (data.access_token) {
+            this.setToken(data.access_token);
+        }
+        
+        return data;
     }
 
     // ============================================================================
@@ -238,9 +241,9 @@ export class AurexAPI {
     async createAuditSession(data: CreateAuditSessionRequest): Promise<AuditSession> {
         const response = await fetch(`${this.baseUrl}/audit/sessions`, {
             method: 'POST',
-            headers: {
+            headers: this.getHeaders({
                 'Content-Type': 'application/json',
-            },
+            }),
             body: JSON.stringify(data),
         });
 
@@ -268,9 +271,9 @@ export class AurexAPI {
     ): Promise<AuditSession> {
         const response = await fetch(`${this.baseUrl}/audit/sessions/${sessionId}`, {
             method: 'PATCH',
-            headers: {
+            headers: this.getHeaders({
                 'Content-Type': 'application/json',
-            },
+            }),
             body: JSON.stringify(data),
         });
 
@@ -284,7 +287,7 @@ export class AurexAPI {
 
     // Get audit session by ID
     async getAuditSession(sessionId: string): Promise<AuditSession> {
-        const response = await fetch(`${this.baseUrl}/audit/sessions/${sessionId}`);
+        const response = await fetch(`${this.baseUrl}/audit/sessions/${sessionId}`, { headers: this.getHeaders() });
 
         if (!response.ok) {
             throw new Error('Failed to fetch audit session');
@@ -299,7 +302,8 @@ export class AurexAPI {
         total: number;
     }> {
         const response = await fetch(
-            `${this.baseUrl}/audit/history/${encodeURIComponent(email)}?skip=${skip}&limit=${limit}`
+            `${this.baseUrl}/audit/history/${encodeURIComponent(email)}?skip=${skip}&limit=${limit}`,
+            { headers: this.getHeaders() }
         );
 
         if (!response.ok) {
