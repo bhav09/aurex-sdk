@@ -840,8 +840,8 @@ function fullReportHtml(
 window.addEventListener("hashchange", () => void boot());
 
 async function boot(): Promise<void> {
-  await initModelCatalog();
   render();
+  initModelCatalog().catch(console.error);
 }
 
 void boot();

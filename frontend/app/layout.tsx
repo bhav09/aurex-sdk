@@ -1,18 +1,17 @@
 import React from "react"
 import type { Metadata } from 'next'
-import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
+import { Inter, Outfit, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const instrumentSans = Instrument_Sans({
+const inter = Inter({
   subsets: ["latin"],
-  variable: '--font-instrument'
+  variable: '--font-inter'
 });
 
-const instrumentSerif = Instrument_Serif({
+const outfit = Outfit({
   subsets: ["latin"],
-  weight: "400",
-  variable: '--font-instrument-serif'
+  variable: '--font-outfit'
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -33,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${instrumentSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>

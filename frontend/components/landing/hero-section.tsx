@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { Button } from "@/components/ui/button";
 
 const words = ["analyze", "optimize", "reduce", "save"];
 
@@ -165,7 +166,7 @@ export function HeroSection() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
               <span className="w-8 h-px bg-white/30" />
-              AI Token Usage Auditor
+              The FinOps Platform for the AI Era
               <span className="w-8 h-px bg-white/30" />
             </span>
           </div>
@@ -176,13 +177,20 @@ export function HeroSection() {
               className={`text-center text-[clamp(2.5rem,7vw,8rem)] font-display leading-[0.88] tracking-[-0.02em] text-white transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
             >
-              <span className="block">crafted for efficient</span>
-              <span className="block">AI systems</span>
+              <span className="block">reduce inference</span>
+              <span className="block text-stroke">costs automatically.</span>
             </h1>
-            <p className={`text-xl text-white/70 mt-8 max-w-2xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            <p className={`text-lg md:text-xl text-white/60 mt-8 max-w-xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}>
-              AI startups waste 64% of inference spend on redundant prompts, agent loops, and over-provisioned models. Aurex finds the leaks
+              ai companies pay daily for compute. your customers pay monthly. aurex closes the cash-flow gap with real-time cost visibility, intelligent routing, and net-30 inference financing.
             </p>
+            <div className={`mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-1000 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+              <a href="/audit">
+                <Button className="rounded-full bg-white hover:bg-white/90 text-black px-8 h-12 text-base font-medium">
+                  Run Free Audit
+                </Button>
+              </a>
+            </div>
           </div>
         </div>
       </div>
