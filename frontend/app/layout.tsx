@@ -1,0 +1,41 @@
+import React from "react"
+import type { Metadata } from 'next'
+import { Inter, Outfit, JetBrains_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
+import './globals.css'
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: '--font-inter'
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: '--font-outfit'
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: '--font-jetbrains'
+});
+
+export const metadata: Metadata = {
+  title: 'Aurex - AI Token Usage Auditor',
+  description: 'Find and eliminate wasted AI tokens instantly. Analyze your GPT, Claude, and Gemini usage locally. No data leaves your system.',
+  generator: 'v0.app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+        {children}
+        <Analytics />
+      </body>
+    </html>
+  )
+}

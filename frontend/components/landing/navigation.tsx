@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
@@ -41,15 +40,18 @@ export function Navigation() {
             }`}
         >
           {/* Logo */}
-          <a href="/" className="flex items-center group">
+          <a href="/" className="flex items-center gap-3 group">
             <Image
               src="/heyaurex_logo/1.png"
               alt="AUREX logo"
               width={140}
               height={120}
-              className={`w-auto transition-all duration-500 ${isScrolled ? "h-10" : "h-12"}`}
+              className={`w-auto transition-all duration-500 ${isScrolled ? "h-8" : "h-10"}`}
               priority
             />
+            <span className={`font-serif uppercase tracking-[0.2em] font-medium transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>
+              AUREX
+            </span>
           </a>
 
           {/* Desktop Navigation */}
@@ -66,17 +68,6 @@ export function Navigation() {
             ))}
           </div>
 
-          {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-4">
-            <a href="/audit">
-              <Button
-                size="sm"
-                className={`rounded-full transition-all duration-500 ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"}`}
-              >
-                Run Free Audit
-              </Button>
-            </a>
-          </div>
 
           {/* Mobile Menu Button */}
           <button
@@ -121,22 +112,7 @@ export function Navigation() {
             ))}
           </div>
 
-          {/* Bottom CTAs */}
-          <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-all duration-500 ${isMobileMenuOpen
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-4"
-            }`}
-            style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
-          >
-            <a href="/audit" className="w-full">
-              <Button
-                className="w-full bg-foreground text-background rounded-full h-14 text-base"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Run Free Audit
-              </Button>
-            </a>
-          </div>
+
         </div>
       </div>
     </header>

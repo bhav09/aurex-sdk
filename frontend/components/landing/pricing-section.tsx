@@ -19,12 +19,12 @@ const plans = [
     highlight: false,
   },
   {
-    name: "SaaS Subscription",
-    description: "Flat monthly fee for the proxy, observability dashboard, and cost-analytics layer",
-    priceDisplay: "$299",
-    billingDisplay: "per month",
+    name: "Performance Plan",
+    description: "We only make money when you save money. We take a cut of the token costs we automatically save you.",
+    priceDisplay: "10%",
+    billingDisplay: "of realized savings",
     features: [
-      "Unlimited audits",
+      "No upfront costs or flat fees",
       "Real-time observability dashboard",
       "Intelligent routing proxy",
       "Advanced cost analytics",
@@ -39,7 +39,7 @@ const plans = [
     priceDisplay: "3-5%",
     billingDisplay: "liquidity fee on financed spend",
     features: [
-      "Everything in SaaS Subscription",
+      "Everything in Performance Plan",
       "Net-30 inference financing",
       "Rate based on your token efficiency",
       "Dedicated capital partner",
