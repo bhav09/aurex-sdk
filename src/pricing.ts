@@ -92,6 +92,11 @@ export const DOWNGRADE_MAP: Record<string, string> = {
 export function downgradeHint(model: string): string | null {
   const k = canonModel(model);
   for (const [expensive, hint] of Object.entries(DOWNGRADE_MAP)) {
+    // Avoid circular downgrade suggestions where mini/haiku models inherit their premium versions' rules
+    if (k.includes("-mini") || k.includes("-haiku")) {
+      if (k === expensive) return hint;
+      continue;
+    }
     if (k.includes(expensive) || expensive.includes(k)) return hint;
   }
   return null;
