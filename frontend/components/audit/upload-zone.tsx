@@ -10,35 +10,49 @@ import { DataExportGuide } from "@/components/audit/data-export-guide";
 
 interface UploadZoneProps {
     onFileSelect: (file: File, userInfo: { user_name: string; email: string; company_name: string }) => void;
+    initialFile?: File | null;
+    initialIsOtpStep?: boolean;
+    initialUserInfo?: { user_name: string; email: string; company_name: string } | null;
+    otpNotice?: string | null;
+    onResetPending?: () => void;
 }
 
-export function UploadZone({ onFileSelect }: UploadZoneProps) {
+export function UploadZone({ 
+    onFileSelect,
+    initialFile = null,
+    initialIsOtpStep = false,
+    initialUserInfo = null,
+    otpNotice = null,
+    onResetPending
+}: UploadZoneProps) {
     const [isMounted, setIsMounted] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(initialFile);
     const [error, setError] = useState<string | null>(null);
-    const [userName, setUserName] = useState("");
-    const [email, setEmail] = useState("");
-    const [companyName, setCompanyName] = useState("");
+    const [userName, setUserName] = useState(initialUserInfo?.user_name || "");
+    const [email, setEmail] = useState(initialUserInfo?.email || "");
+    const [companyName, setCompanyName] = useState(initialUserInfo?.company_name || "");
     const [formErrors, setFormErrors] = useState<{
         userName?: string;
         email?: string;
         companyName?: string;
     }>({});
-    const [isOtpStep, setIsOtpStep] = useState(false);
+    const [isOtpStep, setIsOtpStep] = useState(initialIsOtpStep);
     const [otp, setOtp] = useState("");
     const [otpError, setOtpError] = useState<string | null>(null);
     const [otpLoading, setOtpLoading] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
-        const userInfo = aurixAPI.getUserInfo();
-        if (userInfo) {
-            setUserName(userInfo.user_name);
-            setEmail(userInfo.email);
-            setCompanyName(userInfo.company_name);
+        if (!initialUserInfo) {
+            const userInfo = aurixAPI.getUserInfo();
+            if (userInfo) {
+                setUserName(userInfo.user_name);
+                setEmail(userInfo.email);
+                setCompanyName(userInfo.company_name);
+            }
         }
-    }, []);
+    }, [initialUserInfo]);
 
     const validateFile = (file: File): boolean => {
         const validExtensions = ['.csv', '.json'];
@@ -203,6 +217,9 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
         setCompanyName("");
         setFormErrors({});
         setError(null);
+        if (onResetPending) {
+            onResetPending();
+        }
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -216,11 +233,17 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             <div className="sm:mx-auto sm:max-w-lg flex items-center justify-center p-10 w-full max-w-lg">
                 <form onSubmit={handleOtpSubmit} className="w-full space-y-4">
                     <h3 className="text-lg font-semibold text-foreground">Verify your email</h3>
-                    <p className="text-sm text-muted-foreground">
-                        We've sent a 6-digit code to <strong>{email}</strong>. The code will expire in 10 minutes.
-                    </p>
+                    {otpNotice ? (
+                        <div className="text-sm text-yellow-400 bg-yellow-400/[0.04] border border-yellow-400/20 p-4 rounded-xl leading-relaxed">
+                            {otpNotice}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            We've sent a 6-digit code to <strong>{email}</strong>. The code will expire in 10 minutes.
+                        </p>
+                    )}
                     
-                    <div>
+                    <div className="pt-2">
                         <Label htmlFor="otp" className="text-sm font-medium">Verification Code</Label>
                         <Input
                             id="otp"
@@ -247,7 +270,12 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setIsOtpStep(false)}
+                            onClick={() => {
+                                setIsOtpStep(false);
+                                if (onResetPending) {
+                                    onResetPending();
+                                }
+                            }}
                             className="whitespace-nowrap rounded-sm px-4 py-2 text-sm"
                             disabled={otpLoading}
                         >
