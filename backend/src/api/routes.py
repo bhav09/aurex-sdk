@@ -424,7 +424,7 @@ async def upload_csv(
         for col in ["context_length", "contextlength", "context_tokens", "contexttokens", "input_tokens", "prompt_tokens"]:
             if col in row and pd.notna(row[col]):
                 try:
-                    context_length = int(row[col])
+                    context_length = int(float(sanitize_number(row[col])))
                     break
                 except:
                     continue
