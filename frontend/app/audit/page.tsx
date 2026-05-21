@@ -190,11 +190,12 @@ export default function AuditPage() {
     };
 
     const handleExportCSV = () => {
-        if (!events || events.length === 0) return;
+        const eventsToExport = currentEvents && currentEvents.length > 0 ? currentEvents : events;
+        if (!eventsToExport || eventsToExport.length === 0) return;
         
         const headers = ["Timestamp", "Workflow ID", "Provider", "Model", "Cost", "Total Tokens", "Input Tokens", "Output Tokens", "Context Length", "Latency (ms)"];
         
-        const csvRows = events.map(e => {
+        const csvRows = eventsToExport.map(e => {
             return [
                 e.timestamp || "",
                 e.workflow_id || "",
@@ -271,7 +272,7 @@ export default function AuditPage() {
 
     const workflows = Object.keys(groupedEvents);
     const currentWorkflow = selectedWorkflow || workflows[0];
-    const currentEvents = currentWorkflow ? groupedEvents[currentWorkflow] : [];
+    const currentEvents = currentWorkflow ? (groupedEvents[currentWorkflow] || []) : [];
     const currentIssue = currentWorkflow ? getIssueForWorkflow(currentWorkflow) : undefined;
 
     const openCopilot = (issue: Issue) => {
@@ -419,6 +420,13 @@ export default function AuditPage() {
                             <CreditScoreCard
                                 score={calculateScore(data.executive_summary.waste_percentage)}
                             />
+                            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center backdrop-blur-md">
+                                <p className="text-sm text-white/70 leading-relaxed max-w-3xl mx-auto">
+                                    We analyzed <strong>{data.total_events.toLocaleString()}</strong> LLM requests across <strong>{data.workflow_breakdown.length}</strong> workflows. 
+                                    Our engine identified <strong>${data.executive_summary.wasted_amount.toFixed(2)}</strong> in weekly waste, representing <strong>{data.executive_summary.waste_percentage.toFixed(1)}%</strong> of your total spend. 
+                                    Implementing the top fixes below could project annual savings of <strong>${data.executive_summary.annual_savings_projection.toLocaleString()}</strong>.
+                                </p>
+                            </div>
                         </motion.div>
 
                         <motion.div
@@ -617,8 +625,16 @@ export default function AuditPage() {
                                                             <div key={workflow.workflow_id} className="space-y-2">
                                                                 <div className="flex items-center justify-between">
                                                                     <div>
-                                                                        <span className="text-sm font-semibold text-white">
-                                                                            {workflow.workflow_id}
+                                                                        <span className="text-sm font-semibold text-white flex items-center gap-2">
+                                                                            {workflow.workflow_id === "unknown" ? "Unlabeled Workflow" : 
+                                                                             workflow.workflow_id.startsWith("inferred_session_") ? "Inferred Session (Time-based)" : 
+                                                                             workflow.workflow_id}
+                                                                            
+                                                                            {(workflow.workflow_id === "unknown" || workflow.workflow_id.startsWith("inferred_session_")) && (
+                                                                                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/60 font-normal">
+                                                                                    Missing Automation ID column in export
+                                                                                </span>
+                                                                            )}
                                                                         </span>
                                                                         <span className="ml-2 text-xs text-white/40">
                                                                             {workflow.request_count.toLocaleString()} requests
@@ -717,30 +733,66 @@ export default function AuditPage() {
                                             </div>
 
                                             {currentIssue && (
-                                                <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 backdrop-blur-sm">
-                                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                                                        <AlertTriangle className="h-6 w-6 shrink-0 text-red-400" />
+                                                <div className="rounded-2xl border border-red-500/30 bg-gradient-to-br from-red-500/10 to-red-900/10 p-6 backdrop-blur-md shadow-lg shadow-red-500/5">
+                                                    <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                                                        <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/20">
+                                                            <AlertTriangle className="h-5 w-5 text-red-400" />
+                                                        </div>
                                                         <div className="min-w-0 flex-1">
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <h3 className="text-lg font-semibold text-red-200">
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                <h3 className="text-xl font-bold text-red-200">
                                                                     {currentIssue.title}
                                                                 </h3>
-                                                                <Badge className="border-red-400/40 bg-red-500/20 text-red-300">
+                                                                <Badge className="border-red-400/40 bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-300">
                                                                     {currentIssue.severity}
                                                                 </Badge>
+                                                                <Badge variant="outline" className="border-white/10 text-white/50 bg-white/5">
+                                                                    {currentIssue.affected_event_count.toLocaleString()} affected requests
+                                                                </Badge>
                                                             </div>
-                                                            <p className="mt-2 text-sm text-red-200/75">
+                                                            <p className="mt-3 text-sm leading-relaxed text-red-200/80">
                                                                 {currentIssue.one_line_summary}
                                                             </p>
-                                                            <p className="mt-2 font-mono text-lg font-bold text-red-300">
-                                                                ${currentIssue.weekly_cost.toFixed(2)}/week wasted
-                                                            </p>
+                                                            
+                                                            {currentIssue.metadata?.fix_instructions && (
+                                                                <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5">
+                                                                    <div className="flex items-center gap-2 text-sm font-semibold text-emerald-300 mb-1">
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                        Recommended Engineering Fix
+                                                                    </div>
+                                                                    <p className="text-sm text-emerald-200/80 leading-relaxed">
+                                                                        {currentIssue.metadata.fix_instructions}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-red-500/10 pt-4">
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-red-300/50">Weekly Waste</p>
+                                                                    <p className="font-mono text-lg font-bold text-red-400">${currentIssue.weekly_cost.toFixed(2)}</p>
+                                                                </div>
+                                                                <div className="h-8 w-px bg-red-500/20 hidden sm:block"></div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300/50">Annual Projection</p>
+                                                                    <p className="font-mono text-lg font-bold text-emerald-400">${(currentIssue.weekly_cost * 52).toLocaleString()}</p>
+                                                                </div>
+                                                                <div className="h-8 w-px bg-red-500/20 hidden sm:block"></div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Engineering Effort</p>
+                                                                    <p className="text-sm font-medium text-white/70">{currentIssue.fix_effort}</p>
+                                                                </div>
+                                                                <div className="h-8 w-px bg-red-500/20 hidden sm:block"></div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Confidence</p>
+                                                                    <p className="text-sm font-medium text-white/70">{currentIssue.fix_confidence}</p>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                         <Button
-                                                            size="sm"
-                                                            className="shrink-0 bg-violet-600 hover:bg-violet-500"
+                                                            className="shrink-0 bg-violet-600 hover:bg-violet-500 shadow-lg shadow-violet-500/20"
                                                             onClick={() => openCopilot(currentIssue)}
                                                         >
+                                                            <Zap className="mr-2 h-4 w-4" />
                                                             Fix with agent
                                                         </Button>
                                                     </div>

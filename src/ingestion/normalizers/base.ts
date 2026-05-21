@@ -59,6 +59,10 @@ export abstract class BaseNormalizer implements Normalizer {
 
   protected num(v: unknown, fallback = 0): number {
     if (v == null || v === "") return fallback;
+    if (typeof v === 'string') {
+      // Strip commas and spaces from string numbers (e.g., "29,104")
+      v = v.replace(/[, ]/g, "");
+    }
     const n = Number(v);
     return Number.isFinite(n) ? n : fallback;
   }

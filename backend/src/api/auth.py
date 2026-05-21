@@ -24,9 +24,30 @@ JWT_EXPIRATION_MINUTES = settings.jwt_expiration_minutes
 
 security = HTTPBearer()
 
-# Redis Configuration
+# Redis Configuration (Mocked for local dev)
 REDIS_URL = getattr(settings, "redis_url", "redis://localhost:6379/0")
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+
+class MockRedis:
+    def __init__(self):
+        self.store = {}
+        self.lists = {}
+    async def get(self, key):
+        return self.store.get(key)
+    async def setex(self, key, ttl, value):
+        self.store[key] = value
+    async def delete(self, key):
+        self.store.pop(key, None)
+        self.lists.pop(key, None)
+    async def lrange(self, key, start, end):
+        return self.lists.get(key, [])
+    async def rpush(self, key, *values):
+        if key not in self.lists:
+            self.lists[key] = []
+        self.lists[key].extend(values)
+    async def expire(self, key, ttl):
+        pass
+
+redis_client = MockRedis()
 
 def create_access_token(data: dict):
     to_encode = data.copy()

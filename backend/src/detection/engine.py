@@ -195,19 +195,20 @@ class EnhancedDetectionEngine:
         self.detect_expensive_model_misuse_enhanced()
         self.detect_context_explosion_enhanced()
         
-        # Calculate wasted cost (avoid double-counting)
-        unique_wasted_events = set()
+        # Calculate wasted cost transparently (avoid double-counting by capping at event cost)
+        event_waste_map = defaultdict(float)
         for issue in self.issues:
-            unique_wasted_events.update(issue.affected_events)
-        
-        if unique_wasted_events:
-            wasted_events_cost = sum(e.cost for e in self.events if e.id in unique_wasted_events)
-            # Conservative estimate: 70% of flagged event cost is waste
-            wasted_cost = wasted_events_cost * 0.70
-        else:
-            wasted_cost = 0.0
-        
-        wasted_cost = min(wasted_cost, total_cost * 0.95)  # Cap at 95% of total
+            if issue.affected_events:
+                per_event_waste = issue.weekly_cost / len(issue.affected_events)
+                for event_id in issue.affected_events:
+                    event_waste_map[event_id] += per_event_waste
+                    
+        wasted_cost = 0.0
+        event_cost_map = {e.id: e.cost for e in self.events}
+        for event_id, total_assigned_waste in event_waste_map.items():
+            actual_cost = event_cost_map.get(event_id, 0.0)
+            wasted_cost += min(total_assigned_waste, actual_cost)
+            
         optimized_cost = total_cost - wasted_cost
         
         # Analyze workflows
@@ -266,6 +267,8 @@ class EnhancedDetectionEngine:
         This is often the #1 cost driver
         """
         prompts = defaultdict(list)
+        
+        # 1. Group by exact prompt hash (if available)
         for event in self.events:
             prompt_hash = event.system_prompt_hash
             if not prompt_hash and event.extra_metadata:
@@ -273,6 +276,24 @@ class EnhancedDetectionEngine:
                 
             if prompt_hash:
                 prompts[prompt_hash].append(event)
+                
+        # 2. Fallback: Group by exact input tokens within an inferred session
+        if not prompts:
+            sessions = self._get_inferred_sessions()
+            for session_id, events_list in sessions.items():
+                if len(events_list) < 3:
+                    continue
+                # Cluster by identical input_tokens
+                token_clusters = defaultdict(list)
+                for e in events_list:
+                    if e.input_tokens > 100: # Only care about decently large redundant prompts
+                        token_clusters[e.input_tokens].append(e)
+                
+                for tokens, evs in token_clusters.items():
+                    if len(evs) >= 3:
+                        import uuid
+                        inferred_hash = f"inferred_prompt_{tokens}_{uuid.uuid4().hex[:8]}"
+                        prompts[inferred_hash].extend(evs)
                 
         for prompt_hash, events_list in prompts.items():
             if len(events_list) < 2:
@@ -323,9 +344,14 @@ class EnhancedDetectionEngine:
             )
             self.issues.append(issue)
     
-    def detect_agent_loops_enhanced(self):
-        """Enhanced agent loop detection with exponential pattern recognition"""
+    def _get_inferred_sessions(self) -> Dict[str, List[LLMEvent]]:
+        """
+        Groups events into sessions. Uses explicit workflow_id/session_id if available.
+        Otherwise, falls back to temporal clustering (5-min window).
+        """
         sessions = defaultdict(list)
+        unassigned_events = []
+        
         for event in sorted(self.events, key=lambda e: e.timestamp or datetime.min):
             session_id = None
             if event.extra_metadata:
@@ -335,6 +361,35 @@ class EnhancedDetectionEngine:
             
             if session_id:
                 sessions[session_id].append(event)
+            else:
+                unassigned_events.append(event)
+                
+        if unassigned_events:
+            # Group by model
+            model_groups = defaultdict(list)
+            for e in unassigned_events:
+                model_groups[e.model].append(e)
+                
+            for model, evs in model_groups.items():
+                current_session_id = None
+                last_time = None
+                
+                for e in evs:
+                    ts = e.timestamp or datetime.min
+                    
+                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > 300:
+                        import uuid
+                        current_session_id = f"inferred_session_{uuid.uuid4().hex[:8]}"
+                    
+                    e.workflow_id = current_session_id
+                    sessions[current_session_id].append(e)
+                    last_time = ts
+                    
+        return sessions
+
+    def detect_agent_loops_enhanced(self):
+        """Enhanced agent loop detection with exponential pattern recognition and temporal fallback"""
+        sessions = self._get_inferred_sessions()
         
         for session_id, events_list in sessions.items():
             if len(events_list) < 3:
@@ -386,17 +441,20 @@ class EnhancedDetectionEngine:
     
     def detect_expensive_model_misuse_enhanced(self):
         """
-        Enhanced expensive model detection with workflow-specific recommendations
+        Dynamic expensive model detection with workflow-specific recommendations
         Detects over-provisioned models: expensive models used for simple tasks
         """
-        expensive_models = ["gpt-4o", "gpt-4", "gpt-4-turbo", "claude-3-opus", "claude-opus-4", "claude-3-7-sonnet"]
+        from src.utils.pricing import get_model_pricing
+        
         workflow_model_events = defaultdict(lambda: defaultdict(list))
         
         for event in self.events:
-            is_expensive = any(exp in event.model.lower() for exp in expensive_models)
-            if any(cheap in event.model.lower() for cheap in ["mini", "haiku", "flash"]):
-                is_expensive = False
+            input_price, output_price = get_model_pricing(event.model)
             
+            # Dynamic expensive classification: If input price > $2.00 per 1M tokens
+            is_expensive = input_price > 2.00
+            
+            # Simple task threshold
             is_simple = event.input_tokens < 500 and event.output_tokens < 100
             
             if is_expensive and is_simple:
@@ -410,20 +468,16 @@ class EnhancedDetectionEngine:
                 
                 current_cost = sum(e.cost for e in events_list)
                 
-                if "gpt-4o" in model.lower() and "mini" not in model.lower():
-                    savings_multiplier = 0.94
-                elif "gpt-4" in model.lower():
-                    savings_multiplier = 0.95
-                elif "claude" in model.lower() and "opus" in model.lower():
-                    savings_multiplier = 0.93
-                elif "claude" in model.lower() and "sonnet" in model.lower():
-                    savings_multiplier = 0.85
-                else:
-                    savings_multiplier = 0.90
+                # Assume a cheap model fallback like gpt-4o-mini or claude-3-haiku
+                # e.g., input price drops from $5.00 to $0.15 (~97% savings)
+                # Let's conservatively estimate 90% savings for standard generic simple tasks
+                savings_multiplier = 0.90
                 
                 wasted_cost = current_cost * savings_multiplier
                 avg_input = sum(e.input_tokens for e in events_list) / len(events_list)
                 avg_output = sum(e.output_tokens for e in events_list) / len(events_list)
+                
+                recommended_model = "gpt-4o-mini" if "gpt" in model.lower() or "o1" in model.lower() else "claude-3-5-haiku"
                 
                 issue = EnhancedIssue(
                     rank=0,
@@ -434,31 +488,29 @@ class EnhancedDetectionEngine:
                     one_line_summary=f"Using {model} for {len(events_list)} simple tasks (avg {avg_input:.0f} in / {avg_output:.0f} out tokens)",
                     fix_effort="2 minutes",
                     fix_confidence="HIGH",
-                    cta="Switch to GPT-4o-mini or Haiku",
+                    cta=f"Switch to {recommended_model}",
                     affected_workflow=wf_id,
                     affected_events=[e.id for e in events_list],
                     metadata={
                         "current_model": model,
-                        "recommended_model": "gpt-4o-mini" if "gpt" in model.lower() else "claude-3-5-haiku",
+                        "recommended_model": recommended_model,
                         "request_count": len(events_list),
                         "avg_input_tokens": round(avg_input, 0),
                         "avg_output_tokens": round(avg_output, 0),
                         "current_cost": round(current_cost, 2),
                         "potential_cost": round(current_cost - wasted_cost, 2),
                         "savings_percentage": round(savings_multiplier * 100, 0),
-                        "fix_instructions": "Route simple tasks (<500 input, <100 output tokens) to cheaper models like gpt-4o-mini or claude-haiku"
+                        "fix_instructions": f"Route simple tasks (<500 input, <100 output tokens) to cheaper models like {recommended_model}",
+                        "calculation_formula": "wasted_cost = current_cost * 0.90 (estimated savings)"
                     }
                 )
                 self.issues.append(issue)
     
     def detect_context_explosion_enhanced(self):
-        """Enhanced context explosion detection"""
-        workflows = defaultdict(list)
-        for event in sorted(self.events, key=lambda e: e.timestamp or datetime.min):
-            if event.workflow_id and (event.context_length is not None or event.input_tokens > 0):
-                workflows[event.workflow_id].append(event)
+        """Enhanced context explosion detection with temporal fallback"""
+        sessions = self._get_inferred_sessions()
         
-        for wf_id, events_list in workflows.items():
+        for wf_id, events_list in sessions.items():
             if len(events_list) < 2:
                 continue
             

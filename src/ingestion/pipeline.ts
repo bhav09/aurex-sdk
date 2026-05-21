@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import { CanonicalEvent } from "./contracts";
 import { normalizers, NormalizerContext, Normalizer } from "./normalizers";
+import { UserMappedCsvNormalizer, UserColumnMapping } from "./normalizers/user_mapped_csv";
 
 export interface PipelineOptions {
   onProgress(rowsProcessed: number): void;
@@ -8,6 +9,7 @@ export interface PipelineOptions {
   onWarning(message: string): void;
   onError(message: string): void;
   onComplete(): void;
+  userMapping?: UserColumnMapping;
 }
 
 export function runIngestionPipeline(file: File, options: PipelineOptions): void {
@@ -100,7 +102,12 @@ export function runIngestionPipeline(file: File, options: PipelineOptions): void
         }
 
         const headers = results.meta.fields || Object.keys(chunkRecords[0] || {});
-        normalizer = selectNormalizer(headers, chunkRecords);
+        
+        if (options.userMapping) {
+          normalizer = new UserMappedCsvNormalizer(options.userMapping);
+        } else {
+          normalizer = selectNormalizer(headers, chunkRecords);
+        }
         
         if (!normalizer) {
           parser.abort();
@@ -130,7 +137,7 @@ export function runIngestionPipeline(file: File, options: PipelineOptions): void
   });
 }
 
-function selectNormalizer(headers: string[], firstRows: Record<string, unknown>[]): Normalizer | null {
+export function selectNormalizer(headers: string[], firstRows: Record<string, unknown>[] = []): Normalizer | null {
   for (const norm of normalizers) {
     if (norm.canHandle(headers, firstRows)) {
       return norm;

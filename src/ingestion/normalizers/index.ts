@@ -12,3 +12,4 @@ export * from "./base";
 export * from "./anthropic_csv";
 export * from "./bedrock_csv";
 export * from "./openai_csv";
+export * from "./user_mapped_csv";
