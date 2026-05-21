@@ -8,25 +8,42 @@ from src.detection.engine import EnhancedDetectionEngine, ExecutiveSummary, Work
 
 class TestExecutiveSummary:
     def test_executive_summary_severity_low(self):
-        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=10.0, optimized_spend=90.0)
+        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=10.0, optimized_spend=90.0, period_days=7)
         assert summary.waste_percentage == 10.0
         assert summary.severity == "LOW"
-        assert summary.annual_savings_projection == 520.0
+        assert abs(summary.annual_savings_projection - (10.0 / 7 * 365)) < 1e-4
+        assert summary.credit_score == 90
 
     def test_executive_summary_severity_medium(self):
-        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=20.0, optimized_spend=80.0)
+        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=20.0, optimized_spend=80.0, period_days=7)
         assert summary.waste_percentage == 20.0
         assert summary.severity == "MEDIUM"
+        assert summary.credit_score == 80
 
     def test_executive_summary_severity_high(self):
-        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=40.0, optimized_spend=60.0)
+        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=40.0, optimized_spend=60.0, period_days=7)
         assert summary.waste_percentage == 40.0
         assert summary.severity == "HIGH"
+        assert summary.credit_score == 60
 
     def test_executive_summary_severity_critical(self):
-        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=60.0, optimized_spend=40.0)
+        summary = ExecutiveSummary(current_spend=100.0, wasted_amount=60.0, optimized_spend=40.0, period_days=7)
         assert summary.waste_percentage == 60.0
         assert summary.severity == "CRITICAL"
+        assert summary.credit_score == 40
+
+    def test_executive_summary_normalization_different_periods(self):
+        # 1-day period
+        summary_1d = ExecutiveSummary(current_spend=10.0, wasted_amount=2.0, optimized_spend=8.0, period_days=1)
+        assert summary_1d.current_weekly_spend == 70.0
+        assert summary_1d.wasted_amount == 14.0
+        assert summary_1d.annual_savings_projection == 2.0 * 365
+        
+        # 30-day period
+        summary_30d = ExecutiveSummary(current_spend=300.0, wasted_amount=60.0, optimized_spend=240.0, period_days=30)
+        assert summary_30d.current_weekly_spend == 70.0
+        assert summary_30d.wasted_amount == 14.0
+        assert summary_30d.annual_savings_projection == (60.0 / 30) * 365
 
 
 @pytest.mark.asyncio
