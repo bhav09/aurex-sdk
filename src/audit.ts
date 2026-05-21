@@ -96,25 +96,96 @@ export function recordToUsageRow(
   headerNorms: Set<string>
 ): UsageRow | null {
   if (!map) return null;
-  const ts = parseTs(rec[map.timestamp]);
-  const model = rec[map.model];
-  if (!ts || model == null || String(model).trim() === "") return null;
 
-  let inputT = map.input_tokens ? num(rec[map.input_tokens]) : 0;
-  let outputT = map.output_tokens ? num(rec[map.output_tokens]) : 0;
-  if (
-    inputT === 0 &&
-    outputT === 0 &&
-    (headerNorms.has("total_tokens") || headerNorms.has("totaltokens"))
-  ) {
-    const raw =
-      rec["total_tokens"] ?? rec["Total_Tokens"] ?? rec["total token count"];
-    const tot = num(raw);
-    if (tot > 0) {
-      inputT = Math.round(tot * 0.35);
-      outputT = Math.max(0, tot - inputT);
+  // Detect if this is a Google Cloud Billing export
+  const isGcpBilling =
+    headerNorms.has("sku_description") ||
+    headerNorms.has("sku description") ||
+    headerNorms.has("sku") ||
+    headerNorms.has("billing_account_id") ||
+    headerNorms.has("billing account id") ||
+    String(map.model).toLowerCase().includes("sku");
+
+  let ts: Date | null = null;
+  let modelStr = "";
+  let inputT = 0;
+  let outputT = 0;
+
+  if (isGcpBilling) {
+    // 1. Resolve Timestamp
+    const tsRaw =
+      rec[map.timestamp] ??
+      rec["Usage Start Time"] ??
+      rec["usage_start_time"] ??
+      (rec["usage"] as any)?.usage_start_time;
+    ts = parseTs(tsRaw);
+
+    // 2. Resolve Model
+    const skuRaw =
+      rec[map.model] ??
+      rec["SKU Description"] ??
+      rec["sku_description"] ??
+      rec["sku"];
+    let skuStr = "";
+    if (skuRaw && typeof skuRaw === "object") {
+      const skuObj = skuRaw as any;
+      skuStr = String(skuObj.description ?? skuObj.Description ?? skuObj.id ?? "");
+    } else if (skuRaw != null) {
+      skuStr = String(skuRaw);
+    }
+    modelStr = extractModelFromSku(skuStr);
+
+    // 3. Resolve Usage Amount & Token Types
+    let usageAmount = 0;
+    const usageRaw = rec["Usage.Amount"] ?? rec["usage_amount"] ?? rec["usage"];
+    if (usageRaw && typeof usageRaw === "object") {
+      const usageObj = usageRaw as any;
+      usageAmount = num(usageObj.amount ?? usageObj.Amount ?? 0);
+    } else {
+      usageAmount = num(usageRaw);
+    }
+
+    const skuLower = skuStr.toLowerCase();
+    if (skuLower.includes("input") || skuLower.includes("prompt")) {
+      inputT = usageAmount;
+      outputT = 0;
+    } else if (
+      skuLower.includes("output") ||
+      skuLower.includes("completion") ||
+      skuLower.includes("candidate")
+    ) {
+      inputT = 0;
+      outputT = usageAmount;
+    } else {
+      // Default fallback
+      inputT = usageAmount;
+      outputT = 0;
+    }
+  } else {
+    // Standard execution log mapping
+    ts = parseTs(rec[map.timestamp]);
+    const rawModel = rec[map.model];
+    modelStr = rawModel != null ? String(rawModel).trim() : "";
+
+    inputT = map.input_tokens ? num(rec[map.input_tokens]) : 0;
+    outputT = map.output_tokens ? num(rec[map.output_tokens]) : 0;
+
+    if (
+      inputT === 0 &&
+      outputT === 0 &&
+      (headerNorms.has("total_tokens") || headerNorms.has("totaltokens"))
+    ) {
+      const raw =
+        rec["total_tokens"] ?? rec["Total_Tokens"] ?? rec["total token count"];
+      const tot = num(raw);
+      if (tot > 0) {
+        inputT = Math.round(tot * 0.35);
+        outputT = Math.max(0, tot - inputT);
+      }
     }
   }
+
+  if (!ts || !modelStr) return null;
 
   const hasPrompt = Boolean(map.prompt);
   const promptRaw = hasPrompt ? rec[map.prompt!] : undefined;
@@ -125,7 +196,7 @@ export function recordToUsageRow(
 
   return {
     timestamp: ts,
-    model: String(model).trim(),
+    model: modelStr,
     prompt: promptStr,
     promptNorm,
     inputTokens: Math.max(0, inputT),
@@ -135,6 +206,29 @@ export function recordToUsageRow(
         ? String(rec[map.request_id])
         : undefined,
   };
+}
+
+function extractModelFromSku(sku: string): string {
+  const s = sku.toLowerCase();
+  if (s.includes("gemini 1.5 pro")) return "gemini-1.5-pro";
+  if (s.includes("gemini 1.5 flash")) return "gemini-1.5-flash";
+  if (s.includes("gemini 2.0 flash")) return "gemini-2.0-flash";
+  if (s.includes("gemini 2.5 pro")) return "gemini-2.5-pro";
+  if (s.includes("gemini 2.5 flash")) return "gemini-2.5-flash";
+  if (s.includes("claude 3.5 sonnet")) return "claude-3-5-sonnet";
+  if (s.includes("claude 3.7 sonnet")) return "claude-3-7-sonnet";
+  if (s.includes("claude 3.5 haiku")) return "claude-3-5-haiku";
+  if (s.includes("claude 3 haiku")) return "claude-3-haiku";
+  if (s.includes("claude 3 opus")) return "claude-3-opus";
+  if (s.includes("gpt 4o mini") || s.includes("gpt-4o-mini")) return "gpt-4o-mini";
+  if (s.includes("gpt 4o") || s.includes("gpt-4o")) return "gpt-4o";
+  if (s.includes("gpt 4 turbo") || s.includes("gpt-4-turbo")) return "gpt-4-turbo";
+  if (s.includes("o1")) return "o1";
+
+  return s
+    .replace(/\b(input|output|completion|cached|tokens|token|charges|charge)\b/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
 }
 
 /** Parse tabular records (already objects keyed by CSV headers). */

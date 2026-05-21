@@ -8,10 +8,20 @@ const ALIASES: Record<string, string[]> = {
     "start_time",
     "request_timestamp",
     "usage_timestamp",
+    "usage_start_time",
+    "usage_end_time",
     "end_time",
     "completion_time",
   ],
-  model: ["model", "model_name", "deployment", "engine_id", "publisher_model"],
+  model: [
+    "model",
+    "model_name",
+    "deployment",
+    "engine_id",
+    "publisher_model",
+    "sku_description",
+    "sku",
+  ],
   prompt: [
     "prompt",
     "input",
@@ -28,6 +38,7 @@ const ALIASES: Record<string, string[]> = {
     "input_token_count",
     "prompt_token_count",
     "cached_input_tokens",
+    "usage_amount",
   ],
   output_tokens: [
     "output_tokens",
@@ -36,6 +47,7 @@ const ALIASES: Record<string, string[]> = {
     "candidates_token_count",
     "completion_token_count",
     "total_tokens",
+    "usage_amount",
   ],
   request_id: ["request_id", "id", "requestid", "trace", "span_id"],
 };

@@ -1,0 +1,50 @@
+[
+  {
+    "timestamp": "2026-05-20T21:00:00Z",
+    "organization_id": "org-123",
+    "project_id": "proj-abc",
+    "api_key_id": "key-xyz",
+    "model": "gpt-4o",
+    "prompt_tokens": 1250000,
+    "completion_tokens": 450000,
+    "cost": 7.625,
+    "request_count": 2450,
+    "status": "success"
+  },
+  {
+    "timestamp": "2026-05-20T21:00:00Z",
+    "organization_id": "org-123",
+    "project_id": "proj-abc",
+    "api_key_id": "key-xyz",
+    "model": "gpt-4o-mini",
+    "prompt_tokens": 15420000,
+    "completion_tokens": 6890000,
+    "cost": 6.447,
+    "request_count": 89000,
+    "status": "success"
+  },
+  {
+    "timestamp": "2026-05-20T21:00:00Z",
+    "organization_id": "org-123",
+    "project_id": "proj-abc",
+    "api_key_id": "key-xyz",
+    "model": "o1-preview",
+    "prompt_tokens": 120000,
+    "completion_tokens": 98000,
+    "cost": 7.68,
+    "request_count": 140,
+    "status": "success"
+  },
+  {
+    "timestamp": "2026-05-20T21:00:00Z",
+    "organization_id": "org-123",
+    "project_id": "proj-abc",
+    "api_key_id": "key-xyz",
+    "model": "gpt-4o",
+    "prompt_tokens": 840,
+    "completion_tokens": 320,
+    "cost": 0.0053,
+    "request_count": 4,
+    "status": "error"
+  }
+]

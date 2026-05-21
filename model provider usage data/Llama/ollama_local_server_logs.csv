@@ -1,0 +1,5 @@
+time,level,msg,method,path,status,duration_ms,model,prompt_tokens,completion_tokens
+2026-05-20T20:15:00Z,info,api request,POST,/api/generate,200,420,llama3.1:8b,120,84
+2026-05-20T20:15:45Z,info,api request,POST,/api/chat,200,2450,llama3.1:70b,450,380
+2026-05-20T20:16:12Z,info,api request,POST,/api/generate,200,120,mistral:7b,60,30
+2026-05-20T20:17:05Z,info,api request,POST,/api/chat,200,2480,llama3.1:70b,450,380

@@ -1,0 +1,4 @@
+Date,Model,Input Tokens,Output Tokens,Cache Creation Input Tokens,Cache Read Input Tokens,Total Cost (USD)
+2026-05-20,claude-3-5-sonnet-20241022,45000000,12000000,8000000,15000000,315.00
+2026-05-20,claude-3-5-haiku-20241022,85000000,24000000,0,0,164.00
+2026-05-20,claude-3-opus-20240229,1200000,800000,0,0,78.00

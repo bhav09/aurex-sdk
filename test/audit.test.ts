@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AuditTracker, type UsageRow } from "../src/audit";
+import { AuditTracker, recordsToUsageRows, type UsageRow } from "../src/audit";
 
 describe("AuditTracker", () => {
   it("should calculate totals and defaults correctly", () => {
@@ -87,5 +87,89 @@ describe("AuditTracker", () => {
     const result = tracker.finalize();
     expect(result.modelMismatches.length).toBe(1);
     expect(result.modelMismatches[0].suggestion).toContain("Haiku");
+  });
+
+  it("should parse GCP Cloud Billing CSV-like records correctly", () => {
+    const csvRecords = [
+      {
+        "Billing Account ID": "01A2B3-C4D5E6-F7G8H9",
+        "SKU Description": "Gemini 1.5 Pro Input Tokens",
+        "Usage Start Time": "2026-05-20 00:00:00 UTC",
+        "Usage.Amount": "15420000.0",
+      },
+      {
+        "Billing Account ID": "01A2B3-C4D5E6-F7G8H9",
+        "SKU Description": "Gemini 1.5 Pro Output Tokens",
+        "Usage Start Time": "2026-05-20 00:00:00 UTC",
+        "Usage.Amount": "4890000.0",
+      },
+      {
+        "Billing Account ID": "01A2B3-C4D5E6-F7G8H9",
+        "SKU Description": "Gemini 1.5 Flash Input Tokens",
+        "Usage Start Time": "2026-05-20 01:00:00 UTC",
+        "Usage.Amount": "89420000.0",
+      },
+    ];
+
+    const { rows, warnings } = recordsToUsageRows(csvRecords);
+    expect(warnings.length).toBe(1); // Expect a warning about missing prompt column
+    expect(warnings[0]).toContain("No prompt/message column found");
+    expect(rows.length).toBe(3);
+
+    // Assert Gemini 1.5 Pro Input
+    expect(rows[0].model).toBe("gemini-1.5-pro");
+    expect(rows[0].inputTokens).toBe(15420000);
+    expect(rows[0].outputTokens).toBe(0);
+    expect(rows[0].timestamp.toISOString()).toContain("2026-05-20T00:00:00");
+
+    // Assert Gemini 1.5 Pro Output
+    expect(rows[1].model).toBe("gemini-1.5-pro");
+    expect(rows[1].inputTokens).toBe(0);
+    expect(rows[1].outputTokens).toBe(4890000);
+
+    // Assert Gemini 1.5 Flash Input
+    expect(rows[2].model).toBe("gemini-1.5-flash");
+    expect(rows[2].inputTokens).toBe(89420000);
+    expect(rows[2].outputTokens).toBe(0);
+  });
+
+  it("should parse GCP Cloud Billing JSON-like records correctly", () => {
+    const jsonRecords = [
+      {
+        "billing_account_id": "01A2B3-C4D5E6-F7G8H9",
+        "sku": {
+          "id": "1E1A-5494-0EAD",
+          "description": "Gemini 1.5 Pro Input Tokens"
+        },
+        "usage_start_time": "2026-05-20T00:00:00Z",
+        "usage": {
+          "amount": 15420000.0,
+          "unit": "tokens"
+        }
+      },
+      {
+        "billing_account_id": "01A2B3-C4D5E6-F7G8H9",
+        "sku": {
+          "id": "2F2B-6505-1FAE",
+          "description": "Gemini 1.5 Pro Output Tokens"
+        },
+        "usage_start_time": "2026-05-20T00:00:00Z",
+        "usage": {
+          "amount": 4890000.0,
+          "unit": "tokens"
+        }
+      }
+    ];
+
+    const { rows, warnings } = recordsToUsageRows(jsonRecords);
+    expect(rows.length).toBe(2);
+
+    expect(rows[0].model).toBe("gemini-1.5-pro");
+    expect(rows[0].inputTokens).toBe(15420000);
+    expect(rows[0].outputTokens).toBe(0);
+
+    expect(rows[1].model).toBe("gemini-1.5-pro");
+    expect(rows[1].inputTokens).toBe(0);
+    expect(rows[1].outputTokens).toBe(4890000);
   });
 });

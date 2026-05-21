@@ -1,0 +1,5 @@
+timestamp,organization_id,project_id,api_key_id,model,prompt_tokens,completion_tokens,cost,request_count,status
+2026-05-20T21:00:00Z,org-123,proj-abc,key-xyz,gpt-4o,1250000,450000,7.625,2450,success
+2026-05-20T21:00:00Z,org-123,proj-abc,key-xyz,gpt-4o-mini,15420000,6890000,6.447,89000,success
+2026-05-20T21:00:00Z,org-123,proj-abc,key-xyz,o1-preview,120000,98000,7.68,140,success
+2026-05-20T21:00:00Z,org-123,proj-abc,key-xyz,gpt-4o,840,320,0.0053,4,error
