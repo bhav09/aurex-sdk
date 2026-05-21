@@ -6,26 +6,26 @@ import { Shield, Lock, Eye, FileCheck } from "lucide-react";
 const securityFeatures = [
   {
     icon: Shield,
-    title: "Isolated execution",
-    description: "Each agent runs in its own secure sandbox.",
+    title: "100% Local-First Privacy",
+    description: "Your prompts never leave your browser. Analysis happens entirely locally.",
     image: "/images/isolated.jpg",
   },
   {
     icon: Lock,
-    title: "Encrypted memory",
-    description: "Data encrypted at rest and in transit.",
+    title: "No Cloud Uploads",
+    description: "Raw events are parsed and tokenized in WebAssembly, never sent to our servers.",
     image: "/images/encrypted.jpg",
   },
   {
     icon: Eye,
-    title: "Full audit trails",
-    description: "Every action logged and inspectable.",
+    title: "Metadata Only Sync",
+    description: "We only sync anonymized metrics and aggregate insights.",
     image: "/images/audit.jpg",
   },
   {
     icon: FileCheck,
     title: "Permission boundaries",
-    description: "Principle of least privilege by design.",
+    description: "Enterprise policies to control prompt hashing and retention.",
     image: "/images/permissions.jpg",
   },
 ];

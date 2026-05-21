@@ -32,4 +32,4 @@ class TestPricingUtils:
         assert extract_provider_from_model("llama3.1:70b") == "ollama"
         assert extract_provider_from_model("mistral:7b") == "ollama"
         assert extract_provider_from_model("qwen2.5:72b") == "ollama"
-        assert extract_provider_from_model("gemini-1.5-pro") == "unknown"
+        assert extract_provider_from_model("gemini-1.5-pro") == "google"

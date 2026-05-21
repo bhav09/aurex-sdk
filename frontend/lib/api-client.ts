@@ -95,12 +95,67 @@ export class AurexAPI {
 
     constructor(baseUrl: string = API_BASE_URL) {
         this.baseUrl = baseUrl;
-        // Token is intentionally kept only in memory to prevent XSS attacks
-        // from stealing the token via localStorage or sessionStorage.
+        this.loadSession();
+    }
+
+    private loadSession() {
+        if (typeof window !== 'undefined') {
+            try {
+                this.token = sessionStorage.getItem('aurex_token');
+            } catch (e) {
+                console.warn('Failed to read sessionStorage', e);
+            }
+        }
     }
 
     setToken(token: string) {
         this.token = token;
+        if (typeof window !== 'undefined') {
+            try {
+                if (token) {
+                    sessionStorage.setItem('aurex_token', token);
+                } else {
+                    sessionStorage.removeItem('aurex_token');
+                }
+            } catch (e) {
+                console.warn('Failed to write sessionStorage', e);
+            }
+        }
+    }
+
+    setUserInfo(userInfo: { user_name: string; email: string; company_name: string } | null) {
+        if (typeof window !== 'undefined') {
+            try {
+                if (userInfo) {
+                    sessionStorage.setItem('aurex_user_info', JSON.stringify(userInfo));
+                } else {
+                    sessionStorage.removeItem('aurex_user_info');
+                }
+            } catch (e) {
+                console.warn('Failed to write sessionStorage', e);
+            }
+        }
+    }
+
+    getUserInfo(): { user_name: string; email: string; company_name: string } | null {
+        if (typeof window !== 'undefined') {
+            try {
+                const info = sessionStorage.getItem('aurex_user_info');
+                return info ? JSON.parse(info) : null;
+            } catch (e) {
+                console.warn('Failed to read sessionStorage', e);
+            }
+        }
+        return null;
+    }
+
+    hasActiveSession(): boolean {
+        return !!this.token;
+    }
+
+    clearSession() {
+        this.setToken('');
+        this.setUserInfo(null);
     }
 
     private getHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
@@ -109,6 +164,32 @@ export class AurexAPI {
             headers['Authorization'] = `Bearer ${this.token}`;
         }
         return headers;
+    }
+
+    private async fetchWithRetry(url: string, options: RequestInit = {}, maxRetries = 3): Promise<Response> {
+        let retries = 0;
+        let baseDelay = 500;
+        
+        while (true) {
+            try {
+                const response = await fetch(url, options);
+                if (response.ok || ![429, 500, 502, 503, 504].includes(response.status)) {
+                    return response;
+                }
+                
+                if (retries >= maxRetries) {
+                    return response;
+                }
+            } catch (error) {
+                if (retries >= maxRetries) {
+                    throw error;
+                }
+            }
+            
+            const delay = baseDelay * Math.pow(2, retries) + Math.random() * 200;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            retries++;
+        }
     }
 
     // Upload CSV
@@ -125,7 +206,7 @@ export class AurexAPI {
             url += `?session_id=${encodeURIComponent(sessionId)}`;
         }
 
-        const response = await fetch(url, {
+        const response = await this.fetchWithRetry(url, {
             method: 'POST',
             headers: this.getHeaders(),
             body: formData,
@@ -139,13 +220,35 @@ export class AurexAPI {
         return response.json();
     }
 
+    // Track CTA button click
+    async trackClick(buttonId: string, email?: string, sessionId?: string): Promise<{ status: string }> {
+        try {
+            const response = await this.fetchWithRetry(`${this.baseUrl}/analytics/click`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    button_id: buttonId,
+                    email,
+                    session_id: sessionId
+                }),
+            });
+            if (!response.ok) {
+                return { status: 'failed' };
+            }
+            return response.json();
+        } catch (e) {
+            console.warn('Failed to track click analytics', e);
+            return { status: 'failed' };
+        }
+    }
+
     // Get executive summary
     async getExecutiveSummary(email?: string): Promise<ExecutiveSummary> {
         const url = email 
             ? `${this.baseUrl}/executive-summary?email=${encodeURIComponent(email)}`
             : `${this.baseUrl}/executive-summary`;
             
-        const response = await fetch(url, { headers: this.getHeaders() });
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
             throw new Error('Failed to fetch executive summary');
@@ -170,7 +273,7 @@ export class AurexAPI {
         if (params?.model) queryParams.append('model', params.model);
 
         const url = `${this.baseUrl}/events${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-        const response = await fetch(url, { headers: this.getHeaders() });
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
             throw new Error('Failed to fetch events');
@@ -181,7 +284,7 @@ export class AurexAPI {
 
     // Clear all data
     async clearData(): Promise<{ status: string; events_deleted: number }> {
-        const response = await fetch(`${this.baseUrl}/clear-data?confirm=true`, {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/clear-data?confirm=true`, {
             method: 'DELETE',
             headers: this.getHeaders(),
         });
@@ -198,7 +301,7 @@ export class AurexAPI {
     // ============================================================================
 
     async requestOTP(email: string): Promise<{ status: string; message: string }> {
-        const response = await fetch(`${this.baseUrl}/auth/request-otp`, {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/auth/request-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -213,7 +316,7 @@ export class AurexAPI {
     }
 
     async verifyOTP(email: string, otp: string): Promise<{ status: string; message: string; access_token?: string; token_type?: string }> {
-        const response = await fetch(`${this.baseUrl}/auth/verify-otp`, {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/auth/verify-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, otp }),
@@ -239,7 +342,7 @@ export class AurexAPI {
 
     // Create audit session
     async createAuditSession(data: CreateAuditSessionRequest): Promise<AuditSession> {
-        const response = await fetch(`${this.baseUrl}/audit/sessions`, {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/audit/sessions`, {
             method: 'POST',
             headers: this.getHeaders({
                 'Content-Type': 'application/json',
@@ -269,7 +372,7 @@ export class AurexAPI {
             analysis_results?: Record<string, any>;
         }
     ): Promise<AuditSession> {
-        const response = await fetch(`${this.baseUrl}/audit/sessions/${sessionId}`, {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/audit/sessions/${sessionId}`, {
             method: 'PATCH',
             headers: this.getHeaders({
                 'Content-Type': 'application/json',
@@ -287,7 +390,7 @@ export class AurexAPI {
 
     // Get audit session by ID
     async getAuditSession(sessionId: string): Promise<AuditSession> {
-        const response = await fetch(`${this.baseUrl}/audit/sessions/${sessionId}`, { headers: this.getHeaders() });
+        const response = await this.fetchWithRetry(`${this.baseUrl}/audit/sessions/${sessionId}`, { headers: this.getHeaders() });
 
         if (!response.ok) {
             throw new Error('Failed to fetch audit session');
@@ -301,7 +404,7 @@ export class AurexAPI {
         sessions: AuditSession[];
         total: number;
     }> {
-        const response = await fetch(
+        const response = await this.fetchWithRetry(
             `${this.baseUrl}/audit/history/${encodeURIComponent(email)}?skip=${skip}&limit=${limit}`,
             { headers: this.getHeaders() }
         );
@@ -329,6 +432,9 @@ export class AurexAPI {
             upload_session_id: string;
         };
     }> {
+        // Persist userInfo for the session so they skip OTP on next uploads
+        this.setUserInfo(userInfo);
+
         // Step 1: Create audit session
         const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'csv';
         const session = await this.createAuditSession({

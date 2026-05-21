@@ -3,6 +3,17 @@ import os
 import sys
 
 import structlog
+from opentelemetry import trace
+
+def add_otel_trace_id(logger, log_method, event_dict):
+    """
+    Injects OTel trace_id into structlog logs
+    """
+    span = trace.get_current_span()
+    if span and span.is_recording():
+        event_dict["trace_id"] = format(span.get_span_context().trace_id, '032x')
+        event_dict["span_id"] = format(span.get_span_context().span_id, '016x')
+    return event_dict
 
 def setup_logger():
     """
@@ -22,6 +33,7 @@ def setup_logger():
 
     shared_processors = [
         structlog.contextvars.merge_contextvars,
+        add_otel_trace_id,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso"),

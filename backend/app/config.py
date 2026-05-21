@@ -26,4 +26,7 @@ class Settings(BaseSettings):
     # External APIs
     resend_api_key: str = Field(default="")
 
+    # Google Cloud Configuration
+    google_application_credentials: str = Field(default="/Users/bhavishya/VSC Projects/tbank/aurex-495417-8ed2dc84792c.json")
+
 settings = Settings()

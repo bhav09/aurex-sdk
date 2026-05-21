@@ -1,7 +1,8 @@
 import Papa, { type ParseError } from "papaparse";
-import { AuditTracker, recordToUsageRow, type AuditResult, type SemanticCluster } from "./audit";
-import { resolveHeaderMap, unionHeaderKeys } from "./columns";
+import { AuditTracker, type UsageRow, type AuditResult, type SemanticCluster } from "./audit";
 import EmbeddingWorker from "./embedding-worker?worker";
+import { runIngestionPipeline } from "./ingestion/pipeline";
+import { CanonicalEvent } from "./ingestion/contracts";
 
 export type WorkerMessage =
   | { type: "progress"; rowsProcessed: number | string }
@@ -17,127 +18,40 @@ self.onmessage = async (e) => {
   }
 
   const tracker = new AuditTracker(revenueUSD);
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-
+  
   try {
-    if (ext === "json") {
-      // For JSON, we still read the whole file, since chunking a large JSON array
-      // requires a specialized library like oboe.js. This is acceptable for MVP,
-      // as most heavy log exports are CSVs.
-      const text = await file.text();
-      let data = JSON.parse(text) as any;
-      if (!Array.isArray(data)) {
-        if (data && typeof data === "object") {
-          if (Array.isArray(data.data)) data = data.data;
-          else if (Array.isArray(data.rows)) data = data.rows;
-          else if (Array.isArray(data.items)) data = data.items;
-        }
+    runIngestionPipeline(file, {
+      onProgress: (rowsProcessed) => {
+        self.postMessage({ type: "progress", rowsProcessed });
+      },
+      onEvent: (event: CanonicalEvent) => {
+        // Map CanonicalEvent to UsageRow for current AuditTracker
+        const row: UsageRow = {
+          timestamp: event.timestamp,
+          model: event.model,
+          prompt: event.prompt,
+          promptNorm: event.prompt ? event.prompt.replace(/\s+/g, " ").trim().toLowerCase() : undefined,
+          inputTokens: event.input_tokens,
+          outputTokens: event.output_tokens,
+          requestId: event.request_id,
+        };
+        tracker.addUsageRow(row);
+      },
+      onWarning: (message) => {
+        tracker.warnings.push(message);
+      },
+      onError: (message) => {
+        self.postMessage({ type: "error", message });
+      },
+      onComplete: () => {
+        const auditResult = tracker.finalize();
+        computeSemanticClusters(auditResult).then(() => {
+          self.postMessage({ type: "success", audit: auditResult, warnings: tracker.warnings });
+        }).catch(err => {
+          self.postMessage({ type: "error", message: err.message });
+        });
       }
-      if (!Array.isArray(data)) {
-        throw new Error("JSON must be an array of objects or { data: [...] }.");
-      }
-      
-      const records = data as Record<string, unknown>[];
-      if (records.length === 0) {
-        tracker.warnings.push("No rows found in JSON.");
-      } else {
-        const headers = unionHeaderKeys(records);
-        const map = resolveHeaderMap(headers);
-        
-        if (!map) {
-          tracker.warnings.push("Could not detect required columns (need timestamp + model).");
-        } else {
-          if (!map.prompt) {
-            tracker.warnings.push("No prompt/message column found — redundancy analysis may be limited.");
-          }
-          const headerNorms = new Set(headers.map((h) => h.trim().toLowerCase()));
-          
-          let count = 0;
-          for (const rec of records) {
-            const row = recordToUsageRow(rec, map, headerNorms);
-            if (row) tracker.addUsageRow(row);
-            
-            count++;
-            if (count % 5000 === 0) {
-              self.postMessage({ type: "progress", rowsProcessed: count });
-            }
-          }
-        }
-      }
-
-      const auditResult = tracker.finalize();
-      await computeSemanticClusters(auditResult);
-      self.postMessage({ type: "success", audit: auditResult, warnings: tracker.warnings });
-      
-    } else {
-      // Stream CSV with PapaParse
-      let isFirstChunk = true;
-      let map: ReturnType<typeof resolveHeaderMap> | null = null;
-      let headerNorms: Set<string>;
-      let rowsProcessed = 0;
-
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        chunkSize: 1024 * 1024 * 2, // 2MB chunks
-        chunk: (results, parser) => {
-          if (results.errors.length) {
-            const fatal = results.errors.find(
-              (err: ParseError) => err.type === "Quotes" || err.type === "FieldMismatch"
-            );
-            if (fatal) {
-              parser.abort();
-              self.postMessage({ type: "error", message: `CSV parse: ${fatal.message}` });
-              return;
-            }
-          }
-
-          const chunkRecords = results.data as Record<string, unknown>[];
-          if (chunkRecords.length === 0) return;
-
-          if (isFirstChunk) {
-            isFirstChunk = false;
-            // Sniff headers from the first chunk
-            const headers = unionHeaderKeys(chunkRecords);
-            map = resolveHeaderMap(headers);
-            
-            if (!map) {
-              parser.abort();
-              self.postMessage({ type: "error", message: "Could not detect required columns (need timestamp + model)." });
-              return;
-            }
-            if (!map.prompt) {
-              tracker.warnings.push("No prompt/message column found — redundancy analysis may be limited.");
-            }
-            headerNorms = new Set(headers.map((h) => h.trim().toLowerCase()));
-          }
-
-          if (!map) return;
-
-          for (const rec of chunkRecords) {
-            const row = recordToUsageRow(rec, map, headerNorms);
-            if (row) tracker.addUsageRow(row);
-          }
-
-          rowsProcessed += chunkRecords.length;
-          self.postMessage({ type: "progress", rowsProcessed });
-        },
-        complete: () => {
-          if (isFirstChunk) {
-            tracker.warnings.push("No rows found in CSV.");
-          }
-          const auditResult = tracker.finalize();
-          computeSemanticClusters(auditResult).then(() => {
-            self.postMessage({ type: "success", audit: auditResult, warnings: tracker.warnings });
-          }).catch(err => {
-            self.postMessage({ type: "error", message: err.message });
-          });
-        },
-        error: (err) => {
-          self.postMessage({ type: "error", message: `CSV parse: ${err.message}` });
-        }
-      });
-    }
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     self.postMessage({ type: "error", message: msg });

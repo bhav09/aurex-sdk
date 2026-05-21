@@ -22,12 +22,13 @@ test.describe('Frontend UI E2E (Mocked Backend)', () => {
       await route.fulfill({ json });
     });
 
-    // Mock the upload API
-    await page.route('**/api/v1/upload/csv*', async route => {
+    // Mock the session creation API
+    await page.route('**/api/v1/audit/sessions*', async route => {
       const json = {
         status: 'success',
         events_ingested: 10,
-        upload_session_id: 'mock_session_123'
+        id: 'mock_session_123',
+        email: 'test@example.com'
       };
       await route.fulfill({ json });
     });
