@@ -12,7 +12,7 @@ vi.mock('../../lib/api-client', () => ({
     }),
     completeAudit: vi.fn().mockResolvedValue({
       session: { credit_score: 85 },
-      summary: { executive_summary: { current_weekly_spend: 100 } }
+      summary: { executive_summary: { current_period_spend: 100 } }
     }),
     requestOTP: vi.fn().mockResolvedValue({ status: 'success' }),
     verifyOTP: vi.fn().mockResolvedValue({ status: 'success' }),

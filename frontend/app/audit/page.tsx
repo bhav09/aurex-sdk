@@ -543,17 +543,17 @@ export default function AuditPage() {
 
                                                 <BentoMetricCard className="md:col-span-2">
                                                     <p className="text-xs font-medium uppercase tracking-wider text-white/45">
-                                                        Spend trajectory
+                                                        Spend trajectory ({data.executive_summary.period_days}d)
                                                     </p>
                                                     <p className="mt-2 text-lg text-white/85">
                                                         <span className="text-white/50">Current </span>
                                                         <span className="font-mono font-semibold">
-                                                            ${data.executive_summary.current_weekly_spend.toFixed(2)}/wk
+                                                            ${data.executive_summary.current_period_spend.toFixed(2)}
                                                         </span>
                                                         <span className="mx-2 text-white/35">→</span>
                                                         <span className="text-white/50">Optimized </span>
                                                         <span className="font-mono font-semibold text-emerald-300">
-                                                            ${data.executive_summary.optimized_spend.toFixed(2)}/wk
+                                                            ${data.executive_summary.optimized_spend.toFixed(2)}
                                                         </span>
                                                     </p>
                                                 </BentoMetricCard>
