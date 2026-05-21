@@ -259,7 +259,7 @@ function appChrome(route: "home" | "upload"): string {
   const homeActive = route === "home" ? " is-active" : "";
   return `
     <div class="app-top">
-      <a href="#/" class="brand"><span class="brand-mark">Lumina</span><span class="brand-muted"> Auditor</span></a>
+      <a href="#/" class="brand"><span class="brand-mark">Aurex</span><span class="brand-muted"> Auditor</span></a>
       <nav class="app-nav" aria-label="Pages">
         <a class="nav-pill${homeActive}" href="#/">Live demo</a>
         <a class="nav-pill nav-pill--accent${uploadActive}" href="#/upload">Upload file</a>
@@ -746,7 +746,7 @@ function renderReport(
           body: JSON.stringify({
             email,
             tokenCreditScore: score,
-            source: "lumina-token-auditor",
+            source: "aurex-token-auditor",
             at: new Date().toISOString(),
           }),
         });
