@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException, Query, File, Upl
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, desc
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -158,6 +158,7 @@ async def get_insights(
             engine = EnhancedDetectionEngine(db, session_id=latest_session.id)
             analysis = await engine.analyze_complete()
             latest_session.analysis_results = analysis
+            latest_session.credit_score = analysis.get("credit_score", 100)
             await db.commit()
             await db.refresh(latest_session)
             
@@ -199,6 +200,7 @@ async def get_executive_summary(
             engine = EnhancedDetectionEngine(db, session_id=latest_session.id)
             analysis = await engine.analyze_complete()
             latest_session.analysis_results = analysis
+            latest_session.credit_score = analysis.get("credit_score", 100)
             await db.commit()
             await db.refresh(latest_session)
             
@@ -322,9 +324,13 @@ async def upload_csv(
     
     try:
         if filename.endswith(".json"):
-            df = pd.read_json(io.BytesIO(contents))
+            import json
+            raw_data = json.loads(contents.decode("utf-8"))
+            if isinstance(raw_data, dict):
+                raw_data = [raw_data]
+            chunks = [pd.DataFrame(raw_data)]
         else:
-            df = pd.read_csv(io.BytesIO(contents))
+            chunks = pd.read_csv(io.BytesIO(contents), chunksize=1000)
     except Exception as e:
         logger.exception("Failed to read upload file")
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV/JSON: {str(e)}")
@@ -333,136 +339,247 @@ async def upload_csv(
         h = str(h).strip().lower()
         h = h.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "")
         return h
-        
-    df.columns = [clean_header(col) for col in df.columns]
-    
-    events_inserted = 0
-    
-    for idx, row in df.iterrows():
-        ts_val = None
-        for col in ["timestamp", "date", "created", "starting_at", "ending_at", "time"]:
-            if col in row and pd.notna(row[col]):
-                try:
-                    ts_val = pd.to_datetime(row[col])
-                    break
-                except:
-                    continue
-        if ts_val is None:
-            ts_val = datetime.utcnow()
-            
-        model_val = "unknown"
-        for col in ["model", "model_id", "modelid"]:
-            if col in row and pd.notna(row[col]):
-                model_val = str(row[col])
-                break
-                
-        input_tokens = 0
-        for col in ["input_tokens", "prompt_tokens", "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count"]:
-            if col in row and pd.notna(row[col]):
-                try:
-                    input_tokens = int(row[col])
-                    break
-                except:
-                    continue
-                    
-        output_tokens = 0
-        for col in ["output_tokens", "completion_tokens", "output_token_count", "outputtokencount", "n_generated_tokens_total", "completion_token_count"]:
-            if col in row and pd.notna(row[col]):
-                try:
-                    output_tokens = int(row[col])
-                    break
-                except:
-                    continue
-                    
-        total_tokens = 0
-        for col in ["total_tokens", "tokens", "total_token_count", "totaltokencount"]:
-            if col in row and pd.notna(row[col]):
-                try:
-                    total_tokens = int(row[col])
-                    break
-                except:
-                    continue
-        if total_tokens == 0:
-            total_tokens = input_tokens + output_tokens
-            
-        cost_val = 0.0
-        for col in ["cost", "amount", "total_cost", "cost_usd", "total_cost_usd", "price"]:
-            if col in row and pd.notna(row[col]):
-                try:
-                    cost_val = float(row[col])
-                    break
-                except:
-                    continue
-        if cost_val == 0.0:
-            cost_val = calculate_cost(model_val, input_tokens, output_tokens)
-            
-        provider_val = extract_provider_from_model(model_val)
-        
-        workflow_id = None
-        for col in ["workflow_id", "workflow", "session_id", "session"]:
-            if col in row and pd.notna(row[col]) and col != "session_id":
-                workflow_id = str(row[col])
-                break
-                
-        # Extract system_prompt_hash
-        system_prompt_hash = None
-        for col in ["system_prompt_hash", "systemprompt_hash", "systemprompthash", "prompt_hash", "prompthash", "sys_hash", "sys_prompt_hash"]:
-            if col in row and pd.notna(row[col]):
-                system_prompt_hash = str(row[col])
-                break
-                
-        # Extract context_length
-        context_length = None
-        for col in ["context_length", "contextlength", "context_tokens", "contexttokens", "input_tokens", "prompt_tokens"]:
-            if col in row and pd.notna(row[col]):
-                try:
-                    context_length = int(row[col])
-                    break
-                except:
-                    continue
-        if context_length is None:
-            context_length = input_tokens
-            
-        # Put extra fields in extra_metadata
-        extra_metadata = {}
-        for col in df.columns:
-            if col not in ["timestamp", "date", "created", "starting_at", "ending_at", "time", 
-                           "model", "model_id", "modelid", "input_tokens", "prompt_tokens", 
-                           "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count",
-                           "output_tokens", "completion_tokens", "output_token_count", "outputtokencount", 
-                           "n_generated_tokens_total", "completion_token_count", "total_tokens", "tokens", 
-                           "total_token_count", "totaltokencount", "cost", "amount", "total_cost", 
-                           "cost_usd", "total_cost_usd", "price", "workflow_id", "workflow", "session_id", "session"]:
-                if pd.notna(row[col]):
-                    val = row[col]
-                    if hasattr(val, "item"):
-                        val = val.item()
-                    extra_metadata[col] = val
-                    
-        if system_prompt_hash:
-            extra_metadata["system_prompt_hash"] = system_prompt_hash
 
-        from src.models import LLMEvent
-        event = LLMEvent(
-            id=str(uuid.uuid4()),
-            timestamp=ts_val.to_pydatetime() if hasattr(ts_val, "to_pydatetime") else ts_val,
-            provider=provider_val,
-            model=model_val,
-            workflow_id=workflow_id,
-            upload_session_id=session_id,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
-            cost=cost_val,
-            prompt=str(row.get("prompt")) if "prompt" in row and pd.notna(row["prompt"]) else None,
-            response=str(row.get("response")) if "response" in row and pd.notna(row["response"]) else None,
-            system_prompt_hash=system_prompt_hash,
-            context_length=context_length,
-            extra_metadata=extra_metadata
-        )
-        db.add(event)
-        events_inserted += 1
+    def parse_numeric(val):
+        if pd.isna(val) or val is None:
+            return 0
+        if isinstance(val, (int, float)):
+            return val
+        s = str(val).strip().replace(",", "")
+        try:
+            if "." in s:
+                return float(s)
+            return int(s)
+        except ValueError:
+            return 0
+            
+    events_inserted = 0
+    import json
+    
+    for chunk in chunks:
+        chunk.columns = [clean_header(col) for col in chunk.columns]
         
+        for idx, row in chunk.iterrows():
+            # First, try to extract metadata dictionary
+            meta_dict = {}
+            for col in ["metadata", "jsonpayload", "payload", "labels", "resource"]:
+                if col in row and pd.notna(row[col]):
+                    val = row[col]
+                    if isinstance(val, str):
+                        val = val.strip()
+                        if (val.startswith("{") and val.endswith("}")) or (val.startswith("[") and val.endswith("]")):
+                            try:
+                                val = json.loads(val)
+                            except:
+                                pass
+                    if isinstance(val, dict):
+                        meta_dict.update(val)
+            
+            ts_val = None
+            for col in ["timestamp", "date", "created", "starting_at", "ending_at", "time", "logging_time"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        ts_val = pd.to_datetime(row[col])
+                        break
+                    except:
+                        continue
+            if ts_val is None and meta_dict:
+                for k in ["timestamp", "date", "created", "starting_at", "ending_at", "time", "logging_time"]:
+                    if k in meta_dict:
+                        try:
+                            ts_val = pd.to_datetime(meta_dict[k])
+                            break
+                        except:
+                            continue
+            if ts_val is None:
+                ts_val = datetime.utcnow()
+                
+            model_val = None
+            for col in ["model", "model_id", "modelid"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    model_val = str(row[col]).strip()
+                    break
+            if (not model_val or model_val.lower() == "nan" or model_val.lower() == "unknown") and meta_dict:
+                for k in ["model", "model_id", "modelid", "model_name"]:
+                    if k in meta_dict:
+                        model_val = str(meta_dict[k]).strip()
+                        break
+                        
+            # Map files without model names (AWS Bedrock schema) to a default bedrock model
+            if not model_val or model_val.lower() == "nan" or model_val.lower() == "unknown":
+                is_bedrock = False
+                bedrock_indicators = {"inputtokencount", "outputtokencount", "invocationlatency", "invocations"}
+                if any(col in bedrock_indicators for col in row.index):
+                    is_bedrock = True
+                if is_bedrock:
+                    model_val = "claude-3-5-sonnet"
+                else:
+                    model_val = "unknown"
+                    
+            input_tokens = 0
+            for col in ["input_tokens", "prompt_tokens", "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        input_tokens = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if input_tokens == 0 and meta_dict:
+                for k in ["input_token_count", "input_tokens", "prompt_tokens", "prompt_token_count"]:
+                    if k in meta_dict:
+                        input_tokens = parse_numeric(meta_dict[k])
+                        break
+                        
+            output_tokens = 0
+            for col in ["output_tokens", "completion_tokens", "output_token_count", "outputtokencount", "n_generated_tokens_total", "completion_token_count"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        output_tokens = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if output_tokens == 0 and meta_dict:
+                for k in ["output_token_count", "output_tokens", "completion_tokens", "completion_token_count"]:
+                    if k in meta_dict:
+                        output_tokens = parse_numeric(meta_dict[k])
+                        break
+                        
+            total_tokens = 0
+            for col in ["total_tokens", "tokens", "total_token_count", "totaltokencount"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        total_tokens = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if total_tokens == 0 and meta_dict:
+                for k in ["total_tokens", "tokens", "total_token_count", "totaltokencount"]:
+                    if k in meta_dict:
+                        total_tokens = parse_numeric(meta_dict[k])
+                        break
+            if total_tokens == 0:
+                total_tokens = input_tokens + output_tokens
+                
+            cache_read_tokens = 0
+            for col in ["cache_read_tokens", "cache_read_input_tokens", "cache_read_tokens_count", "cache_read"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        cache_read_tokens = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if cache_read_tokens == 0 and meta_dict:
+                for k in ["cache_read_tokens", "cache_read_input_tokens", "cache_read_tokens_count", "cache_read"]:
+                    if k in meta_dict:
+                        cache_read_tokens = parse_numeric(meta_dict[k])
+                        break
+                        
+            cache_creation_tokens = 0
+            for col in ["cache_creation_tokens", "cache_creation_input_tokens", "cache_creation_tokens_count", "cache_creation", "cache_write_tokens"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        cache_creation_tokens = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if cache_creation_tokens == 0 and meta_dict:
+                for k in ["cache_creation_tokens", "cache_creation_input_tokens", "cache_creation_tokens_count", "cache_creation", "cache_write_tokens"]:
+                    if k in meta_dict:
+                        cache_creation_tokens = parse_numeric(meta_dict[k])
+                        break
+
+            cost_val = 0.0
+            for col in ["cost", "amount", "total_cost", "cost_usd", "total_cost_usd", "price"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        cost_val = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if cost_val == 0.0 and meta_dict:
+                for k in ["cost", "amount", "total_cost", "cost_usd", "total_cost_usd", "price"]:
+                    if k in meta_dict:
+                        cost_val = parse_numeric(meta_dict[k])
+                        break
+            if cost_val == 0.0:
+                cost_val = calculate_cost(
+                    model_val, 
+                    input_tokens, 
+                    output_tokens,
+                    cache_read_tokens=cache_read_tokens,
+                    cache_creation_tokens=cache_creation_tokens
+                )
+                
+            provider_val = extract_provider_from_model(model_val)
+            
+            workflow_id = None
+            for col in ["workflow_id", "workflow", "session_id", "session"]:
+                if col in row and pd.notna(row[col]) and col != "session_id" and not isinstance(row[col], dict):
+                    workflow_id = str(row[col])
+                    break
+                    
+            system_prompt_hash = None
+            for col in ["system_prompt_hash", "systemprompt_hash", "systemprompthash", "prompt_hash", "prompthash", "sys_hash", "sys_prompt_hash"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    system_prompt_hash = str(row[col])
+                    break
+                    
+            context_length = None
+            for col in ["context_length", "contextlength", "context_tokens", "contexttokens", "input_tokens", "prompt_tokens"]:
+                if col in row and pd.notna(row[col]) and not isinstance(row[col], dict):
+                    try:
+                        context_length = parse_numeric(row[col])
+                        break
+                    except:
+                        continue
+            if context_length is None:
+                context_length = input_tokens
+                
+            extra_metadata = {}
+            for col in chunk.columns:
+                if col not in ["timestamp", "date", "created", "starting_at", "ending_at", "time", "logging_time",
+                               "model", "model_id", "modelid", "input_tokens", "prompt_tokens", 
+                               "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count",
+                               "output_tokens", "completion_tokens", "output_token_count", "outputtokencount", 
+                               "n_generated_tokens_total", "completion_token_count", "total_tokens", "tokens", 
+                               "total_token_count", "totaltokencount", "cost", "amount", "total_cost", 
+                               "cost_usd", "total_cost_usd", "price", "workflow_id", "workflow", "session_id", "session"]:
+                    if pd.notna(row[col]):
+                        val = row[col]
+                        if hasattr(val, "item"):
+                            val = val.item()
+                        extra_metadata[col] = val
+                        
+            if meta_dict:
+                extra_metadata.update(meta_dict)
+                
+            if system_prompt_hash:
+                extra_metadata["system_prompt_hash"] = system_prompt_hash
+                
+            extra_metadata["cache_read_tokens"] = cache_read_tokens
+            extra_metadata["cache_creation_tokens"] = cache_creation_tokens
+
+            from src.models import LLMEvent
+            event = LLMEvent(
+                id=str(uuid.uuid4()),
+                timestamp=ts_val.to_pydatetime() if hasattr(ts_val, "to_pydatetime") else ts_val,
+                provider=provider_val,
+                model=model_val,
+                workflow_id=workflow_id,
+                upload_session_id=session_id,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                cost=cost_val,
+                prompt=str(row.get("prompt")) if "prompt" in row and pd.notna(row["prompt"]) else None,
+                response=str(row.get("response")) if "response" in row and pd.notna(row["response"]) else None,
+                system_prompt_hash=system_prompt_hash,
+                context_length=context_length,
+                extra_metadata=extra_metadata
+            )
+            db.add(event)
+            events_inserted += 1
+            
     await db.commit()
     logger.info("Events ingested successfully via upload", count=events_inserted, session_id=session_id)
     
@@ -698,17 +815,31 @@ async def get_company_audits(
     """
     from src.models import AuditSession
     
-    # Simple check: current user must have the company domain in their email
-    # A robust check would look at user's actual registered company in DB
-    domain = current_user.split("@")[1] if "@" in current_user else ""
-    # We verify if they are allowed by checking if they've had any sessions with this company
+    domain = current_user.split("@")[1].lower() if "@" in current_user else ""
+    generic_domains = {
+        "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", 
+        "aol.com", "zoho.com", "protonmail.com", "proton.me", "mail.com", 
+        "yandex.com", "live.com", "gmx.com"
+    }
+    
+    # Check if they have an active session with this company
     user_sessions_query = select(func.count(AuditSession.id)).where(
-        AuditSession.email == current_user,
-        AuditSession.company_name == company_name
+        func.lower(AuditSession.email) == func.lower(current_user),
+        func.lower(AuditSession.company_name) == func.lower(company_name)
     )
     user_sessions = (await db.execute(user_sessions_query)).scalar()
     
-    if not user_sessions and domain.lower() not in company_name.lower():
+    # Check domain alignment (exclude generic domains)
+    domain_allowed = False
+    if domain and domain not in generic_domains:
+        domain_name = domain.split(".")[0]
+        if (company_name.lower() == domain or 
+            company_name.lower() == domain_name or 
+            domain in company_name.lower() or 
+            domain_name in company_name.lower()):
+            domain_allowed = True
+            
+    if not user_sessions and not domain_allowed:
         raise HTTPException(status_code=403, detail="Not authorized to access company data")
         
     
@@ -799,5 +930,155 @@ async def track_click(
         session_id=payload.session_id
     )
     return {"status": "success"}
+
+
+class OptimizationRequest(BaseModel):
+    issue_type: str
+    issue_title: str
+    weekly_cost: float
+    one_line_summary: str
+    message: str
+    chat_history: Optional[List[Dict[str, str]]] = []
+
+
+@router.post("/optimization/generate")
+async def generate_optimization(
+    payload: OptimizationRequest,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Generate interactive, contextual engineering optimizations for the copilot agent.
+    """
+    issue_type = payload.issue_type.lower()
+    msg = payload.message.lower()
+    
+    # Initialize response with tailored technical remediation guidance
+    response = ""
+    
+    if "code" in msg or "fix" in msg or "snippet" in msg or "how to" in msg or "implement" in msg:
+        if "prompt" in issue_type or "system" in issue_type or "cache" in issue_type:
+            response = (
+                "Here is the production-ready code snippet to implement **Prompt Caching** for your static system instructions. "
+                "This moves repeated prompt headers to ephemeral cache, cutting costs by up to 50% on Anthropic and 80% on DeepSeek:\n\n"
+                "```python\n"
+                "# For Anthropic Claude (cache-control block)\n"
+                "import anthropic\n"
+                "client = anthropic.Anthropic()\n\n"
+                "response = client.messages.create(\n"
+                "    model=\"claude-3-5-sonnet-20241022\",\n"
+                "    max_tokens=1024,\n"
+                "    system=[\n"
+                "        {\n"
+                "            \"type\": \"text\",\n"
+                "            \"text\": \"You are a helpful assistant executing complex data audits...\",\n"
+                "            \"cache_control\": {\"type\": \"ephemeral\"}  # Marks this block for caching\n"
+                "        }\n"
+                "    ],\n"
+                "    messages=[{\"role\": \"user\", \"content\": \"Analyze this dataset.\"}]\n"
+                ")\n"
+                "```\n\n"
+                "And here is how to verify cache hits in the response:\n"
+                "```python\n"
+                "print(response.usage.cache_read_input_tokens) # Tokens read from cache (cheap!)\n"
+                "print(response.usage.cache_creation_input_tokens) # Tokens written to cache\n"
+                "```"
+            )
+        elif "model" in issue_type or "expensive" in issue_type or "misuse" in issue_type:
+            response = (
+                "To optimize model routes and avoid expensive models for low-complexity inputs, you can introduce a "
+                "**Dynamic Router Middleware**:\n\n"
+                "```python\n"
+                "import tiktoken\n\n"
+                "def estimate_tokens(text: str) -> int:\n"
+                "    encoding = tiktoken.encoding_for_model(\"gpt-4o\")\n"
+                "    return len(encoding.encode(text))\n\n"
+                "def route_request(prompt: str) -> str:\n"
+                "    token_count = estimate_tokens(prompt)\n"
+                "    \n"
+                "    # Route simple queries (< 200 tokens) to the faster, cheaper mini model\n"
+                "    if token_count < 200:\n"
+                "        return \"gpt-4o-mini\"\n"
+                "    return \"gpt-4o\"\n"
+                "```\n\n"
+                "This guarantees that lightweight tasks (like classification or yes/no assertions) are run on $0.15/1M token models instead of $2.50/1M token models."
+            )
+        elif "loop" in issue_type or "agent" in issue_type:
+            response = (
+                "Here is the standard middleware to prevent **Agent Loops** (monotonic context growth or rapid retries) "
+                "from consuming your API budget. This maintains a running counter of execution steps and raises an exception if a loop is detected:\n\n"
+                "```python\n"
+                "import time\n"
+                "from collections import defaultdict\n\n"
+                "class LoopDetector:\n"
+                "    def __init__(self, max_steps: int = 5, window_seconds: float = 60.0):\n"
+                "        self.max_steps = max_steps\n"
+                "        self.window_seconds = window_seconds\n"
+                "        self.history = defaultdict(list) # session_id -> list of timestamps\n\n"
+                "    def record_step(self, session_id: str):\n"
+                "        now = time.time()\n"
+                "        timestamps = self.history[session_id]\n"
+                "        # Remove timestamps outside window\n"
+                "        self.history[session_id] = [t for t in timestamps if now - t < self.window_seconds]\n"
+                "        self.history[session_id].append(now)\n"
+                "        \n"
+                "        if len(self.history[session_id]) > self.max_steps:\n"
+                "            raise RuntimeError(f\"Agent Loop Detected for session {session_id}! Aborting to save tokens.\")\n"
+                "```"
+            )
+        elif "explosion" in issue_type or "context" in issue_type:
+            response = (
+                "To resolve context explosion issues, you should limit context growth by trimming older history "
+                "or summarizing old turns before passing them back to the model. Here is a python helper:\n\n"
+                "```python\n"
+                "def truncate_chat_history(messages: list, max_tokens: int = 4000) -> list:\n"
+                "    # Keep system message, keep latest N turns within token budget\n"
+                "    system_msg = [m for m in messages if m.get(\"role\") == \"system\"]\n"
+                "    user_assistant_msgs = [m for m in messages if m.get(\"role\") != \"system\"]\n"
+                "    \n"
+                "    truncated = []\n"
+                "    total_tokens = 0\n"
+                "    \n"
+                "    # Iterate backwards to keep the most recent messages\n"
+                "    for msg in reversed(user_assistant_msgs):\n"
+                "        msg_tokens = len(msg[\"content\"]) // 4 # Simple approximation\n"
+                "        if total_tokens + msg_tokens > max_tokens:\n"
+                "            break\n"
+                "        truncated.insert(0, msg)\n"
+                "        total_tokens += msg_tokens\n"
+                "        \n"
+                "    return system_msg + truncated\n"
+                "```"
+            )
+        else:
+            response = (
+                "Here is a generic recommendation template for this issue:\n\n"
+                "```python\n"
+                "# 1. Monitor token ingestion metrics\n"
+                "# 2. Configure rate limits and retry guardrails\n"
+                "def execute_remediation(payload):\n"
+                "    # Implement your custom logic here\n"
+                "    pass\n"
+                "```"
+            )
+    elif "why" in msg or "explain" in msg or "cause" in msg:
+        response = (
+            f"The primary driver of the **{payload.issue_title}** issue is redundancy in model operations. "
+            f"According to the audit logs, this is causing a weekly loss of **${payload.weekly_cost:.2f}**.\n\n"
+            f"**Underlying Cause:**\n"
+            f"1. *{payload.one_line_summary}*\n"
+            f"2. High frequency call triggers with no intermediate client-side caching or state sharing.\n"
+            f"3. Over-provisioning capabilities (e.g. running basic reasoning queries on flagship models)."
+        )
+    else:
+        response = (
+            f"Hello! I am your Aurex Agent. I'm ready to help you optimize and remediate **{payload.issue_title}** "
+            f"(saving you **${payload.weekly_cost:.2f}/week**).\n\n"
+            f"Would you like me to:\n"
+            f"- Generate a production-ready **python code patch** for this issue?\n"
+            f"- Explain the **architectural cause** of the leak?\n"
+            f"- Outline the **confidence score** or effort parameters for the remediation?"
+        )
+        
+    return {"response": response}
 
 

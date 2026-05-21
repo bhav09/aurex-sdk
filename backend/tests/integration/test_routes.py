@@ -139,6 +139,61 @@ class TestApiRoutes:
         assert data["upload_session_id"] == "mock-session-id"
 
     @pytest.mark.asyncio
+    async def test_upload_csv_sanitized_and_nested(self, client: AsyncClient):
+        from src.api.auth import create_access_token
+        email = "uploader@example.com"
+        token = create_access_token(data={"sub": email})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Test CSV with stringified numbers containing commas and spaces
+        csv_content = (
+            "timestamp,model,prompt_tokens,completion_tokens,cost\n"
+            "2026-05-21T10:00:00Z,gpt-4o,\" 1,000 \",\" 500 \",\" 0.015 \"\n"
+        )
+        files = {"file": ("test_sanitize.csv", csv_content, "text/csv")}
+        response = await client.post(
+            "/api/v1/upload/csv?session_id=session-sanitize",
+            files=files,
+            headers=headers
+        )
+        assert response.status_code == 200
+        assert response.json()["events_ingested"] == 1
+
+        # 2. Test JSON with nested metadata (e.g. Vertex AI logs)
+        vertex_json = json.dumps([
+            {
+                "logging_time": "2026-05-20T21:30:00Z",
+                "model": "publishers/google/models/gemini-1.5-pro-001",
+                "metadata": {
+                    "input_token_count": " 600 ",
+                    "output_token_count": " 700 "
+                }
+            }
+        ])
+        files = {"file": ("vertex.json", vertex_json, "application/json")}
+        response = await client.post(
+            "/api/v1/upload/csv?session_id=session-nested",
+            files=files,
+            headers=headers
+        )
+        assert response.status_code == 200
+        assert response.json()["events_ingested"] == 1
+
+        # 3. Test AWS Bedrock schema (no model column, but bedrock indicators)
+        bedrock_csv = (
+            "Timestamp,InputTokenCount,InvocationLatency,Invocations,OutputTokenCount\n"
+            "2026-05-15T10:00:01Z,387,1543,1,120\n"
+        )
+        files = {"file": ("bedrock.csv", bedrock_csv, "text/csv")}
+        response = await client.post(
+            "/api/v1/upload/csv?session_id=session-bedrock",
+            files=files,
+            headers=headers
+        )
+        assert response.status_code == 200
+        assert response.json()["events_ingested"] == 1
+
+    @pytest.mark.asyncio
     async def test_track_click(self, client: AsyncClient):
         payload = {
             "button_id": "test_cta_button",
@@ -148,4 +203,31 @@ class TestApiRoutes:
         response = await client.post("/api/v1/analytics/click", json=payload)
         assert response.status_code == 200
         assert response.json() == {"status": "success"}
+
+    @pytest.mark.asyncio
+    async def test_generate_optimization(self, client: AsyncClient, monkeypatch):
+        from src.api.auth import create_access_token, redis_client
+        
+        async def mock_get(*args, **kwargs):
+            return json.dumps({"verified": True})
+        monkeypatch.setattr(redis_client, "get", mock_get)
+        
+        email = "user@example.com"
+        token = create_access_token(data={"sub": email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        payload = {
+            "issue_type": "expensive_model_misuse",
+            "issue_title": "Expensive Model Misuse",
+            "weekly_cost": 150.0,
+            "one_line_summary": "Low complexity tasks run on GPT-4o instead of GPT-4o-mini",
+            "message": "Give me code snippet to resolve this",
+            "chat_history": []
+        }
+        
+        response = await client.post("/api/v1/optimization/generate", json=payload, headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert "response" in data
+        assert "Dynamic Router Middleware" in data["response"]
 

@@ -65,8 +65,8 @@ def normalize_model_name(m: str) -> str:
 
 def get_model_pricing(model: str) -> Tuple[float, float]:
     """
-    Get pricing for a model
-    Returns (input_price, output_price) per 1M tokens
+    Get pricing for a model. If unknown, falls back to the provider's median model pricing.
+    Returns (input_price, output_price) per 1M tokens.
     """
     if not model:
         return 3.00, 12.00
@@ -79,27 +79,68 @@ def get_model_pricing(model: str) -> Tuple[float, float]:
         return pricing["input"], pricing["output"]
     
     # 2. Match based on substring matching with descending key length
-    # This prevents shorter models matching first (e.g. gpt-4o-mini matching gpt-4o)
     sorted_keys = sorted(MODEL_PRICING.keys(), key=len, reverse=True)
     
     for key in sorted_keys:
         if key in query_norm:
             return MODEL_PRICING[key]["input"], MODEL_PRICING[key]["output"]
             
-    # Default fallback for unknown models (assume expensive model pricing, matches python tests)
-    return 15.00, 60.00
+    # Default fallback: median pricing of the identified provider, or 15.00/60.00 if unknown
+    provider = extract_provider_from_model(query_norm)
+    if provider == "unknown":
+        return 15.00, 60.00
+        
+    provider_inputs = []
+    provider_outputs = []
+    for k, v in MODEL_PRICING.items():
+        if extract_provider_from_model(k) == provider:
+            provider_inputs.append(v["input"])
+            provider_outputs.append(v["output"])
+            
+    def calculate_lower_median(lst):
+        if not lst:
+            return 0.0
+        s = sorted(lst)
+        return s[(len(s) - 1) // 2]
+        
+    return calculate_lower_median(provider_inputs), calculate_lower_median(provider_outputs)
 
 
-def calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+def calculate_cost(
+    model: str, 
+    input_tokens: int, 
+    output_tokens: int,
+    cache_read_tokens: int = 0,
+    cache_creation_tokens: int = 0
+) -> float:
     """
-    Calculate cost for a given model and token usage
+    Calculate cost for a given model and token usage, accounting for prompt caching
     """
     input_price, output_price = get_model_pricing(model)
+    provider = extract_provider_from_model(model)
     
+    standard_input = max(0, input_tokens - cache_read_tokens - cache_creation_tokens)
+    
+    # Cache pricing multipliers
+    cache_read_mult = 1.0
+    cache_create_mult = 1.0
+    
+    if provider == "anthropic":
+        cache_read_mult = 0.10
+        cache_create_mult = 1.25
+    elif provider == "openai":
+        cache_read_mult = 0.50
+        cache_create_mult = 1.0
+    elif provider == "google":
+        cache_read_mult = 0.25
+        cache_create_mult = 1.0
+        
     cost = (
-        (input_tokens / 1_000_000 * input_price) +
-        (output_tokens / 1_000_000 * output_price)
-    )
+        (standard_input * input_price) +
+        (cache_read_tokens * input_price * cache_read_mult) +
+        (cache_creation_tokens * input_price * cache_create_mult) +
+        (output_tokens * output_price)
+    ) / 1_000_000
     
     return cost
 

@@ -494,6 +494,38 @@ export class AurexAPI {
             summary,
         };
     }
+
+    // Generate optimizations using backend optimization generator
+    async generateOptimization(data: {
+        issue_type: string;
+        issue_title: string;
+        weekly_cost: number;
+        one_line_summary: string;
+        message: string;
+        chat_history?: { role: "assistant" | "user"; text: string }[];
+    }): Promise<{ response: string }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/optimization/generate`, {
+            method: 'POST',
+            headers: this.getHeaders({
+                'Content-Type': 'application/json',
+            }),
+            body: JSON.stringify({
+                issue_type: data.issue_type,
+                issue_title: data.issue_title,
+                weekly_cost: data.weekly_cost,
+                one_line_summary: data.one_line_summary,
+                message: data.message,
+                chat_history: data.chat_history?.map(msg => ({ role: msg.role, text: msg.text })) || []
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate optimization');
+        }
+
+        return response.json();
+    }
 }
 
 export const aurixAPI = new AurexAPI();

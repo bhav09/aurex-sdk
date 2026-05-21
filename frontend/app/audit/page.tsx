@@ -85,11 +85,14 @@ export default function AuditPage() {
     const [progressSteps, setProgressSteps] = useState<string[]>([]);
     const [data, setData] = useState<ExecutiveSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<"overview" | "data" | "insights">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "data" | "compare" | "insights">("overview");
     const [events, setEvents] = useState<LLMEvent[]>([]);
     const [loadingEvents, setLoadingEvents] = useState(false);
     const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
     const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [compareWorkflowA, setCompareWorkflowA] = useState("");
+    const [compareWorkflowB, setCompareWorkflowB] = useState("");
     const [copilotOpen, setCopilotOpen] = useState(false);
     const [copilotIssue, setCopilotIssue] = useState<Issue | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -271,9 +274,23 @@ export default function AuditPage() {
     );
 
     const workflows = Object.keys(groupedEvents);
+    const allWorkflows = data ? data.workflow_breakdown.map((w) => w.workflow_id) : [];
     const currentWorkflow = selectedWorkflow || workflows[0];
     const currentEvents = currentWorkflow ? (groupedEvents[currentWorkflow] || []) : [];
     const currentIssue = currentWorkflow ? getIssueForWorkflow(currentWorkflow) : undefined;
+    const totalPages = Math.ceil(currentEvents.length / 25);
+    const paginatedEvents = currentEvents.slice((currentPage - 1) * 25, currentPage * 25);
+
+    useEffect(() => {
+        if (allWorkflows.length > 0) {
+            if (!compareWorkflowA) setCompareWorkflowA(allWorkflows[0]);
+            if (!compareWorkflowB) setCompareWorkflowB(allWorkflows[1] || allWorkflows[0]);
+        }
+    }, [allWorkflows, compareWorkflowA, compareWorkflowB]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [currentWorkflow]);
 
     const openCopilot = (issue: Issue) => {
         setCopilotIssue(issue);
@@ -312,6 +329,9 @@ export default function AuditPage() {
         setExpandedEventId(null);
         setCopilotOpen(false);
         setCopilotIssue(null);
+        setCurrentPage(1);
+        setCompareWorkflowA("");
+        setCompareWorkflowB("");
     };
 
     return (
@@ -433,7 +453,7 @@ export default function AuditPage() {
                             variants={itemVariants}
                             className="flex flex-wrap gap-2 border-b border-white/10"
                         >
-                            {(["overview", "data", "insights"] as const).map((tab) => (
+                            {(["overview", "data", "compare", "insights"] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     type="button"
@@ -444,7 +464,7 @@ export default function AuditPage() {
                                             : "text-white/45 hover:text-white/80"
                                     }`}
                                 >
-                                    {tab === "data" ? "Data view" : tab}
+                                    {tab === "data" ? "Data view" : tab === "compare" ? "Comparison view" : tab}
                                 </button>
                             ))}
                         </motion.div>
@@ -814,7 +834,7 @@ export default function AuditPage() {
                                                         </TableRow>
                                                     </TableHeader>
                                                     <TableBody>
-                                                        {currentEvents.slice(0, 50).map((event, idx) => {
+                                                        {paginatedEvents.map((event, idx) => {
                                                             const hasIssue = currentIssue !== undefined;
                                                             const isHighCost = event.cost > 0.01;
                                                             const isExpanded = expandedEventId === event.id;
@@ -841,7 +861,7 @@ export default function AuditPage() {
                                                                             )}
                                                                         </TableCell>
                                                                         <TableCell className="font-mono text-xs text-white/40">
-                                                                            {idx + 1}
+                                                                            {(currentPage - 1) * 25 + idx + 1}
                                                                         </TableCell>
                                                                         <TableCell className="font-mono text-xs text-white/60">
                                                                             {new Date(event.timestamp).toLocaleTimeString()}
@@ -888,14 +908,265 @@ export default function AuditPage() {
                                                         })}
                                                     </TableBody>
                                                 </Table>
-                                                {currentEvents.length > 50 && (
-                                                    <div className="border-t border-white/10 p-4 text-center font-mono text-xs text-white/40">
-                                                        Showing 50 of {currentEvents.length} events
+                                                
+                                                {/* Pagination Controls */}
+                                                <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 bg-white/[0.01]">
+                                                    <div className="text-xs text-white/40">
+                                                        Showing <span className="font-mono text-white/70">{Math.min(currentEvents.length, (currentPage - 1) * 25 + 1)}</span> to{" "}
+                                                        <span className="font-mono text-white/70">{Math.min(currentEvents.length, currentPage * 25)}</span> of{" "}
+                                                        <span className="font-mono text-white/70">{currentEvents.length}</span> events
                                                     </div>
-                                                )}
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={currentPage === 1}
+                                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                            className="h-8 border-white/10 bg-white/5 text-xs text-white hover:bg-white/10 disabled:opacity-30"
+                                                        >
+                                                            Previous
+                                                        </Button>
+                                                        <span className="text-xs text-white/50 px-2 font-medium">
+                                                            Page {currentPage} of {totalPages || 1}
+                                                        </span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={currentPage >= totalPages || totalPages === 0}
+                                                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                            className="h-8 border-white/10 bg-white/5 text-xs text-white hover:bg-white/10 disabled:opacity-30"
+                                                        >
+                                                            Next
+                                                        </Button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </>
                                     )}
+                                </motion.div>
+                            ) : activeTab === "compare" ? (
+                                <motion.div
+                                    key="compare"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    className="space-y-6"
+                                >
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <h2 className="font-display text-3xl font-bold tracking-tight text-white">
+                                                Comparison view
+                                            </h2>
+                                            <p className="mt-2 text-sm text-white/50">
+                                                Compare stats and model selections between two different workflows side-by-side.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Selection Row */}
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-xs font-semibold uppercase tracking-wider text-white/45">Workflow A</label>
+                                            <select
+                                                value={compareWorkflowA}
+                                                onChange={(e) => setCompareWorkflowA(e.target.value)}
+                                                className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white focus:outline-none focus:border-violet-500/50"
+                                            >
+                                                {allWorkflows.map((w) => (
+                                                    <option key={w} value={w} className="bg-[oklch(0.1_0.02_260)] text-white">
+                                                        {w}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-xs font-semibold uppercase tracking-wider text-white/45">Workflow B</label>
+                                            <select
+                                                value={compareWorkflowB}
+                                                onChange={(e) => setCompareWorkflowB(e.target.value)}
+                                                className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white focus:outline-none focus:border-violet-500/50"
+                                            >
+                                                {allWorkflows.map((w) => (
+                                                    <option key={w} value={w} className="bg-[oklch(0.1_0.02_260)] text-white">
+                                                        {w}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Comparison Panels */}
+                                    {(() => {
+                                        if (!data) return null;
+                                        const wA = data.workflow_breakdown.find(w => w.workflow_id === compareWorkflowA) || data.workflow_breakdown[0];
+                                        const wB = data.workflow_breakdown.find(w => w.workflow_id === compareWorkflowB) || data.workflow_breakdown[1] || data.workflow_breakdown[0];
+                                        if (!wA || !wB) return null;
+
+                                        const costDiff = wB.total_cost - wA.total_cost;
+                                        const costDiffPct = wA.total_cost > 0 ? (costDiff / wA.total_cost) * 100 : 0;
+                                        const reqDiff = wB.request_count - wA.request_count;
+                                        const reqDiffPct = wA.request_count > 0 ? (reqDiff / wA.request_count) * 100 : 0;
+                                        const costPerReqDiff = wB.cost_per_request - wA.cost_per_request;
+                                        const costPerReqDiffPct = wA.cost_per_request > 0 ? (costPerReqDiff / wA.cost_per_request) * 100 : 0;
+
+                                        const issueA = getIssueForWorkflow(wA.workflow_id);
+                                        const issueB = getIssueForWorkflow(wB.workflow_id);
+
+                                        return (
+                                            <div className="grid gap-6 md:grid-cols-2">
+                                                {/* Left Panel: Workflow A */}
+                                                <Card className="border-white/10 bg-white/[0.02] p-6 backdrop-blur-md space-y-4">
+                                                    <div className="flex justify-between items-start">
+                                                        <h3 className="text-lg font-bold text-violet-400 truncate max-w-[70%]">
+                                                            {wA.workflow_id}
+                                                        </h3>
+                                                        <span className="text-[10px] text-white/40 font-mono">Workflow A</span>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="rounded-xl bg-white/5 p-3">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Total Spend</span>
+                                                            <span className="text-xl font-bold text-white">${wA.total_cost.toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="rounded-xl bg-white/5 p-3">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Requests</span>
+                                                            <span className="text-xl font-bold text-white">{wA.request_count.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="rounded-xl bg-white/5 p-3">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Cost / Req</span>
+                                                            <span className="text-xl font-bold text-white">${wA.cost_per_request.toFixed(4)}</span>
+                                                        </div>
+                                                        <div className="rounded-xl bg-white/5 p-3">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Total Tokens</span>
+                                                            <span className="text-xl font-bold text-white">{wA.total_tokens.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <h4 className="text-xs font-semibold uppercase tracking-wider text-white/45">Models Used</h4>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {wA.models_used.map((model) => (
+                                                                <span key={model} className="rounded bg-white/10 px-2 py-0.5 font-mono text-[10px] text-white/80">
+                                                                    {model}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {issueA ? (
+                                                        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <AlertCircle className="h-4 w-4 text-red-400" />
+                                                                <span className="text-xs font-bold text-red-300">Audited Inefficiencies Detected</span>
+                                                            </div>
+                                                            <p className="text-xs text-white/70 leading-relaxed">{issueA.title}</p>
+                                                            <div className="flex justify-between items-center pt-2">
+                                                                <span className="text-[10px] text-white/40">Waste: ${issueA.weekly_cost.toFixed(2)}/wk</span>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => openCopilot(issueA)}
+                                                                    className="h-7 text-[10px] bg-red-600/30 hover:bg-red-600 text-white rounded-lg border border-red-500/40"
+                                                                >
+                                                                    Remediation Copilot
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center gap-2">
+                                                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                                                            <span className="text-xs font-semibold text-emerald-300">No active audit issues flagged.</span>
+                                                        </div>
+                                                    )}
+                                                </Card>
+
+                                                {/* Right Panel: Workflow B */}
+                                                <Card className="border-white/10 bg-white/[0.02] p-6 backdrop-blur-md space-y-4">
+                                                    <div className="flex justify-between items-start">
+                                                        <h3 className="text-lg font-bold text-violet-400 truncate max-w-[70%]">
+                                                            {wB.workflow_id}
+                                                        </h3>
+                                                        <span className="text-[10px] text-white/40 font-mono">Workflow B</span>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="rounded-xl bg-white/5 p-3 relative overflow-hidden">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Total Spend</span>
+                                                            <span className="text-xl font-bold text-white">${wB.total_cost.toFixed(2)}</span>
+                                                            {compareWorkflowA !== compareWorkflowB && (
+                                                                <span className={`absolute right-2 bottom-2 text-[9px] font-bold ${costDiff > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                                                                    {costDiff > 0 ? "+" : ""}{costDiffPct.toFixed(1)}%
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="rounded-xl bg-white/5 p-3 relative overflow-hidden">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Requests</span>
+                                                            <span className="text-xl font-bold text-white">{wB.request_count.toLocaleString()}</span>
+                                                            {compareWorkflowA !== compareWorkflowB && (
+                                                                <span className={`absolute right-2 bottom-2 text-[9px] font-bold ${reqDiff > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                                                                    {reqDiff > 0 ? "+" : ""}{reqDiffPct.toFixed(1)}%
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="rounded-xl bg-white/5 p-3 relative overflow-hidden">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Cost / Req</span>
+                                                            <span className="text-xl font-bold text-white">${wB.cost_per_request.toFixed(4)}</span>
+                                                            {compareWorkflowA !== compareWorkflowB && (
+                                                                <span className={`absolute right-2 bottom-2 text-[9px] font-bold ${costPerReqDiff > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                                                                    {costPerReqDiff > 0 ? "+" : ""}{costPerReqDiffPct.toFixed(1)}%
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="rounded-xl bg-white/5 p-3">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-white/45">Total Tokens</span>
+                                                            <span className="text-xl font-bold text-white">{wB.total_tokens.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <h4 className="text-xs font-semibold uppercase tracking-wider text-white/45">Models Used</h4>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {wB.models_used.map((model) => (
+                                                                <span key={model} className="rounded bg-white/10 px-2 py-0.5 font-mono text-[10px] text-white/80">
+                                                                    {model}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {issueB ? (
+                                                        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <AlertCircle className="h-4 w-4 text-red-400" />
+                                                                <span className="text-xs font-bold text-red-300">Audited Inefficiencies Detected</span>
+                                                            </div>
+                                                            <p className="text-xs text-white/70 leading-relaxed">{issueB.title}</p>
+                                                            <div className="flex justify-between items-center pt-2">
+                                                                <span className="text-[10px] text-white/40">Waste: ${issueB.weekly_cost.toFixed(2)}/wk</span>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => openCopilot(issueB)}
+                                                                    className="h-7 text-[10px] bg-red-600/30 hover:bg-red-600 text-white rounded-lg border border-red-500/40"
+                                                                >
+                                                                    Remediation Copilot
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center gap-2">
+                                                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                                                            <span className="text-xs font-semibold text-emerald-300">No active audit issues flagged.</span>
+                                                        </div>
+                                                    )}
+                                                </Card>
+                                            </div>
+                                        );
+                                    })()}
                                 </motion.div>
                             ) : (
                                 <motion.div

@@ -33,3 +33,36 @@ class TestPricingUtils:
         assert extract_provider_from_model("mistral:7b") == "ollama"
         assert extract_provider_from_model("qwen2.5:72b") == "ollama"
         assert extract_provider_from_model("gemini-1.5-pro") == "google"
+
+    def test_get_model_pricing_provider_median_fallback(self):
+        # Unknown anthropic model should fallback to anthropic median pricing
+        # Median anthropic input = 3.00, output = 15.00
+        input_price, output_price = get_model_pricing("claude-unknown-999")
+        assert input_price == 3.00
+        assert output_price == 15.00
+        
+        # Unknown openai model should fallback to openai median pricing
+        # Median openai input = 2.50, output = 10.00 (depending on median calculation)
+        input_price_oa, output_price_oa = get_model_pricing("gpt-unknown-999")
+        assert input_price_oa == 2.50
+        assert output_price_oa == 10.00
+
+    def test_calculate_cost_with_prompt_caching(self):
+        # Test Anthropic Claude Sonnet with cache read & creation
+        # Claude 3.5 Sonnet base: input = 3.0, output = 15.0
+        # cache_read multiplier = 0.1 (0.3/1M), cache_creation multiplier = 1.25 (3.75/1M)
+        # 1M input (including 200k read, 100k creation) -> standard input = 700k
+        # Standard input cost = 700k * 3.0 = 2.10
+        # Cache read cost = 200k * 0.3 = 0.06
+        # Cache creation cost = 100k * 3.75 = 0.375
+        # Output cost = 1M * 15.0 = 15.0
+        # Total cost = 2.10 + 0.06 + 0.375 + 15.0 = 17.535
+        cost = calculate_cost(
+            model="claude-3-5-sonnet",
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
+            cache_read_tokens=200_000,
+            cache_creation_tokens=100_000
+        )
+        assert abs(cost - 17.535) < 1e-4
+

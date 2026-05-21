@@ -1,10 +1,7 @@
-# Enhanced Task Brief (ETB): Session-Aware OTP Reuse, Realistic Data Exports, and Google-Backed Analytics
+# Enhanced Task Brief (ETB): Robust Email Deliverability Verification & Dummy Domain Prevention
 
 ## Original Request
-The user wants a highly realistic, production-ready implementation of:
-1. **Session-Aware OTP Reuse**: Users with an active/valid session (same browser session) must skip OTP verification and be asked directly to upload their file when clicking "Analyze another file".
-2. **Realistic Provider Usage Data**: Sample data under `model provider usage data/` and `sample_data/` should resemble real-world raw CSV logs of OpenAI, Anthropic, and AWS Bedrock (e.g. Activity or Cost Reports) with all industry-standard columns, showing non-compliance/inefficiency patterns.
-3. **Google-Backed Usage Analytics**: Store unique email addresses, session lifecycle events, and record every single application CTA button-click (using the service account file `aurex-495417-8ed2dc84792c.json` for storage like BigQuery or Google Cloud Storage).
+The user wants to ensure that email addresses entered into the Aurex system are actual/valid public email addresses, rather than fictitious or dummy-generated email addresses (e.g., `user@example.com`, `random@test.com`, or fake non-existent domains).
 
 ---
 
@@ -13,55 +10,44 @@ The user wants a highly realistic, production-ready implementation of:
 
 ---
 
-## Scope of Changes
+## Technical Approach & Proposed Changes
 
-### 1. Backend/Python (Auth & Sessions & Ingestion)
-- **JWT & Session ID (`sid`) Tracking**: Add a server-side generated session ID inside JWT claims (`sid`) and/or a Redis-backed session lookup mapping.
-- **OTP Verification Bypass**: Maintain active sessions so that if a user submits a valid JWT bearer token, they can create new audit sessions without a fresh OTP check. Update `POST /audit/sessions` to use standard `get_current_user` dependencies instead of checking Redis OTP directly.
-- **Upload Endpoint Support**: Ensure `POST /upload/csv` and other parsing/ingestion endpoints support passing the active `session_id` and are authenticated.
-- **Centralized Environment Configuration**: Load Google Cloud configuration (`GOOGLE_APPLICATION_CREDENTIALS` path, dataset name, bigquery logging options) cleanly through `Settings` in `backend/app/config.py`.
+We will implement a multi-layered verification system for emails on the backend within the `/request-otp` endpoint:
 
-### 2. Frontend/TypeScript (API Client & Upload Zone)
-- **sessionStorage Auth Persistence**: Save the JWT access token and user session details in `sessionStorage` (which persists per tab/session) so that same-session uploads can read the token and bypass OTP.
-- **Same-Session Upload Flow**: Modify `UploadZone` and `AuditPage` so that if an active session token is present, the username, email, company, and OTP fields are hidden or pre-filled, and the file-upload interface is displayed directly.
-- **Analyze Another File Transition**: Maintain the session when transitioning from results back to the upload screen, enabling frictionless multi-file re-analysis.
+### 1. Hardcoded Dummy Domain Blocklist
+We will explicitly block known dummy, local, and sample domains that are commonly used for automated testing, local development, or spam registration. 
+* **Domains Blocked:** `example.com`, `test.com`, `dummy.com`, `sample.com`, `domain.com`, `invalid.com`, `localhost`, `tempmail.com`, `testjwt.com`, `validuser.com`, `foo.com`, `bar.com`.
+* *Note:* To allow tests to run seamlessly, this blocklist and subsequent network-based DNS checks will be automatically bypassed when the application is running in a test suite (checking `os.getenv("PYTEST_CURRENT_TEST")` or in `settings.debug = True` depending on development convenience, but specifically `PYTEST_CURRENT_TEST` is safest to keep test runs working).
 
-### 3. Google-Backed Analytics
-- **Analytics Event Schema**: Write structured log records to Google BigQuery (or a safe Cloud Storage fallback if BigQuery is unprovisioned) tracking:
-  - `unique_email_id` (recorded and safely hashed/tracked)
-  - `button_click_count` (how many times the application was used / primary CTA was clicked)
-  - `session_id` and `timestamp`
-  - `event_type` (`otp_request`, `otp_verify`, `audit_start`, `file_upload`, `analysis_complete`)
-- **Safe Service Account Usage**: Use `@aurex-495417-8ed2dc84792c.json` as a local credential via `GOOGLE_APPLICATION_CREDENTIALS` (do NOT hardcode paths or commit the private key to git).
+### 2. Active DNS MX Record Verification (Deliverability Check)
+Using the pre-installed `email-validator` library (`validate_email(email, check_deliverability=True)`), the backend will perform a real-time DNS lookup for MX (Mail Exchanger) records on the email's domain.
+* If a domain does not have active MX records (meaning it cannot receive emails), it will be rejected as an invalid/non-existent domain.
+* Normalized email forms will be used for consistency.
 
-### 4. Realistic Provider Data Exports & Normalizers
-- **Realistic Dataset Generators**: Update `scripts/generate_test_data.py` to create raw, messy CSV files simulating real-world exports for:
-  - **OpenAI**: `timestamp,organization_id,project_id,api_key_id,model,prompt_tokens,completion_tokens,cost,request_count,status`
-  - **Anthropic**: `starting_at,ending_at,model,workspace_id,api_key_id,input_tokens,output_tokens,cache_read_input_tokens,cache_creation_tokens,cost_type,amount,currency`
-  - **Bedrock**: `Timestamp,modelId,requestId,operation,inputTokenCount,outputTokenCount,latencyMs`
-- **Updated Normalizers**: Check and ensure `OpenAiCsvNormalizer`, `AnthropicCsvNormalizer`, and `BedrockCsvNormalizer` process these realistic formats smoothly, using robust substring matching and snake_case normalization.
+### 3. Error Handling and Graceful Fallback
+* Provide highly informative error responses back to the user (e.g., `400 Bad Request` with detail: `"Email domain 'sdfgsdfg.com' does not exist or has no active mail servers configured"`).
+* Protect against network latency or timeouts during DNS queries with graceful timeouts.
 
 ---
 
 ## Trade-offs
-- **sessionStorage vs. localStorage vs. Cookies**:
-  - *Trade-off*: sessionStorage isolates auth tokens to the active browser tab, protecting against cross-tab access and expiring when the tab closes. localStorage survives tab closure but exposes tokens longer.
-  - *Decision*: sessionStorage matches the request of "same session" perfectly without storing credentials permanently.
-- **BigQuery vs. local/SQL DB**:
-  - *Trade-off*: BigQuery is the industry standard for analytical queries but adds an external network dependency.
-  - *Decision*: Run BigQuery logging in a background thread or asynchronous task, failing gracefully if GCP credentials/resources are missing.
+* **Latency vs. Security**:
+  * *Trade-off*: Performing a real-time DNS lookup introduces a small network latency (typically 50-200ms) to the `/request-otp` API endpoint.
+  * *Decision*: This is acceptable and expected for authentication request endpoints.
+* **Testing Integrity**:
+  * *Trade-off*: If deliverability check is always on, pytest tests will fail as they use `test@example.com` or other mock emails.
+  * *Decision*: Safely bypass DNS queries in test/pytest environments so local builds remain green and robust.
 
 ---
 
 ## Verification Plan
 
 ### Test Commands
-1. Run backend tests to verify session-aware OTP and routes:
+1. Run backend tests to verify that standard flows work:
    ```bash
    pytest backend/tests/
    ```
-2. Run frontend unit/integration tests:
-   ```bash
-   npm run test --prefix frontend
-   ```
-3. Run normalizer and generator verification scripts.
+2. Manually test OTP requests with valid/invalid domains on the backend to confirm:
+   * Real domains (like `gmail.com`, `outlook.com`) succeed.
+   * Fake domains (like `asdfasdf1234.com`) get rejected.
+   * Hardcoded dummy domains (like `example.com`) get blocked.

@@ -25,12 +25,14 @@ class ExecutiveSummary:
         optimized_spend: float,
         period_days: int = 7
     ):
-        self.current_weekly_spend = current_spend
-        self.wasted_amount = wasted_amount
+        self.period_days = max(1, period_days)
+        # Convert spend over the actual period to weekly equivalent
+        self.current_weekly_spend = (current_spend / self.period_days) * 7
+        self.wasted_amount = (wasted_amount / self.period_days) * 7
         self.waste_percentage = (wasted_amount / current_spend * 100) if current_spend > 0 else 0
-        self.optimized_spend = optimized_spend
-        self.annual_savings_projection = wasted_amount * 52  # Weekly to annual
-        self.period_days = period_days
+        self.optimized_spend = (optimized_spend / self.period_days) * 7
+        self.annual_savings_projection = (wasted_amount / self.period_days) * 365
+        self.credit_score = max(0, min(100, round(100.0 - self.waste_percentage)))
         
         # Determine severity
         if self.waste_percentage > 50:
@@ -50,7 +52,8 @@ class ExecutiveSummary:
             "optimized_spend": round(self.optimized_spend, 2),
             "annual_savings_projection": round(self.annual_savings_projection, 2),
             "period_days": self.period_days,
-            "severity": self.severity
+            "severity": self.severity,
+            "credit_score": self.credit_score
         }
 
 
@@ -214,12 +217,21 @@ class EnhancedDetectionEngine:
         # Analyze workflows
         self._analyze_workflows()
         
+        # Calculate actual period days dynamically
+        timestamps = [e.timestamp for e in self.events if e.timestamp]
+        if timestamps:
+            import math
+            time_delta = max(timestamps) - min(timestamps)
+            period_days = max(1, math.ceil(time_delta.total_seconds() / 86400.0))
+        else:
+            period_days = 7
+
         # Create executive summary
         exec_summary = ExecutiveSummary(
             current_spend=total_cost,
             wasted_amount=wasted_cost,
             optimized_spend=max(0.0, optimized_cost),
-            period_days=7
+            period_days=period_days
         )
         
         # Sort issues by cost impact
@@ -241,6 +253,7 @@ class EnhancedDetectionEngine:
         
         return {
             "executive_summary": exec_summary.to_dict(),
+            "credit_score": exec_summary.credit_score,
             "top_issues": [issue.to_dict() for issue in self.issues[:10]],  # Top 10
             "workflow_breakdown": [wa.to_dict() for wa in sorted(
                 self.workflow_analyses.values(),
