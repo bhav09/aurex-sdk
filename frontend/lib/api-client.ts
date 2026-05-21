@@ -3,7 +3,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://aurex-backend-8
 
 export interface ExecutiveSummary {
     executive_summary: {
-        current_weekly_spend: number;
+        current_period_spend: number;
         wasted_amount: number;
         waste_percentage: number;
         optimized_spend: number;
@@ -480,7 +480,7 @@ export class AurexAPI {
         // Update session with results
         const updatedSession = await this.updateAuditSession(session.id, {
             credit_score: creditScore,
-            total_cost: summary.executive_summary.current_weekly_spend,
+            total_cost: summary.executive_summary.current_period_spend,
             wasted_cost: summary.executive_summary.wasted_amount,
             waste_percentage: summary.executive_summary.waste_percentage,
             total_events: summary.total_events,

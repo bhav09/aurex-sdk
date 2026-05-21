@@ -339,7 +339,6 @@ async def upload_csv(
         h = str(h).strip().lower()
         h = h.replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "")
         return h
-
     def parse_numeric(val):
         if pd.isna(val) or val is None:
             return 0

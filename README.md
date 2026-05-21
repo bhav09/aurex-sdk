@@ -212,6 +212,17 @@ Deploy the **`dist/`** directory to any static host (S3, Cloudflare Pages, Netli
 - **LangSmith / Helicone** optional pull via user-supplied keys in the browser.  
 - **A/B replay** (optional user OpenAI key): replay a flagged prompt against a cheaper model and compare output in the UI.
 
+### How Waste is Calculated
+Waste is calculated strictly by clustering requests into sessions (via explicit ID or 5-minute temporal windows) and assigning proportional cost penalties capped at the raw event cost. Triggers include:
+- **Runaway Loops:** Context length exponentially doubling (>= 1.8x) within a session.
+- **Redundant Prompts:** Identical large `input_tokens` counts sent repeatedly.
+- **Expensive Model Misuse:** Premium models (>$2/1M tokens) generating tiny outputs.
+
+### Required CSV Metadata
+For the engine to function, your usage export needs the following columns:
+- **Required:** `Timestamp`, `Model`, `Input Tokens`, `Output Tokens`
+- **Recommended (For better accuracy):** `Automation ID` (or Workflow ID), `Cost`, `Context Length`
+
 ### Pricing data (Lumina)
 
 Loads community **[LiteLLM `model_prices_and_context_window.json`](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)** when allowed by network/CORS. Fallback: bundled `public/model-catalog.json` (after sync script) → fetch → embedded table in `src/pricing.ts`. **Not** your negotiated enterprise rates — validate before finance use.

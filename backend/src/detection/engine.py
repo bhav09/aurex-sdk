@@ -25,13 +25,15 @@ class ExecutiveSummary:
         optimized_spend: float,
         period_days: int = 7
     ):
-        self.period_days = max(1, period_days)
-        # Convert spend over the actual period to weekly equivalent
-        self.current_weekly_spend = (current_spend / self.period_days) * 7
-        self.wasted_amount = (wasted_amount / self.period_days) * 7
+        self.current_period_spend = current_spend
+        self.wasted_amount = wasted_amount
         self.waste_percentage = (wasted_amount / current_spend * 100) if current_spend > 0 else 0
-        self.optimized_spend = (optimized_spend / self.period_days) * 7
-        self.annual_savings_projection = (wasted_amount / self.period_days) * 365
+        self.optimized_spend = optimized_spend
+        self.period_days = max(period_days, 1)  # Guard against zero
+        
+        # Compute annual projection from ACTUAL date span
+        daily_waste = wasted_amount / self.period_days
+        self.annual_savings_projection = daily_waste * 365
         self.credit_score = max(0, min(100, round(100.0 - self.waste_percentage)))
         
         # Determine severity
@@ -46,7 +48,7 @@ class ExecutiveSummary:
     
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "current_weekly_spend": round(self.current_weekly_spend, 2),
+            "current_period_spend": round(self.current_period_spend, 2),
             "wasted_amount": round(self.wasted_amount, 2),
             "waste_percentage": round(self.waste_percentage, 1),
             "optimized_spend": round(self.optimized_spend, 2),
@@ -520,20 +522,54 @@ class EnhancedDetectionEngine:
                 self.issues.append(issue)
     
     def detect_context_explosion_enhanced(self):
-        """Enhanced context explosion detection with temporal fallback"""
+        """
+        Enhanced context explosion detection using per-turn delta analysis.
+        
+        The old approach flagged any session where max_context >= 2x min_context,
+        which falsely flags normal multi-turn chatbots (context naturally doubles
+        as conversation history accumulates).
+        
+        New approach: Check if any SINGLE turn causes a disproportionate context
+        jump (>= 1.8x the previous turn). Normal multi-turn conversations grow
+        linearly (~+500-2000 tokens per turn). Exponential growth signals an
+        agent loop or missing context management.
+        """
         sessions = self._get_inferred_sessions()
         
         for wf_id, events_list in sessions.items():
-            if len(events_list) < 2:
+            if len(events_list) < 3:  # Need at least 3 turns to detect explosion
                 continue
             
             contexts = [e.context_length if e.context_length is not None else e.input_tokens for e in events_list]
-            min_context = min(contexts)
-            max_context = max(contexts)
             
-            if min_context > 0 and max_context >= min_context * 2:
-                large_events = [e for e, c in zip(events_list, contexts) if c >= min_context * 1.5]
+            # Skip if any context is zero (missing data)
+            if any(c == 0 or c is None for c in contexts):
+                continue
+            
+            # Calculate per-turn deltas
+            explosive_turns = []  # Indices where context jumped >= 1.8x
+            for i in range(1, len(contexts)):
+                prev = contexts[i - 1]
+                curr = contexts[i]
+                if prev > 0 and curr >= prev * 1.8:
+                    explosive_turns.append(i)
+            
+            # Also check total growth, but only flag if individual jumps are explosive
+            total_growth = contexts[-1] / contexts[0] if contexts[0] > 0 else 0
+            
+            # Flag only if:
+            # 1. At least 2 explosive turns (not just one large message), OR
+            # 2. Total growth >= 5x (even if individual jumps are spread out)
+            if len(explosive_turns) >= 2 or (total_growth >= 5 and len(explosive_turns) >= 1):
+                # The "wasted" events are those after the first explosion
+                first_explosion_idx = explosive_turns[0]
+                large_events = events_list[first_explosion_idx:]
                 wasted_cost = sum(e.cost for e in large_events) * 0.5
+                
+                max_jump = max(
+                    contexts[i] / contexts[i - 1]
+                    for i in explosive_turns
+                ) if explosive_turns else 0
                 
                 issue = EnhancedIssue(
                     rank=0,
@@ -541,17 +577,19 @@ class EnhancedDetectionEngine:
                     title="Context Explosion",
                     severity="HIGH",
                     weekly_cost=wasted_cost,
-                    one_line_summary=f"Context grew {max_context/min_context:.1f}x",
+                    one_line_summary=f"Context grew {total_growth:.1f}x total, {len(explosive_turns)} explosive turn(s)",
                     fix_effort="15 minutes",
                     fix_confidence="MEDIUM",
                     cta="Implement Sliding Window",
                     affected_workflow=wf_id,
                     affected_events=[e.id for e in large_events],
                     metadata={
-                        "min_context": min_context,
-                        "max_context": max_context,
-                        "growth_factor": round(max_context / min_context, 2),
-                        "fix_instructions": "Implement context summarization or sliding window"
+                        "min_context": contexts[0],
+                        "max_context": max(contexts),
+                        "total_growth_factor": round(total_growth, 2),
+                        "explosive_turns": len(explosive_turns),
+                        "max_single_turn_jump": round(max_jump, 2),
+                        "fix_instructions": "Implement context summarization or sliding window to cap context growth"
                     }
                 )
                 self.issues.append(issue)

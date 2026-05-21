@@ -66,35 +66,20 @@ export function PricingSection() {
   }, []);
 
   return (
-    <section id="pricing" ref={sectionRef} className="relative py-32 lg:py-40">
+    <section id="pricing" ref={sectionRef} className="relative py-20 sm:py-24 lg:py-32">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header - Dramatic offset */}
-        <div className="grid lg:grid-cols-12 gap-8 mb-20">
-          <div className="lg:col-span-7">
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-8">
-              <span className="w-12 h-px bg-foreground/30" />
-               Pricing
-            </span>
-            <h2 className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-              }`}>
-              Simple
-              <br />
-              <span className="text-stroke">pricing...</span>
-            </h2>
-          </div>
-
-          <div className="lg:col-span-5 relative p-0 h-96 lg:h-auto">
-            {/* Whale image */}
-            {/* <div className={`absolute inset-0 pointer-events-none transition-all duration-1000 delay-100 ${isVisible ? "opacity-100" : "opacity-0"
-              }`}>
-              <img
-                src="/images/whale.png"
-                alt="Organic whale"
-                className="w-full h-full object-contain object-center"
-              />
-            </div> */}
-
-          </div>
+        {/* Header */}
+        <div className="mb-12 sm:mb-16 lg:mb-20">
+          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6 sm:mb-8">
+            <span className="w-12 h-px bg-foreground/30" />
+            Pricing
+          </span>
+          <h2 className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}>
+            Simple
+            <br />
+            <span className="text-stroke">pricing...</span>
+          </h2>
         </div>
 
         {/* Pricing cards - Horizontal layout with overlap */}
@@ -104,8 +89,8 @@ export function PricingSection() {
               <div
                 key={plan.name}
                 className={`relative bg-background border transition-all duration-700 ${plan.highlight
-                    ? "border-foreground lg:-mx-2 lg:z-10 lg:scale-105"
-                    : "border-foreground/10 lg:first:-mr-2 lg:last:-ml-2"
+                  ? "border-foreground lg:-mx-2 lg:z-10 lg:scale-105"
+                  : "border-foreground/10 lg:first:-mr-2 lg:last:-ml-2"
                   } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
@@ -152,7 +137,7 @@ export function PricingSection() {
                   </ul>
 
                   {/* CTA */}
-                  
+
                 </div>
               </div>
             ))}

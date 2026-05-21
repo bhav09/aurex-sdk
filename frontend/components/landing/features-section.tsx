@@ -1,0 +1,244 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+const features = [
+  {
+    number: "01",
+    title: "Cost Savings",
+    description: "Identify where you're wasting tokens and reduce spend. Get actionable recommendations to optimize your AI usage and cut costs by up to 40%.",
+    stats: { value: "40%", label: "avg cost reduction" },
+  },
+  {
+    number: "02",
+    title: "Visibility",
+    description: "Understand exactly how your AI is being used. Track token consumption, model distribution, and usage patterns across your entire organization.",
+    stats: { value: "100%", label: "usage transparency" },
+  },
+  {
+    number: "03",
+    title: "Privacy",
+    description: "Runs locally. Your data never leaves your environment. All analysis happens on your machine with zero data transmission to external servers.",
+    stats: { value: "0", label: "data shared" },
+  },
+];
+
+// Auto-scroll through features
+function useFeatureScroll(featuresLength: number) {
+  const [activeFeature, setActiveFeature] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveFeature((prev) => (prev + 1) % featuresLength);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [featuresLength]);
+
+  return activeFeature;
+}
+
+// Floating dot particles visualization
+function ParticleVisualization() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef(0);
+  const mouseRef = useRef({ x: 0.5, y: 0.5 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current = {
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      };
+    };
+    canvas.addEventListener("mousemove", handleMouseMove);
+
+    // Generate stable particle positions
+    const COUNT = 70;
+    const particles = Array.from({ length: COUNT }, (_, i) => {
+      const seed = i * 1.618;
+      return {
+        bx: ((seed * 127.1) % 1),
+        by: ((seed * 311.7) % 1),
+        phase: seed * Math.PI * 2,
+        speed: 0.4 + (seed % 0.4),
+        radius: 1.2 + (seed % 2.2),
+      };
+    });
+
+    let time = 0;
+    const render = () => {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const mx = mouseRef.current.x;
+      const my = mouseRef.current.y;
+
+      particles.forEach((p) => {
+        const flowX = Math.sin(time * p.speed * 0.4 + p.phase) * 38;
+        const flowY = Math.cos(time * p.speed * 0.3 + p.phase * 0.7) * 24;
+
+        const bx = p.bx * w;
+        const by = p.by * h;
+        const dx = p.bx - mx;
+        const dy = p.by - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const influence = Math.max(0, 1 - dist * 2.8);
+
+        const x = bx + flowX + influence * Math.cos(time + p.phase) * 36;
+        const y = by + flowY + influence * Math.sin(time + p.phase) * 36;
+
+        const pulse = Math.sin(time * p.speed + p.phase) * 0.5 + 0.5;
+        const alpha = 0.08 + pulse * 0.18 + influence * 0.3;
+
+        ctx.beginPath();
+        ctx.arc(x, y, p.radius + pulse * 0.8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.fill();
+      });
+
+      time += 0.016;
+      frameRef.current = requestAnimationFrame(render);
+    };
+    render();
+
+    return () => {
+      window.removeEventListener("resize", resize);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      cancelAnimationFrame(frameRef.current);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ width: "100%", height: "100%" }}
+    />
+  );
+}
+
+export function FeaturesSection() {
+  const [isVisible, setIsVisible] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const activeFeature = useFeatureScroll(features.length);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      },
+      { threshold: 0.1 }
+    );
+
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <section
+      id="features"
+      ref={sectionRef}
+      className="relative py-16 sm:py-20 lg:py-28 overflow-hidden"
+    >
+      <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
+        {/* Header */}
+        <div className="relative mb-12 sm:mb-16 lg:mb-20">
+          <div className="grid lg:grid-cols-12 gap-6 sm:gap-8 items-end">
+            <div className="lg:col-span-7">
+              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4 sm:mb-6">
+                <span className="w-12 h-px bg-foreground/30" />
+                Value Propositions
+              </span>
+              <h2
+                className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                  }`}
+              >
+                Smart
+                <br />
+                <span className="text-muted-foreground">auditing.</span>
+              </h2>
+            </div>
+            <div className="lg:col-span-5 lg:pb-4">
+              <p className={`text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                }`}>
+                Analyze your AI token usage locally and discover where you're wasting money. Get actionable insights in seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Horizontal Scrollable Cards */}
+        <div className="relative">
+          {/* Scroll container */}
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-6 px-6 lg:mx-0 lg:px-0">
+            {features.map((feature, index) => (
+              <div
+                key={feature.number}
+                className={`flex-none w-[85vw] sm:w-[75vw] lg:w-[calc(33.333%-16px)] relative bg-black border border-foreground/10 min-h-[380px] sm:min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                  }`}
+                style={{ transitionDelay: `${index * 100}ms` }}
+              >
+                <div className="relative h-full p-6 sm:p-8 lg:p-10 bg-black">
+                  <ParticleVisualization />
+                  <div className="relative z-10 flex flex-col h-full">
+                    <span className="font-mono text-xs sm:text-sm text-muted-foreground">{feature.number}</span>
+                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-display mt-3 sm:mt-4 mb-4 sm:mb-6 group-hover:translate-x-2 transition-transform duration-500">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-6 sm:mb-8 flex-1">
+                      {feature.description}
+                    </p>
+                    <div className="mt-auto">
+                      <span className="text-4xl sm:text-5xl lg:text-6xl font-display">{feature.stats.value}</span>
+                      <span className="block text-xs sm:text-sm text-muted-foreground font-mono mt-2">{feature.stats.label}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Scroll indicators */}
+          <div className="flex justify-center gap-2 mt-6 lg:hidden">
+            {features.map((_, index) => (
+              <button
+                key={index}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === activeFeature ? "bg-foreground w-8" : "bg-foreground/20"
+                  }`}
+                aria-label={`Go to feature ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

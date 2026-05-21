@@ -1,5 +1,0 @@
-Billing Account ID,Service ID,Service Description,SKU ID,SKU Description,Usage Start Time,Usage End Time,Project ID,Project Name,Project Number,Location.Region,Usage.Amount,Usage.Unit,Cost,Currency,Credits
-01A2B3-C4D5E6-F7G8H9,6F84-D411-B61E,Vertex AI,1E1A-5494-0EAD,Gemini 1.5 Pro Input Tokens,2026-05-20 00:00:00 UTC,2026-05-20 01:00:00 UTC,lumina-prod-101,Lumina Production,123456789012,us-central1,15420000.0,tokens,18.504,USD,-3.70
-01A2B3-C4D5E6-F7G8H9,6F84-D411-B61E,Vertex AI,2F2B-6505-1FAE,Gemini 1.5 Pro Output Tokens,2026-05-20 00:00:00 UTC,2026-05-20 01:00:00 UTC,lumina-prod-101,Lumina Production,123456789012,us-central1,4890000.0,tokens,29.34,USD,-5.868
-01A2B3-C4D5E6-F7G8H9,6F84-D411-B61E,Vertex AI,1E1A-5494-0EAD,Gemini 1.5 Flash Input Tokens,2026-05-20 01:00:00 UTC,2026-05-20 02:00:00 UTC,lumina-prod-101,Lumina Production,123456789012,us-central1,89420000.0,tokens,6.7065,USD,0.0
-01A2B3-C4D5E6-F7G8H9,6F84-D411-B61E,Vertex AI,2F2B-6505-1FAE,Gemini 1.5 Flash Output Tokens,2026-05-20 01:00:00 UTC,2026-05-20 02:00:00 UTC,lumina-prod-101,Lumina Production,123456789012,us-central1,34120000.0,tokens,10.236,USD,0.0
