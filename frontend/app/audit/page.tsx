@@ -93,6 +93,10 @@ export default function AuditPage() {
     const [copilotOpen, setCopilotOpen] = useState(false);
     const [copilotIssue, setCopilotIssue] = useState<Issue | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [pendingUserInfo, setPendingUserInfo] = useState<{ user_name: string; email: string; company_name: string } | null>(null);
+    const [authRequired, setAuthRequired] = useState(false);
+    const [authRequiredMessage, setAuthRequiredMessage] = useState<string | null>(null);
 
     const simulateProgress = () => {
         const steps = [
@@ -142,10 +146,44 @@ export default function AuditPage() {
             setProgress(100);
             await new Promise((resolve) => setTimeout(resolve, 500));
             setData(summary);
+            
+            // Clear pending states upon successful upload & analysis
+            setPendingFile(null);
+            setPendingUserInfo(null);
+            setAuthRequired(false);
+            setAuthRequiredMessage(null);
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Upload failed";
-            setError(message);
             clearInterval(progressInterval);
+            
+            const isAuthError = message.toLowerCase().includes("verification") || 
+                                message.toLowerCase().includes("authenticate") || 
+                                message.toLowerCase().includes("authorized") ||
+                                message.toLowerCase().includes("403") ||
+                                message.toLowerCase().includes("401");
+            
+            if (isAuthError) {
+                // Clear staled sessionStorage auth
+                aurixAPI.clearSession();
+                
+                // Track pending items so they don't have to re-select file/re-type info
+                setPendingFile(file);
+                setPendingUserInfo(userInfo);
+                setAuthRequired(true);
+                setAuthRequiredMessage("Your session expired. Please enter the new 6-digit verification code sent to your email to complete the audit.");
+                
+                // Automatically request a new OTP code!
+                try {
+                    await aurixAPI.requestOTP(userInfo.email);
+                } catch (otpErr) {
+                    console.error("Auto sending OTP failed:", otpErr);
+                }
+                
+                // Set page error to null so we don't display the generic failure card
+                setError(null);
+            } else {
+                setError(message);
+            }
         } finally {
             setAnalyzing(false);
         }
@@ -291,7 +329,19 @@ export default function AuditPage() {
 
             <div className="container mx-auto px-4 py-12">
                 {!(data || analyzing) && (
-                    <UploadZone onFileSelect={handleFileSelect} />
+                    <UploadZone 
+                        onFileSelect={handleFileSelect} 
+                        initialFile={pendingFile}
+                        initialIsOtpStep={authRequired}
+                        initialUserInfo={pendingUserInfo}
+                        otpNotice={authRequiredMessage}
+                        onResetPending={() => {
+                            setPendingFile(null);
+                            setPendingUserInfo(null);
+                            setAuthRequired(false);
+                            setAuthRequiredMessage(null);
+                        }}
+                    />
                 )}
 
                 {analyzing && (
