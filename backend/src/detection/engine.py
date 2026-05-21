@@ -26,10 +26,12 @@ class ExecutiveSummary:
         period_days: int = 7
     ):
         self.current_period_spend = current_spend
-        self.wasted_amount = wasted_amount
-        self.waste_percentage = (wasted_amount / current_spend * 100) if current_spend > 0 else 0
         self.optimized_spend = optimized_spend
         self.period_days = max(period_days, 1)  # Guard against zero
+        
+        self.current_weekly_spend = (current_spend / self.period_days) * 7
+        self.wasted_amount = (wasted_amount / self.period_days) * 7
+        self.waste_percentage = (wasted_amount / current_spend * 100) if current_spend > 0 else 0
         
         # Compute annual projection from ACTUAL date span
         daily_waste = wasted_amount / self.period_days
@@ -49,6 +51,7 @@ class ExecutiveSummary:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "current_period_spend": round(self.current_period_spend, 2),
+            "current_weekly_spend": round(self.current_weekly_spend, 2),
             "wasted_amount": round(self.wasted_amount, 2),
             "waste_percentage": round(self.waste_percentage, 1),
             "optimized_spend": round(self.optimized_spend, 2),
@@ -537,7 +540,7 @@ class EnhancedDetectionEngine:
         sessions = self._get_inferred_sessions()
         
         for wf_id, events_list in sessions.items():
-            if len(events_list) < 3:  # Need at least 3 turns to detect explosion
+            if len(events_list) < 2:  # Need at least 2 turns to detect explosion
                 continue
             
             contexts = [e.context_length if e.context_length is not None else e.input_tokens for e in events_list]
