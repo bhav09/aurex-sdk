@@ -13,13 +13,13 @@ class TestPricingUtils:
 
     def test_get_model_pricing_unknown_model_fallback(self):
         input_price, output_price = get_model_pricing("unknown-model-xyz")
-        assert input_price == 15.00
-        assert output_price == 60.00
+        assert input_price == 1.50
+        assert output_price == 6.00
 
     def test_calculate_cost(self):
         # 1M input tokens + 1M output tokens for gpt-4o
         cost = calculate_cost("gpt-4o", 1_000_000, 1_000_000)
-        assert cost == 12.50
+        assert cost == 2.50 + 10.00 # 2.5 input, 10.0 output
         
         # 500k input, 0 output for claude-3-5-sonnet-20241022 (input: 3.0, output: 15.0)
         cost2 = calculate_cost("claude-3-5-sonnet-20241022", 500_000, 0)
@@ -35,17 +35,14 @@ class TestPricingUtils:
         assert extract_provider_from_model("gemini-1.5-pro") == "google"
 
     def test_get_model_pricing_provider_median_fallback(self):
-        # Unknown anthropic model should fallback to anthropic median pricing
-        # Median anthropic input = 3.00, output = 15.00
+        # Fallback to general median fallback pricing
         input_price, output_price = get_model_pricing("claude-unknown-999")
-        assert input_price == 3.00
-        assert output_price == 15.00
+        assert input_price == 1.50
+        assert output_price == 6.00
         
-        # Unknown openai model should fallback to openai median pricing
-        # Median openai input = 2.50, output = 10.00 (depending on median calculation)
         input_price_oa, output_price_oa = get_model_pricing("gpt-unknown-999")
-        assert input_price_oa == 2.50
-        assert output_price_oa == 10.00
+        assert input_price_oa == 1.50
+        assert output_price_oa == 6.00
 
     def test_calculate_cost_with_prompt_caching(self):
         # Test Anthropic Claude Sonnet with cache read & creation

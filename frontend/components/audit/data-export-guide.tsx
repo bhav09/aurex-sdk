@@ -25,7 +25,7 @@ export function DataExportGuide() {
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-display">How to export your LLM usage data</DialogTitle>
                     <DialogDescription>
-                        Follow these steps to export your token usage logs from major AI providers for analysis in Aurex/Lumina.
+                        Follow these steps to export your token usage logs from major AI providers for analysis in Aurex.
                     </DialogDescription>
                 </DialogHeader>
 
