@@ -18,3 +18,10 @@ aurex-*.json
 backend/data/
 backend/.venv/
 
+# CSV and database files
+*.csv
+!examples/**/*.csv
+!src/demo/**/*.csv
+*.db
+*.sqlite
+*.sqlite3
