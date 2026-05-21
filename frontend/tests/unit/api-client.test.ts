@@ -95,7 +95,7 @@ describe('AurexAPI', () => {
 
         it('should not include Authorization header if token is absent', async () => {
             const mockResponse = {
-                executive_summary: { current_weekly_spend: 100 },
+                executive_summary: { current_period_spend: 100 },
                 total_events: 50,
             };
 
@@ -121,7 +121,7 @@ describe('AurexAPI', () => {
             api.setToken('mock_jwt_token');
 
             const mockResponse = {
-                executive_summary: { current_weekly_spend: 100 },
+                executive_summary: { current_period_spend: 100 },
                 total_events: 50,
             };
 
@@ -146,7 +146,7 @@ describe('AurexAPI', () => {
     describe('getExecutiveSummary', () => {
         it('should fetch executive summary without email', async () => {
             const mockResponse = {
-                executive_summary: { current_weekly_spend: 100 },
+                executive_summary: { current_period_spend: 100 },
                 total_events: 50,
             };
 
@@ -163,7 +163,7 @@ describe('AurexAPI', () => {
 
         it('should fetch executive summary with email', async () => {
             const mockResponse = {
-                executive_summary: { current_weekly_spend: 200 },
+                executive_summary: { current_period_spend: 200 },
                 total_events: 150,
             };
 

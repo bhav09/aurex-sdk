@@ -1,223 +1,219 @@
-"use client";
+"use client"
 
-import { useEffect, useState, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
 
-const words = ["analyze", "optimize", "reduce", "save"];
-
-function BlurWord({ word, trigger }: { word: string; trigger: number }) {
-  const letters = word.split("");
-  const STAGGER = 45;      // ms between each letter
-  const DURATION = 500;    // blur+opacity fade duration per letter
-  const GRADIENT_HOLD = STAGGER * letters.length + DURATION + 200;
-
-  const [letterStates, setLetterStates] = useState<{ opacity: number; blur: number }[]>(
-    letters.map(() => ({ opacity: 0, blur: 20 }))
-  );
-  const [showGradient, setShowGradient] = useState(true);
-  const framesRef = useRef<number[]>([]);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+function ElegantShape({
+  className,
+  delay = 0,
+  width = 400,
+  height = 100,
+  rotate = 0,
+  gradient = "from-white/[0.08]",
+}: {
+  className?: string
+  delay?: number
+  width?: number
+  height?: number
+  rotate?: number
+  gradient?: string
+}) {
+  const [shouldAnimate, setShouldAnimate] = useState(false)
 
   useEffect(() => {
-    // reset
-    framesRef.current.forEach(cancelAnimationFrame);
-    timersRef.current.forEach(clearTimeout);
-    framesRef.current = [];
-    timersRef.current = [];
-
-    setLetterStates(letters.map(() => ({ opacity: 0, blur: 20 })));
-    setShowGradient(true);
-
-    // stagger each letter
-    letters.forEach((_, i) => {
-      const t = setTimeout(() => {
-        const start = performance.now();
-        const tick = (now: number) => {
-          const progress = Math.min((now - start) / DURATION, 1);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          setLetterStates(prev => {
-            const next = [...prev];
-            next[i] = { opacity: eased, blur: 20 * (1 - eased) };
-            return next;
-          });
-          if (progress < 1) {
-            const id = requestAnimationFrame(tick);
-            framesRef.current.push(id);
-          }
-        };
-        const id = requestAnimationFrame(tick);
-        framesRef.current.push(id);
-      }, i * STAGGER);
-      timersRef.current.push(t);
-    });
-
-    // remove gradient once all letters are settled
-    const gt = setTimeout(() => setShowGradient(false), GRADIENT_HOLD);
-    timersRef.current.push(gt);
-
-    return () => {
-      framesRef.current.forEach(cancelAnimationFrame);
-      timersRef.current.forEach(clearTimeout);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trigger]);
-
-  // gradient colours cycling across letter positions
-  const gradientColors = ["#eca8d6", "#a78bfa", "#67e8f9", "#fbbf24", "#eca8d6"];
+    // Only animate on larger screens for better performance
+    setShouldAnimate(window.innerWidth > 768)
+  }, [])
 
   return (
-    <>
-      {letters.map((char, i) => {
-        const colorIndex = (i / Math.max(letters.length - 1, 1)) * (gradientColors.length - 1);
-        const lower = Math.floor(colorIndex);
-        const upper = Math.min(lower + 1, gradientColors.length - 1);
-        const t = colorIndex - lower;
-
-        // lerp hex colours
-        const hex2rgb = (hex: string) => {
-          const r = parseInt(hex.slice(1, 3), 16);
-          const g = parseInt(hex.slice(3, 5), 16);
-          const b = parseInt(hex.slice(5, 7), 16);
-          return [r, g, b];
-        };
-        const [r1, g1, b1] = hex2rgb(gradientColors[lower]);
-        const [r2, g2, b2] = hex2rgb(gradientColors[upper]);
-        const r = Math.round(r1 + (r2 - r1) * t);
-        const g = Math.round(g1 + (g2 - g1) * t);
-        const b = Math.round(b1 + (b2 - b1) * t);
-
-        return (
-          <span
-            key={i}
-            style={{
-              display: "inline-block",
-              opacity: letterStates[i]?.opacity ?? 0,
-              filter: `blur(${letterStates[i]?.blur ?? 20}px)`,
-              color: showGradient ? `rgb(${r},${g},${b})` : "white",
-              transition: "color 0.4s ease",
-            }}
-          >
-            {char}
-          </span>
-        );
-      })}
-    </>
-  );
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: shouldAnimate ? -150 : 0,
+        rotate: shouldAnimate ? rotate - 15 : rotate,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        rotate: rotate,
+      }}
+      transition={{
+        duration: shouldAnimate ? 2.4 : 0.8,
+        delay,
+        ease: [0.23, 0.86, 0.39, 0.96],
+        opacity: { duration: 1.2 },
+      }}
+      className={cn("absolute", className)}
+    >
+      <motion.div
+        animate={shouldAnimate ? {
+          y: [0, 15, 0],
+        } : {}}
+        transition={{
+          duration: 12,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        style={{
+          width: width,
+          height: height,
+        }}
+        className="relative"
+      >
+        <div
+          className={cn(
+            "absolute inset-0 rounded-full",
+            "bg-gradient-to-r to-transparent",
+            gradient,
+            "backdrop-blur-[2px] border-2 border-white/[0.15]",
+            "shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]",
+            "after:absolute after:inset-0 after:rounded-full",
+            "after:bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.2),transparent_70%)]",
+          )}
+        />
+      </motion.div>
+    </motion.div>
+  )
 }
 
 export function HeroSection() {
-  const [isVisible, setIsVisible] = useState(false);
-  const [wordIndex, setWordIndex] = useState(0);
-
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setWordIndex((prev) => (prev + 1) % words.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <section className="relative min-h-screen flex flex-col justify-center items-start overflow-hidden bg-black">
-      {/* Background video */}
-      <div className="absolute inset-0 z-0">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          aria-hidden="true"
-          className="w-full h-full object-cover object-center opacity-50"
-          style={{ filter: 'brightness(0.8)' }}
-        >
-          {/* <source src="/84938-587646716_small.mp4" type="video/mp4" /> */}
-          <source src="/2.mp4" type="video/mp4" />
-        </video>
-        {/* Darker overlay to reduce brightness and ensure text readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
-        <div className="absolute inset-0 bg-black/30" />
+    <div className="relative min-h-[100dvh] w-full flex items-center justify-center overflow-hidden bg-[#030303]">
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
+
+      {/* Fewer shapes on mobile, more on desktop */}
+      <div className="absolute inset-0 overflow-hidden">
+        <ElegantShape
+          delay={0.3}
+          width={600}
+          height={140}
+          rotate={12}
+          gradient="from-indigo-500/[0.15]"
+          className="left-[-10%] md:left-[-5%] top-[15%] md:top-[20%]"
+        />
+
+        <ElegantShape
+          delay={0.5}
+          width={500}
+          height={120}
+          rotate={-15}
+          gradient="from-rose-500/[0.15]"
+          className="right-[-5%] md:right-[0%] top-[70%] md:top-[75%]"
+        />
+
+        {/* Hide some shapes on mobile for better performance */}
+        <ElegantShape
+          delay={0.4}
+          width={300}
+          height={80}
+          rotate={-8}
+          gradient="from-violet-500/[0.15]"
+          className="hidden md:block left-[5%] md:left-[10%] bottom-[5%] md:bottom-[10%]"
+        />
+
+        <ElegantShape
+          delay={0.6}
+          width={200}
+          height={60}
+          rotate={20}
+          gradient="from-amber-500/[0.15]"
+          className="hidden lg:block right-[15%] md:right-[20%] top-[10%] md:top-[15%]"
+        />
+
+        <ElegantShape
+          delay={0.7}
+          width={150}
+          height={40}
+          rotate={-25}
+          gradient="from-cyan-500/[0.15]"
+          className="hidden lg:block left-[20%] md:left-[25%] top-[5%] md:top-[10%]"
+        />
       </div>
 
-      <style jsx>{`
-        video {
-          animation: slowPan 60s ease-in-out infinite alternate;
-        }
-        @keyframes slowPan {
-          0% {
-            transform: scale(1.05) translateX(0);
-          }
-          100% {
-            transform: scale(1.1) translateX(-2%);
-          }
-        }
-      `}</style>
-
-
-      <div className="relative z-10 w-full max-w-[1400px] mx-auto px-6 lg:px-12 py-32 lg:py-40">
-        <div className="flex flex-col items-center text-center">
-          {/* Eyebrow */}
-          <div
-            className={`mb-8 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6 sm:mb-8 md:mb-12"
           >
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
-              <span className="w-8 h-px bg-white/30" />
-              The FinOps Platform for the AI Era
-              <span className="w-8 h-px bg-white/30" />
-            </span>
-          </div>
+            <span className="w-6 sm:w-8 h-px bg-white/30" />
+            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">The FinOps Platform for the AI Era</span>
+            <span className="w-6 sm:w-8 h-px bg-white/30" />
+          </motion.div>
 
-          {/* Main headline */}
-          <div className="mb-12">
-            <h1
-              className={`text-center text-[clamp(2.5rem,7vw,8rem)] font-display leading-[0.88] tracking-[-0.02em] text-white transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                }`}
-            >
-              <span className="block">reduce inference</span>
-              <span className="block text-stroke">costs automatically.</span>
-            </h1>
-            <p className={`text-lg md:text-xl text-white/60 mt-8 max-w-xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}>
-              ai companies pay daily for compute. your customers pay monthly. aurex closes the cash-flow gap with real-time cost visibility, intelligent routing, and net-30 inference financing.
-            </p>
-            <div className={`mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-1000 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-              <a href="/audit">
-                <Button className="rounded-full bg-white hover:bg-white/90 text-black px-8 h-12 text-base font-medium">
-                  Run Free Audit
-                </Button>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats — 3 metrics static, no auto-scroll */}
-      <div
-        className={`absolute bottom-12 left-0 right-0 px-6 lg:px-12 transition-all duration-700 delay-500 ${isVisible ? "opacity-100" : "opacity-0"
-          }`}
-      >
-        <div className="max-w-[1400px] mx-auto flex items-start justify-center gap-10 lg:gap-20">
-          {[
-            { value: "30%", label: "avg tokens wasted" },
-            { value: "$2.4k", label: "potential monthly savings" },
-            { value: "<30s", label: "time to audit" },
-          ].map((stat) => (
-            <div key={stat.label} className="flex flex-col gap-2 text-center">
-              <span className="text-3xl lg:text-4xl font-display text-white">{stat.value}</span>
-              <span className="text-xs text-white/50 leading-tight">
-                {stat.label}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+          >
+            <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-4 sm:mb-6 md:mb-8 tracking-tight leading-[0.9]">
+              <span className="block bg-clip-text text-transparent bg-gradient-to-b from-white to-white/80">
+                reduce inference
               </span>
+              <span
+                className={cn(
+                  "block bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300"
+                )}
+              >
+                costs automatically.
+              </span>
+            </h1>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+          >
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/40 mb-8 sm:mb-10 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-2 sm:px-4">
+              real-time cost visibility, intelligent routing, and net-30 inference financing for ai companies.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.9 }}
+          >
+            <a href="/audit">
+              <Button className="rounded-full bg-white hover:bg-white/90 text-black px-6 sm:px-8 h-11 sm:h-12 text-sm sm:text-base font-medium shadow-lg hover:shadow-xl transition-all">
+                Run Free Audit
+              </Button>
+            </a>
+          </motion.div>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.1 }}
+            className="mt-12 sm:mt-16 md:mt-20 lg:mt-24"
+          >
+            <div className="flex items-start justify-center gap-6 sm:gap-8 md:gap-10 lg:gap-20 flex-wrap">
+              {[
+                { value: "30%", label: "avg tokens wasted" },
+                { value: "$2.4k", label: "potential monthly savings" },
+                { value: "<30s", label: "time to audit" },
+              ].map((stat) => (
+                <div key={stat.label} className="flex flex-col gap-1 sm:gap-2 text-center">
+                  <span className="text-2xl sm:text-3xl lg:text-4xl font-display text-white">{stat.value}</span>
+                  <span className="text-[10px] sm:text-xs text-white/50 leading-tight">
+                    {stat.label}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          </motion.div>
         </div>
       </div>
 
-      {/* Scroll indicator */}
-
-    </section>
-  );
+      <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
+    </div>
+  )
 }
+
+// Made with Bob

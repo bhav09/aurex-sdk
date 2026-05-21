@@ -1,0 +1,52 @@
+name: Refresh provider pricing
+
+# Daily refresh of backend/data/pricing/<provider>.json. PRs the diff so a
+# human reviews any model rename / price change before it lands.
+#
+# Manual run:
+#   gh workflow run refresh-pricing.yml
+
+on:
+  schedule:
+    - cron: "17 9 * * *"   # 09:17 UTC daily — off-peak, off-the-hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run scraper
+        run: |
+          python -m scripts.scrape_pricing
+      - name: Diff
+        id: diff
+        working-directory: ${{ github.workspace }}
+        run: |
+          if git diff --quiet -- backend/data/pricing; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open PR
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: pricing/refresh-${{ github.run_id }}
+          title: "Pricing refresh — $(date -u +%Y-%m-%d)"
+          body: |
+            Automated daily refresh of `backend/data/pricing/*.json` from provider pricing pages.
+
+            Review any added or removed models carefully — provider pages occasionally rename SKUs or de-list older snapshots (which would zero out cost on rows that still reference them in customer exports).
+          commit-message: "chore(pricing): daily catalog refresh"
+          add-paths: backend/data/pricing/*.json
