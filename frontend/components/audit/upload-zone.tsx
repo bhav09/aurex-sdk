@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,12 +13,13 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ onFileSelect }: UploadZoneProps) {
+    const [isMounted, setIsMounted] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [userName, setUserName] = useState(() => aurixAPI.getUserInfo()?.user_name || "");
-    const [email, setEmail] = useState(() => aurixAPI.getUserInfo()?.email || "");
-    const [companyName, setCompanyName] = useState(() => aurixAPI.getUserInfo()?.company_name || "");
+    const [userName, setUserName] = useState("");
+    const [email, setEmail] = useState("");
+    const [companyName, setCompanyName] = useState("");
     const [formErrors, setFormErrors] = useState<{
         userName?: string;
         email?: string;
@@ -28,6 +29,16 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     const [otp, setOtp] = useState("");
     const [otpError, setOtpError] = useState<string | null>(null);
     const [otpLoading, setOtpLoading] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+        const userInfo = aurixAPI.getUserInfo();
+        if (userInfo) {
+            setUserName(userInfo.user_name);
+            setEmail(userInfo.email);
+            setCompanyName(userInfo.company_name);
+        }
+    }, []);
 
     const validateFile = (file: File): boolean => {
         const validExtensions = ['.csv', '.json'];
@@ -262,7 +273,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
                 <h3 className="text-lg font-semibold text-foreground">File Upload</h3>
 
                 {/* User Information Fields or Active Session badge */}
-                {aurixAPI.hasActiveSession() && aurixAPI.getUserInfo() ? (
+                {isMounted && aurixAPI.hasActiveSession() && aurixAPI.getUserInfo() ? (
                     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 mt-4 flex items-center justify-between">
                         <div>
                             <p className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">AUDIT SESSION ACTIVE</p>
