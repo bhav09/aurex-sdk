@@ -290,9 +290,9 @@ export default function AuditPage() {
             </div>
 
             <div className="container mx-auto px-4 py-12">
-                <div className={data || analyzing ? "hidden" : ""}>
+                {!(data || analyzing) && (
                     <UploadZone onFileSelect={handleFileSelect} />
-                </div>
+                )}
 
                 {analyzing && (
                     <div className="mx-auto max-w-2xl">
@@ -825,7 +825,10 @@ export default function AuditPage() {
                             <Button
                                 variant="outline"
                                 className="border-white/15 text-white hover:bg-white/10"
-                                onClick={resetAudit}
+                                onClick={() => {
+                                    aurixAPI.trackClick("analyze_another_file_click", userEmail || undefined);
+                                    resetAudit();
+                                }}
                             >
                                 Analyze another file
                             </Button>

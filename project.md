@@ -1,65 +1,67 @@
-# Enhanced Task Brief (ETB)
+# Enhanced Task Brief (ETB): Session-Aware OTP Reuse, Realistic Data Exports, and Google-Backed Analytics
 
 ## Original Request
-"Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself. To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos."
-
-## Analysis & Enhanced Prompt
-The user wants to implement the "Lumina Token Waste Auditor: Expansion Plan" which includes:
-1. D3.js Interactive Visualizations (Timeline and Donut charts)
-2. Direct Platform Integrations (OAuth/API keys for LangSmith, Helicone)
-3. WebAssembly Local Semantic Clustering (using `@xenova/transformers`)
-4. Proactive CI/CD and Alerting (Node CLI wrapper for audit)
-5. A/B Testing Simulator / Replay (Direct API calls to cheaper models for comparison)
-
-The plan involves significant changes spanning frontend UI, worker threads (adding an embedding worker), backend integrations, and a new CLI.
-
-**Enhanced Task:** 
-1. **D3 Charts:** Install `d3` & `@types/d3`. Create `src/charts.ts`. Modify `src/main.ts` to render a timeline chart from `AuditTracker.buckets` and a donut chart of model spend. Add interactivity to filter prompts by burst windows.
-2. **Platform Integrations:** Create `src/integrations/`. Add API key inputs to UI. Implement adapters for LangSmith/Helicone to fetch logs, map to `UsageRow`, and run the audit.
-3. **Semantic Clustering:** Install `@xenova/transformers`. Create `src/embedding-worker.ts` using `all-MiniLM-L6-v2`. Send unique prompts to the worker, group by cosine similarity, and expose `SemanticClusters` in `AuditResult`.
-4. **CLI / CI/CD:** Extract core audit logic to be Node.js compatible. Create `cli/index.js` to parse CSVs via Node and run the audit. Provide a GitHub Action template `.github/workflows/lumina-audit.yml`.
-5. **A/B Replay:** Add UI for "A/B Replay". Accept API keys. Fetch cheaper model responses for heavy prompts. Display a side-by-side diff.
-
-## Mode
-`[Production]`
-
-## Scope of Changes
-- **New files:** `src/charts.ts`, `src/integrations/*`, `src/embedding-worker.ts`, `cli/index.js`, `.github/workflows/lumina-audit.yml`.
-- **Modifying:** `src/main.ts`, `src/worker.ts`, `src/audit.ts`, `package.json` (adding dependencies).
-
-## Trade-offs
-- **Speed vs Features:** Adding WASM embedding models and D3 will significantly increase the bundle size and initial load time, though computation happens locally.
-- **Simplicity vs Automation:** Building a CLI requires maintaining both browser and Node compatibilities, complicating the build process (e.g., PapaParse works differently in Node vs Browser).
-- **Security vs Integration:** Fetching logs directly requires users to input API keys. We will store these securely in `sessionStorage` and never persist them to a backend.
+The user wants a highly realistic, production-ready implementation of:
+1. **Session-Aware OTP Reuse**: Users with an active/valid session (same browser session) must skip OTP verification and be asked directly to upload their file when clicking "Analyze another file".
+2. **Realistic Provider Usage Data**: Sample data under `model provider usage data/` and `sample_data/` should resemble real-world raw CSV logs of OpenAI, Anthropic, and AWS Bedrock (e.g. Activity or Cost Reports) with all industry-standard columns, showing non-compliance/inefficiency patterns.
+3. **Google-Backed Usage Analytics**: Store unique email addresses, session lifecycle events, and record every single application CTA button-click (using the service account file `aurex-495417-8ed2dc84792c.json` for storage like BigQuery or Google Cloud Storage).
 
 ---
 
-# ETB: Security & Quality Fixes (Based on Assessment)
-
-## Original Request
-"Can you fix all of them?" (Referring to the test security assessment plan findings).
-
-## Analysis & Enhanced Prompt
-The user wants to implement the recommended smallest viable fixes from the security assessment.
-1. **Backend Dependencies:** Add `email-validator` to `requirements.txt` and update packages with known vulnerabilities (`fastapi`, `python-multipart`, `python-dotenv`, `starlette`).
-2. **Backend Hardening:** Disable destructive endpoints (`DELETE /clear-data`, `POST /ingest/llm-use-sessions`, `DELETE /audit/sessions/{id}`) by raising 403 Forbidden. Update CORS to restrict wildcard credentials.
-3. **Frontend Contract & Validation:**
-   - Restrict `UploadZone` file validation to just `.csv`.
-   - Fix `LLMEvent` type mismatch (`metadata` -> `extra_metadata`) in `api-client.ts`.
-4. **Frontend CI/Quality:** 
-   - Install `eslint` & `eslint-config-next` so `npm run lint` passes.
-   - Delete `frontend/pnpm-lock.yaml` to resolve lockfile confusion.
-   - Re-enable TS build validation by changing `ignoreBuildErrors` to `false` in `next.config.mjs`.
-5. **Root/Frontend Audit:** Run `npm audit fix` where safe.
-
-## Mode
+## Operating Mode
 `[Production]`
 
+---
+
 ## Scope of Changes
-- **Modifying:** `backend/requirements.txt`, `backend/src/api/routes.py`, `backend/main.py`, `frontend/components/audit/upload-zone.tsx`, `frontend/lib/api-client.ts`, `frontend/next.config.mjs`, `frontend/package.json`
-- **Deleting:** `frontend/pnpm-lock.yaml`
+
+### 1. Backend/Python (Auth & Sessions & Ingestion)
+- **JWT & Session ID (`sid`) Tracking**: Add a server-side generated session ID inside JWT claims (`sid`) and/or a Redis-backed session lookup mapping.
+- **OTP Verification Bypass**: Maintain active sessions so that if a user submits a valid JWT bearer token, they can create new audit sessions without a fresh OTP check. Update `POST /audit/sessions` to use standard `get_current_user` dependencies instead of checking Redis OTP directly.
+- **Upload Endpoint Support**: Ensure `POST /upload/csv` and other parsing/ingestion endpoints support passing the active `session_id` and are authenticated.
+- **Centralized Environment Configuration**: Load Google Cloud configuration (`GOOGLE_APPLICATION_CREDENTIALS` path, dataset name, bigquery logging options) cleanly through `Settings` in `backend/app/config.py`.
+
+### 2. Frontend/TypeScript (API Client & Upload Zone)
+- **sessionStorage Auth Persistence**: Save the JWT access token and user session details in `sessionStorage` (which persists per tab/session) so that same-session uploads can read the token and bypass OTP.
+- **Same-Session Upload Flow**: Modify `UploadZone` and `AuditPage` so that if an active session token is present, the username, email, company, and OTP fields are hidden or pre-filled, and the file-upload interface is displayed directly.
+- **Analyze Another File Transition**: Maintain the session when transitioning from results back to the upload screen, enabling frictionless multi-file re-analysis.
+
+### 3. Google-Backed Analytics
+- **Analytics Event Schema**: Write structured log records to Google BigQuery (or a safe Cloud Storage fallback if BigQuery is unprovisioned) tracking:
+  - `unique_email_id` (recorded and safely hashed/tracked)
+  - `button_click_count` (how many times the application was used / primary CTA was clicked)
+  - `session_id` and `timestamp`
+  - `event_type` (`otp_request`, `otp_verify`, `audit_start`, `file_upload`, `analysis_complete`)
+- **Safe Service Account Usage**: Use `@aurex-495417-8ed2dc84792c.json` as a local credential via `GOOGLE_APPLICATION_CREDENTIALS` (do NOT hardcode paths or commit the private key to git).
+
+### 4. Realistic Provider Data Exports & Normalizers
+- **Realistic Dataset Generators**: Update `scripts/generate_test_data.py` to create raw, messy CSV files simulating real-world exports for:
+  - **OpenAI**: `timestamp,organization_id,project_id,api_key_id,model,prompt_tokens,completion_tokens,cost,request_count,status`
+  - **Anthropic**: `starting_at,ending_at,model,workspace_id,api_key_id,input_tokens,output_tokens,cache_read_input_tokens,cache_creation_tokens,cost_type,amount,currency`
+  - **Bedrock**: `Timestamp,modelId,requestId,operation,inputTokenCount,outputTokenCount,latencyMs`
+- **Updated Normalizers**: Check and ensure `OpenAiCsvNormalizer`, `AnthropicCsvNormalizer`, and `BedrockCsvNormalizer` process these realistic formats smoothly, using robust substring matching and snake_case normalization.
+
+---
 
 ## Trade-offs
-- **Speed vs Safety:** Disabling destructive routes is fast and safe, but requires developers to manage DB resets manually.
-- **Simplicity vs Flexibility:** Removing `pnpm-lock.yaml` strictly enforces `npm` for the frontend, which might disrupt developers using pnpm.
-- **Short-term vs Long-term:** Bumping vulnerable packages addresses immediate CVEs, but might require minor code adjustments if there are breaking changes in minor version updates (e.g., `fastapi`).
+- **sessionStorage vs. localStorage vs. Cookies**:
+  - *Trade-off*: sessionStorage isolates auth tokens to the active browser tab, protecting against cross-tab access and expiring when the tab closes. localStorage survives tab closure but exposes tokens longer.
+  - *Decision*: sessionStorage matches the request of "same session" perfectly without storing credentials permanently.
+- **BigQuery vs. local/SQL DB**:
+  - *Trade-off*: BigQuery is the industry standard for analytical queries but adds an external network dependency.
+  - *Decision*: Run BigQuery logging in a background thread or asynchronous task, failing gracefully if GCP credentials/resources are missing.
+
+---
+
+## Verification Plan
+
+### Test Commands
+1. Run backend tests to verify session-aware OTP and routes:
+   ```bash
+   pytest backend/tests/
+   ```
+2. Run frontend unit/integration tests:
+   ```bash
+   npm run test --prefix frontend
+   ```
+3. Run normalizer and generator verification scripts.

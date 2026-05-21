@@ -16,9 +16,9 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [userName, setUserName] = useState("");
-    const [email, setEmail] = useState("");
-    const [companyName, setCompanyName] = useState("");
+    const [userName, setUserName] = useState(() => aurixAPI.getUserInfo()?.user_name || "");
+    const [email, setEmail] = useState(() => aurixAPI.getUserInfo()?.email || "");
+    const [companyName, setCompanyName] = useState(() => aurixAPI.getUserInfo()?.company_name || "");
     const [formErrors, setFormErrors] = useState<{
         userName?: string;
         email?: string;
@@ -128,6 +128,16 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             return;
         }
 
+        const storedUserInfo = aurixAPI.getUserInfo();
+        if (aurixAPI.hasActiveSession() && storedUserInfo) {
+            onFileSelect(selectedFile, storedUserInfo);
+            setSelectedFile(null);
+            setIsOtpStep(false);
+            setOtp("");
+            setOtpError(null);
+            return;
+        }
+
         if (!validateForm()) {
             return;
         }
@@ -135,6 +145,7 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
         try {
             setOtpLoading(true);
             setError(null);
+            aurixAPI.trackClick("upload_and_analyze_click", email || undefined);
             await aurixAPI.requestOTP(email);
             setIsOtpStep(true);
         } catch (err: any) {
@@ -156,12 +167,17 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             setOtpLoading(true);
             setOtpError(null);
             await aurixAPI.verifyOTP(email, otp);
+            aurixAPI.trackClick("verify_and_analyze_click", email || undefined);
             // OTP verified! Proceed with upload
             onFileSelect(selectedFile!, {
                 user_name: userName,
                 email: email,
                 company_name: companyName
             });
+            setSelectedFile(null);
+            setIsOtpStep(false);
+            setOtp("");
+            setOtpError(null);
         } catch (err: any) {
             setOtpError(err.message || "Invalid verification code. Please try again.");
         } finally {
@@ -245,86 +261,112 @@ export function UploadZone({ onFileSelect }: UploadZoneProps) {
             <form onSubmit={handleSubmit} className="w-full">
                 <h3 className="text-lg font-semibold text-foreground">File Upload</h3>
 
-                {/* User Information Fields */}
-                <div className="mt-4 space-y-4">
-                    <div>
-                        <Label htmlFor="user-name" className="text-sm font-medium">
-                            User Name <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            id="user-name"
-                            type="text"
-                            value={userName}
-                            onChange={(e) => {
-                                setUserName(e.target.value);
-                                if (formErrors.userName) {
-                                    setFormErrors({ ...formErrors, userName: undefined });
-                                }
+                {/* User Information Fields or Active Session badge */}
+                {aurixAPI.hasActiveSession() && aurixAPI.getUserInfo() ? (
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 mt-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">AUDIT SESSION ACTIVE</p>
+                            <p className="text-sm font-semibold text-white mt-1">{aurixAPI.getUserInfo()?.user_name} · {aurixAPI.getUserInfo()?.company_name}</p>
+                            <p className="text-xs text-white/50">{aurixAPI.getUserInfo()?.email}</p>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                aurixAPI.trackClick("change_user_click", aurixAPI.getUserInfo()?.email || undefined);
+                                aurixAPI.clearSession();
+                                setUserName("");
+                                setEmail("");
+                                setCompanyName("");
+                                setError(null);
                             }}
-                            placeholder="Enter your name"
-                            className={`mt-1 ${formErrors.userName ? 'border-red-500' : ''}`}
-                            required
-                        />
-                        {formErrors.userName && (
-                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {formErrors.userName}
-                            </p>
-                        )}
+                            className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                            Change User
+                        </Button>
                     </div>
+                ) : (
+                    <div className="mt-4 space-y-4">
+                        <div>
+                            <Label htmlFor="user-name" className="text-sm font-medium">
+                                User Name <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                                id="user-name"
+                                type="text"
+                                value={userName}
+                                onChange={(e) => {
+                                    setUserName(e.target.value);
+                                    if (formErrors.userName) {
+                                        setFormErrors({ ...formErrors, userName: undefined });
+                                    }
+                                }}
+                                placeholder="Enter your name"
+                                className={`mt-1 ${formErrors.userName ? 'border-red-500' : ''}`}
+                                required
+                            />
+                            {formErrors.userName && (
+                                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {formErrors.userName}
+                                </p>
+                            )}
+                        </div>
 
-                    <div>
-                        <Label htmlFor="email" className="text-sm font-medium">
-                            Email <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => {
-                                setEmail(e.target.value);
-                                if (formErrors.email) {
-                                    setFormErrors({ ...formErrors, email: undefined });
-                                }
-                            }}
-                            placeholder="your.email@company.com"
-                            className={`mt-1 ${formErrors.email ? 'border-red-500' : ''}`}
-                            required
-                        />
-                        {formErrors.email && (
-                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {formErrors.email}
-                            </p>
-                        )}
-                    </div>
+                        <div>
+                            <Label htmlFor="email" className="text-sm font-medium">
+                                Email <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => {
+                                    setEmail(e.target.value);
+                                    if (formErrors.email) {
+                                        setFormErrors({ ...formErrors, email: undefined });
+                                    }
+                                }}
+                                placeholder="your.email@company.com"
+                                className={`mt-1 ${formErrors.email ? 'border-red-500' : ''}`}
+                                required
+                            />
+                            {formErrors.email && (
+                                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {formErrors.email}
+                                </p>
+                            )}
+                        </div>
 
-                    <div>
-                        <Label htmlFor="company-name" className="text-sm font-medium">
-                            Company Name <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            id="company-name"
-                            type="text"
-                            value={companyName}
-                            onChange={(e) => {
-                                setCompanyName(e.target.value);
-                                if (formErrors.companyName) {
-                                    setFormErrors({ ...formErrors, companyName: undefined });
-                                }
-                            }}
-                            placeholder="Enter your company name"
-                            className={`mt-1 ${formErrors.companyName ? 'border-red-500' : ''}`}
-                            required
-                        />
-                        {formErrors.companyName && (
-                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {formErrors.companyName}
-                            </p>
-                        )}
+                        <div>
+                            <Label htmlFor="company-name" className="text-sm font-medium">
+                                Company Name <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                                id="company-name"
+                                type="text"
+                                value={companyName}
+                                onChange={(e) => {
+                                    setCompanyName(e.target.value);
+                                    if (formErrors.companyName) {
+                                        setFormErrors({ ...formErrors, companyName: undefined });
+                                    }
+                                }}
+                                placeholder="Enter your company name"
+                                className={`mt-1 ${formErrors.companyName ? 'border-red-500' : ''}`}
+                                required
+                            />
+                            {formErrors.companyName && (
+                                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {formErrors.companyName}
+                                </p>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* File Upload Area */}
                 <div className="mt-4 flex justify-end">

@@ -27,6 +27,29 @@ describe('AurexAPI', () => {
         });
         window.localStorage.clear();
 
+        // Mock sessionStorage
+        const sessionStorageMock = (function() {
+            let store: Record<string, string> = {};
+            return {
+                getItem(key: string) {
+                    return store[key] || null;
+                },
+                setItem(key: string, value: string) {
+                    store[key] = value.toString();
+                },
+                removeItem(key: string) {
+                    delete store[key];
+                },
+                clear() {
+                    store = {};
+                }
+            };
+        })();
+        Object.defineProperty(window, 'sessionStorage', {
+            value: sessionStorageMock,
+            writable: true
+        });
+
         api = new AurexAPI(mockBaseUrl);
         // Mock global fetch
         global.fetch = vi.fn();
@@ -37,13 +60,37 @@ describe('AurexAPI', () => {
     });
 
     describe('Token Management & Authorization', () => {
-        it('should persist token in localStorage when setToken is called', () => {
+        it('should persist token in memory when setToken is called', () => {
             api.setToken('mock_jwt_token');
-            expect(window.localStorage.getItem('aurex_token')).toBe('mock_jwt_token');
-            // Also check that a new instance picks it up
+            expect((api as any).token).toBe('mock_jwt_token');
+        });
+
+        it('should persist token in sessionStorage when setToken is called', () => {
+            api.setToken('mock_jwt_token_session');
+            expect(window.sessionStorage.getItem('aurex_token')).toBe('mock_jwt_token_session');
+            expect(api.hasActiveSession()).toBe(true);
+        });
+
+        it('should restore token from sessionStorage in constructor', () => {
+            window.sessionStorage.setItem('aurex_token', 'restored_token');
             const newApi = new AurexAPI(mockBaseUrl);
-            // It should be injected
-            expect((newApi as any).token).toBe('mock_jwt_token');
+            expect(newApi.hasActiveSession()).toBe(true);
+            expect((newApi as any).token).toBe('restored_token');
+        });
+
+        it('should save and restore user info in sessionStorage', () => {
+            const userInfo = {
+                user_name: 'Jane Doe',
+                email: 'jane@example.com',
+                company_name: 'Aurex Corp'
+            };
+            api.setUserInfo(userInfo);
+            expect(JSON.parse(window.sessionStorage.getItem('aurex_user_info')!)).toEqual(userInfo);
+            expect(api.getUserInfo()).toEqual(userInfo);
+            
+            api.clearSession();
+            expect(api.hasActiveSession()).toBe(false);
+            expect(api.getUserInfo()).toBeNull();
         });
 
         it('should not include Authorization header if token is absent', async () => {

@@ -15,7 +15,12 @@ vi.mock('../../lib/api-client', () => ({
       summary: { executive_summary: { current_weekly_spend: 100 } }
     }),
     requestOTP: vi.fn().mockResolvedValue({ status: 'success' }),
-    verifyOTP: vi.fn().mockResolvedValue({ status: 'success' })
+    verifyOTP: vi.fn().mockResolvedValue({ status: 'success' }),
+    getUserInfo: vi.fn().mockReturnValue(null),
+    setUserInfo: vi.fn(),
+    hasActiveSession: vi.fn().mockReturnValue(false),
+    clearSession: vi.fn(),
+    trackClick: vi.fn().mockResolvedValue({ status: 'success' })
   }
 }));
 
@@ -26,7 +31,7 @@ describe('Audit Integration Flow', () => {
         
         // Wait for it to settle
         await waitFor(() => {
-            expect(screen.getByText(/Upload/i)).toBeInTheDocument();
+            expect(screen.getAllByText(/Upload/i).length).toBeGreaterThan(0);
         });
     });
 });

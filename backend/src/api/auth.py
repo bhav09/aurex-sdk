@@ -3,6 +3,8 @@ import time
 import httpx
 import resend
 import jwt
+import json
+import redis.asyncio as redis
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException, Depends
@@ -21,6 +23,10 @@ JWT_ALGORITHM = settings.jwt_algorithm
 JWT_EXPIRATION_MINUTES = settings.jwt_expiration_minutes
 
 security = HTTPBearer()
+
+# Redis Configuration
+REDIS_URL = getattr(settings, "redis_url", "redis://localhost:6379/0")
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -42,13 +48,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
-# Note: resend.api_key will be set inside the request_otp function to ensure env vars are loaded
+security_optional = HTTPBearer(auto_error=False)
 
-# In-memory storage
-# otp_store[email] = {"otp": "123456", "expiry": timestamp, "attempts": 0, "verified": bool}
-otp_store: Dict[str, dict] = {}
-# rate_limit_store[email] = [timestamp1, timestamp2, ...]
-rate_limit_store: Dict[str, list] = {}
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional)) -> Optional[str]:
+    if credentials is None:
+        return None
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        email: str = payload.get("sub")
+        return email
+    except Exception:
+        return None
+
+@router.get("/session")
+async def get_session(current_user: str = Depends(get_current_user)):
+    return {
+        "status": "active",
+        "email": current_user
+    }
+
 
 # Cache disposable domains
 disposable_domains_cache = set()
@@ -69,19 +88,6 @@ async def get_disposable_domains():
             logger.error("Error loading disposable domains", error=str(e))
     return disposable_domains_cache
 
-def cleanup_expired():
-    now = time.time()
-    # Cleanup OTPs older than 10 mins (600s)
-    expired_emails = [email for email, data in otp_store.items() if now > data["expiry"]]
-    for email in expired_emails:
-        del otp_store[email]
-    
-    # Cleanup rate limits older than 1 hr (3600s)
-    for email in list(rate_limit_store.keys()):
-        rate_limit_store[email] = [t for t in rate_limit_store[email] if now - t < 3600]
-        if not rate_limit_store[email]:
-            del rate_limit_store[email]
-
 class OTPRequest(BaseModel):
     email: EmailStr
 
@@ -91,7 +97,6 @@ class OTPVerify(BaseModel):
 
 @router.post("/request-otp")
 async def request_otp(data: OTPRequest):
-    cleanup_expired()
     email = data.email.lower()
     
     # Check disposable
@@ -101,9 +106,14 @@ async def request_otp(data: OTPRequest):
         logger.warning("Disposable domain blocked", domain=domain, email=email)
         raise HTTPException(status_code=400, detail="Disposable email addresses are not allowed")
 
-    # Check rate limit (max 3 per hour)
+    # Rate limiting checking via Redis
+    history_key = f"rate_limit:{email}"
     now = time.time()
-    history = rate_limit_store.get(email, [])
+    
+    history_raw = await redis_client.lrange(history_key, 0, -1)
+    history = [float(t) for t in history_raw]
+    history = [t for t in history if now - t < 3600] # cleanup old
+    
     if len(history) >= 3:
         logger.warning("Rate limit exceeded", email=email, attempts=len(history))
         raise HTTPException(status_code=429, detail="Too many OTP requests. Please try again later.")
@@ -112,16 +122,19 @@ async def request_otp(data: OTPRequest):
     otp_code = f"{secrets.randbelow(1000000):06d}"
     
     # Store OTP (10 mins TTL)
-    otp_store[email] = {
+    otp_data = {
         "otp": otp_code,
-        "expiry": now + 600,
         "attempts": 0,
         "verified": False
     }
+    await redis_client.setex(f"otp:{email}", 600, json.dumps(otp_data))
     
     # Update rate limit
     history.append(now)
-    rate_limit_store[email] = history
+    await redis_client.delete(history_key)
+    if history:
+        await redis_client.rpush(history_key, *history)
+        await redis_client.expire(history_key, 3600)
     
     # Send email
     resend.api_key = settings.resend_api_key
@@ -137,23 +150,24 @@ async def request_otp(data: OTPRequest):
                 "text": f"Your Aurex verification code is: {otp_code}\\n\\nThis code expires in 10 minutes."
             })
         except Exception as e:
-            # If email sending fails, we should still probably raise a 500
             logger.error("Error sending email", error=str(e), email=email)
             raise HTTPException(status_code=500, detail="Failed to send verification email")
             
     logger.info("OTP requested", email_domain=domain, status="success")
+    from src.utils.analytics import log_analytics_event
+    log_analytics_event(event_type="otp_request", email=email)
     return {"status": "success", "message": "OTP sent successfully"}
 
 @router.post("/verify-otp")
 async def verify_otp(data: OTPVerify):
-    cleanup_expired()
     email = data.email.lower()
     
-    if email not in otp_store:
+    otp_raw = await redis_client.get(f"otp:{email}")
+    if not otp_raw:
         logger.warning("OTP verification failed: no active OTP", email=email)
         raise HTTPException(status_code=400, detail="No active OTP found for this email or it has expired")
         
-    otp_data = otp_store[email]
+    otp_data = json.loads(otp_raw)
     
     if otp_data["attempts"] >= 3:
         logger.warning("OTP verification failed: max attempts", email=email, attempts=otp_data["attempts"])
@@ -162,16 +176,20 @@ async def verify_otp(data: OTPVerify):
     otp_data["attempts"] += 1
     
     if otp_data["otp"] != data.otp:
+        await redis_client.setex(f"otp:{email}", 600, json.dumps(otp_data))
         logger.warning("OTP verification failed: invalid code", email=email, attempts=otp_data["attempts"])
         raise HTTPException(status_code=400, detail="Invalid verification code")
         
     # Mark as verified
     otp_data["verified"] = True
+    await redis_client.setex(f"otp:{email}", 600, json.dumps(otp_data))
     
     # Generate JWT token
     access_token = create_access_token(data={"sub": email})
     
     logger.info("OTP verified successfully", email=email)
+    from src.utils.analytics import log_analytics_event
+    log_analytics_event(event_type="otp_verify", email=email)
     return {
         "status": "success", 
         "message": "Email verified successfully",

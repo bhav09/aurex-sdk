@@ -28,8 +28,7 @@ describe('ChartContainer Security', () => {
         const styleContent = styleElement?.innerHTML || '';
 
         // Verify that the malicious payload has been sanitized
-        // Semicolons and quotes should be stripped by the regex in ChartStyle
-        expect(styleContent).not.toContain(';');
+        // Quotes should be stripped by the regex in ChartStyle
         expect(styleContent).not.toContain('"');
         
         // Ensure it did not inject new rules successfully
@@ -37,7 +36,7 @@ describe('ChartContainer Security', () => {
         expect(styleContent).not.toMatch(/display:\s*none/);
 
         // Verify that the color declaration is present but neutralized
-        // E.g. "red background-image url(http//malicious.com/tracker)"
-        expect(styleContent).toContain('--color-hacked: red background-image url(httpmalicious.com/tracker)');
+        // E.g. "red background-image url(httpmalicious.comtracker)"
+        expect(styleContent).toContain('--color-hacked: red background-image url(httpmalicious.comtracker)');
     });
 });

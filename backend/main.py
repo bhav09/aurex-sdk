@@ -21,8 +21,11 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
 from src.api import router
-from src.database import init_db
+from src.database import init_db, engine
 from src.middleware.logging_middleware import LoggingMiddleware
 from src.utils.logger import get_logger
 from fastapi import Request
@@ -37,7 +40,13 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # Startup
     print("Initializing database...")
-    init_db()
+    await init_db()
+    
+    # Instrument SQLAlchemy
+    SQLAlchemyInstrumentor().instrument(
+        engine=engine.sync_engine,
+    )
+    
     print("Database initialized successfully")
     print("Aurex Backend is ready!")
     yield
@@ -55,8 +64,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure rate limiter
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+# Instrument FastAPI for OpenTelemetry
+FastAPIInstrumentor.instrument_app(app)
+
+# Configure rate limiter with Redis backend
+REDIS_URL = getattr(settings, "redis_url", "redis://localhost:6379/0")
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"], storage_uri=REDIS_URL)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
