@@ -181,7 +181,7 @@ async function main() {
 }
 
 function generateMarkdownReport(audit: AuditResult): string {
-  let md = `## Lumina Token Audit Report\n\n`;
+  let md = `## Aurex Token Audit Report\n\n`;
   md += `- **Requests Parsed:** ${audit.rowCount.toLocaleString()}\n`;
   md += `- **Estimated Spend:** $${audit.estCostUSD.toFixed(2)}\n`;
   md += `- **Exact-match Duplicates:** ${audit.duplicates.length} groups\n`;
