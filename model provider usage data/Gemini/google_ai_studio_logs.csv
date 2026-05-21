@@ -1,5 +1,0 @@
-id,timestamp,model,prompt,response,input_token_count,candidates_token_count,status_code
-req_01j1a,2026-05-20T22:00:01Z,gemini-1.5-flash,How do I fix a React useEffect memory leak?,To fix a React useEffect memory leak, you should return a cleanup function in your useEffect.,128,450,200
-req_01j1b,2026-05-20T22:01:05Z,gemini-1.5-pro,Write a fast sorting algorithm in TypeScript.,Here is the implementation of QuickSort in TypeScript:\n\n```typescript\nfunction quickSort(arr: number[]): number[] { ... }\n```,95,680,200
-req_01j1c,2026-05-20T22:02:12Z,gemini-1.5-flash,Explain rate limiting.,Rate limiting is a strategy for limiting network traffic. It puts a cap on how often someone can repeat an action.,42,120,200
-req_01j1d,2026-05-20T22:03:00Z,gemini-1.5-flash,How do I fix a React useEffect memory leak?,To fix a React useEffect memory leak, you should return a cleanup function in your useEffect.,128,450,200

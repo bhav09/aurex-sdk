@@ -165,10 +165,10 @@ async def request_otp(data: OTPRequest):
     else:
         try:
             resend.Emails.send({
-                "from": "Aurex <otp@noreply.heyaurex.com>",
+                "from": "Aurex <onboarding@resend.dev>",
                 "to": [email],
                 "subject": "Your Aurex verification code",
-                "text": f"Your Aurex verification code is: {otp_code}\\n\\nThis code expires in 10 minutes."
+                "text": f"Your Aurex verification code is: {otp_code}\n\nThis code expires in 10 minutes."
             })
         except Exception as e:
             logger.error("Error sending email", error=str(e), email=email)
