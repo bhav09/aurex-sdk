@@ -336,6 +336,14 @@ async def upload_csv(
         
     df.columns = [clean_header(col) for col in df.columns]
     
+    def sanitize_number(val) -> str:
+        """Strip commas, spaces, dollar signs from numeric strings so int()/float() won't crash.
+           '1,234' -> '1234', '$5.00' -> '5.00', '1 000' -> '1000'
+        """
+        s = str(val).strip()
+        s = s.replace(",", "").replace("$", "").replace(" ", "")
+        return s
+    
     events_inserted = 0
     
     for idx, row in df.iterrows():
@@ -360,7 +368,7 @@ async def upload_csv(
         for col in ["input_tokens", "prompt_tokens", "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count"]:
             if col in row and pd.notna(row[col]):
                 try:
-                    input_tokens = int(row[col])
+                    input_tokens = int(float(sanitize_number(row[col])))
                     break
                 except:
                     continue
@@ -369,7 +377,7 @@ async def upload_csv(
         for col in ["output_tokens", "completion_tokens", "output_token_count", "outputtokencount", "n_generated_tokens_total", "completion_token_count"]:
             if col in row and pd.notna(row[col]):
                 try:
-                    output_tokens = int(row[col])
+                    output_tokens = int(float(sanitize_number(row[col])))
                     break
                 except:
                     continue
@@ -378,7 +386,7 @@ async def upload_csv(
         for col in ["total_tokens", "tokens", "total_token_count", "totaltokencount"]:
             if col in row and pd.notna(row[col]):
                 try:
-                    total_tokens = int(row[col])
+                    total_tokens = int(float(sanitize_number(row[col])))
                     break
                 except:
                     continue
@@ -389,7 +397,7 @@ async def upload_csv(
         for col in ["cost", "amount", "total_cost", "cost_usd", "total_cost_usd", "price"]:
             if col in row and pd.notna(row[col]):
                 try:
-                    cost_val = float(row[col])
+                    cost_val = float(sanitize_number(row[col]))
                     break
                 except:
                     continue
