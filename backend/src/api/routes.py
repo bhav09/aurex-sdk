@@ -137,22 +137,34 @@ async def get_insights(
 ):
     """
     Get overall insights and detected issues across all events.
-    Now retrieves the pre-computed analysis results from the latest session.
+    Retrieves or dynamically computes the analysis results from the latest session.
     """
     from src.models import AuditSession
+    from src.detection.engine import EnhancedDetectionEngine
     
-    query = select(AuditSession).where(
-        func.lower(AuditSession.email) == func.lower(current_user),
-        AuditSession.analysis_results.isnot(None)
-    ).order_by(desc(AuditSession.created_at))
-    
-    result = await db.execute(query)
-    latest_session = result.scalars().first()
-    
-    if not latest_session or not latest_session.analysis_results:
-        return {"aggregations": {}, "insights": []}
+    try:
+        # Get absolute latest session for the user
+        query = select(AuditSession).where(
+            func.lower(AuditSession.email) == func.lower(current_user)
+        ).order_by(desc(AuditSession.created_at))
         
-    return latest_session.analysis_results
+        result = await db.execute(query)
+        latest_session = result.scalars().first()
+        
+        if not latest_session:
+            return {"aggregations": {}, "insights": []}
+            
+        if not latest_session.analysis_results:
+            engine = EnhancedDetectionEngine(db, session_id=latest_session.id)
+            analysis = await engine.analyze_complete()
+            latest_session.analysis_results = analysis
+            await db.commit()
+            await db.refresh(latest_session)
+            
+        return latest_session.analysis_results
+    except Exception as e:
+        logger.exception("Error loading or generating insights")
+        return {"aggregations": {}, "insights": [], "error": str(e)}
 
 
 @router.get("/executive-summary")
@@ -170,20 +182,30 @@ async def get_executive_summary(
         
     try:
         from src.models import AuditSession
+        from src.detection.engine import EnhancedDetectionEngine
+        
+        # Get absolute latest session for the user
         query = select(AuditSession).where(
-            func.lower(AuditSession.email) == func.lower(current_user),
-            AuditSession.analysis_results.isnot(None)
+            func.lower(AuditSession.email) == func.lower(current_user)
         ).order_by(desc(AuditSession.created_at))
         
         result = await db.execute(query)
         latest_session = result.scalars().first()
         
-        if not latest_session or not latest_session.analysis_results:
+        if not latest_session:
             return {"executive_summary": {}}
+            
+        if not latest_session.analysis_results:
+            engine = EnhancedDetectionEngine(db, session_id=latest_session.id)
+            analysis = await engine.analyze_complete()
+            latest_session.analysis_results = analysis
+            await db.commit()
+            await db.refresh(latest_session)
             
         return latest_session.analysis_results
     
     except Exception as e:
+        logger.exception("Error generating executive summary", email=email)
         raise HTTPException(status_code=500, detail=f"Error generating executive summary: {str(e)}")
 
 
@@ -382,6 +404,44 @@ async def upload_csv(
                 workflow_id = str(row[col])
                 break
                 
+        # Extract system_prompt_hash
+        system_prompt_hash = None
+        for col in ["system_prompt_hash", "systemprompt_hash", "systemprompthash", "prompt_hash", "prompthash", "sys_hash", "sys_prompt_hash"]:
+            if col in row and pd.notna(row[col]):
+                system_prompt_hash = str(row[col])
+                break
+                
+        # Extract context_length
+        context_length = None
+        for col in ["context_length", "contextlength", "context_tokens", "contexttokens", "input_tokens", "prompt_tokens"]:
+            if col in row and pd.notna(row[col]):
+                try:
+                    context_length = int(row[col])
+                    break
+                except:
+                    continue
+        if context_length is None:
+            context_length = input_tokens
+            
+        # Put extra fields in extra_metadata
+        extra_metadata = {}
+        for col in df.columns:
+            if col not in ["timestamp", "date", "created", "starting_at", "ending_at", "time", 
+                           "model", "model_id", "modelid", "input_tokens", "prompt_tokens", 
+                           "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count",
+                           "output_tokens", "completion_tokens", "output_token_count", "outputtokencount", 
+                           "n_generated_tokens_total", "completion_token_count", "total_tokens", "tokens", 
+                           "total_token_count", "totaltokencount", "cost", "amount", "total_cost", 
+                           "cost_usd", "total_cost_usd", "price", "workflow_id", "workflow", "session_id", "session"]:
+                if pd.notna(row[col]):
+                    val = row[col]
+                    if hasattr(val, "item"):
+                        val = val.item()
+                    extra_metadata[col] = val
+                    
+        if system_prompt_hash:
+            extra_metadata["system_prompt_hash"] = system_prompt_hash
+
         from src.models import LLMEvent
         event = LLMEvent(
             id=str(uuid.uuid4()),
@@ -395,7 +455,10 @@ async def upload_csv(
             total_tokens=total_tokens,
             cost=cost_val,
             prompt=str(row.get("prompt")) if "prompt" in row and pd.notna(row["prompt"]) else None,
-            response=str(row.get("response")) if "response" in row and pd.notna(row["response"]) else None
+            response=str(row.get("response")) if "response" in row and pd.notna(row["response"]) else None,
+            system_prompt_hash=system_prompt_hash,
+            context_length=context_length,
+            extra_metadata=extra_metadata
         )
         db.add(event)
         events_inserted += 1
