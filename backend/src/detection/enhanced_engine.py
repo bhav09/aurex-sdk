@@ -186,9 +186,17 @@ class EnhancedDetectionEngine:
         
         # Calculate actual waste from unique events
         if unique_wasted_events:
-            wasted_events = self.db.query(LLMEvent).filter(LLMEvent.id.in_(unique_wasted_events)).all()
+            # Chunk unique_wasted_events to avoid SQLite's limit of 999 parameters
+            unique_wasted_list = list(unique_wasted_events)
+            total_wasted_cost = 0.0
+            chunk_size = 900
+            for i in range(0, len(unique_wasted_list), chunk_size):
+                chunk = unique_wasted_list[i:i + chunk_size]
+                wasted_events_chunk = self.db.query(LLMEvent.cost).filter(LLMEvent.id.in_(chunk)).all()
+                total_wasted_cost += sum(e[0] for e in wasted_events_chunk if e[0] is not None)
+            
             # Conservative estimate: 70% of flagged event cost is waste
-            wasted_cost = sum(e.cost for e in wasted_events) * 0.70
+            wasted_cost = total_wasted_cost * 0.70
         else:
             wasted_cost = 0
         
@@ -397,6 +405,8 @@ class EnhancedDetectionEngine:
         
         for event in self._get_events_query().all():
             is_expensive = any(exp in event.model.lower() for exp in expensive_models)
+            if any(cheap in event.model.lower() for cheap in ["mini", "haiku", "flash"]):
+                is_expensive = False
             
             # User's criteria: <500 input tokens AND <100 output tokens = simple task
             is_simple = event.input_tokens < 500 and event.output_tokens < 100

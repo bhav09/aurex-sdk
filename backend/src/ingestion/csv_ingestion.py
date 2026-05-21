@@ -22,9 +22,13 @@ def parse_anthropic_csv(file: BinaryIO) -> List[LLMEventCreate]:
     Expected columns:
     - timestamp or created_at
     - model
-    - input_tokens
-    - output_tokens
+    - input_tokens or prompt_tokens
+    - output_tokens or completion_tokens
     - cost (optional)
+    - workflow_id (optional)
+    - session_id (optional)
+    - prompt (optional)
+    - metadata or extra_metadata (optional JSON string)
     """
     df = pd.read_csv(file)
     events = []
@@ -49,9 +53,35 @@ def parse_anthropic_csv(file: BinaryIO) -> List[LLMEventCreate]:
         model = str(row.get("model", "unknown"))
         provider = extract_provider_from_model(model)
         
+        # Extract workflow, session, and request/step ID
+        workflow_id = row.get("workflow_id") or row.get("workflow")
+        if pd.isna(workflow_id) or workflow_id is None:
+            workflow_id = None
+        else:
+            workflow_id = str(workflow_id)
+            
+        session_id = row.get("session_id") or row.get("session")
+        if pd.isna(session_id) or session_id is None:
+            session_id = None
+        else:
+            session_id = str(session_id)
+
+        request_id = row.get("request_id") or row.get("step_id") or row.get("id")
+        if pd.isna(request_id) or request_id is None:
+            request_id = None
+        else:
+            request_id = str(request_id)
+            
+        # Extract prompt
+        prompt = row.get("prompt") or row.get("prompt_text") or row.get("input")
+        if pd.isna(prompt) or prompt is None:
+            prompt = None
+        else:
+            prompt = str(prompt)
+            
         # Extract token counts
-        input_tokens = int(row.get("input_tokens", 0))
-        output_tokens = int(row.get("output_tokens", 0))
+        input_tokens = int(row.get("input_tokens") or row.get("prompt_tokens") or 0)
+        output_tokens = int(row.get("output_tokens") or row.get("completion_tokens") or 0)
         total_tokens = input_tokens + output_tokens
         
         # Get or calculate cost
@@ -60,28 +90,62 @@ def parse_anthropic_csv(file: BinaryIO) -> List[LLMEventCreate]:
             cost = calculate_cost(model, input_tokens, output_tokens)
         else:
             cost = float(cost)
+            
+        # Parse metadata if present
+        metadata_raw = row.get("metadata") or row.get("extra_metadata")
+        extra_metadata = {
+            "source": "anthropic_csv",
+            "cache_creation_tokens": int(row.get("cache_creation_input_tokens") or row.get("cache_creation_tokens") or 0),
+            "cache_read_tokens": int(row.get("cache_read_input_tokens") or row.get("cache_read_tokens") or 0)
+        }
+        
+        system_prompt_hash = row.get("system_prompt_hash")
+        if pd.isna(system_prompt_hash) or system_prompt_hash is None:
+            system_prompt_hash = None
+        else:
+            system_prompt_hash = str(system_prompt_hash)
+
+        if metadata_raw and not pd.isna(metadata_raw):
+            try:
+                import json
+                metadata_dict = json.loads(metadata_raw) if isinstance(metadata_raw, str) else metadata_raw
+                extra_metadata.update(metadata_dict)
+                
+                # Extract system prompt hash or session/request info if in JSON metadata
+                if not system_prompt_hash:
+                    system_prompt_hash = metadata_dict.get("system_prompt_hash")
+                if not session_id:
+                    session_id = metadata_dict.get("session_id")
+                if not request_id:
+                    request_id = metadata_dict.get("request_id")
+                if not workflow_id:
+                    workflow_id = metadata_dict.get("workflow_id")
+            except:
+                extra_metadata["raw_metadata"] = str(metadata_raw)
+        
+        # Add session/request info to metadata
+        if session_id:
+            extra_metadata["session_id"] = str(session_id)
+        if request_id:
+            extra_metadata["request_id"] = str(request_id)
         
         # Create event
         event = LLMEventCreate(
             timestamp=timestamp,
             provider=provider,
             model=model,
-            workflow_id=None,  # CSV doesn't have workflow info
-            step_id=None,
+            workflow_id=workflow_id,
+            step_id=request_id,
             parent_step_id=None,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
             cost=cost,
-            prompt=None,  # CSV doesn't include prompts
+            prompt=prompt,
             response=None,
-            system_prompt_hash=None,
+            system_prompt_hash=system_prompt_hash,
             context_length=total_tokens,
-            extra_metadata={
-                "source": "anthropic_csv",
-                "cache_creation_tokens": int(row.get("cache_creation_input_tokens", 0)),
-                "cache_read_tokens": int(row.get("cache_read_input_tokens", 0))
-            }
+            extra_metadata=extra_metadata
         )
         
         events.append(event)
