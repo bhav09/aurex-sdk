@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurex - 3D Feature & Moat Graph</title>
+    
+    <!-- TailWind CSS for utility styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#030712',
+                        glassbg: 'rgba(10, 15, 30, 0.7)',
+                        glassborder: 'rgba(255, 255, 255, 0.08)',
+                        brandcyan: '#06B6D4',
+                        brandpurple: '#A855F7',
+                        brandemerald: '#10B981',
+                        brandrose: '#F43F5E',
+                        brandpink: '#EC4899',
+                        brandblue: '#3B82F6',
+                        brandyellow: '#F59E0B'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts: Inter and Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Three.js and 3d-force-graph libraries -->
+    <script src="https://unpkg.com/three@0.146.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/3d-force-graph@1.73.0/dist/3d-force-graph.min.js"></script>
+
+    <style>
+        /* Custom scrollbar styling for glassmorphic elements */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.05);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Glassmorphism utility class */
+        .glass-panel {
+            background: rgba(8, 12, 26, 0.72);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Pulse glow animation for badges */
+        @keyframes pulse-glow-green {
+            0%, 100% { box-shadow: 0 0 3px rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.7); }
+        }
+        .glow-green {
+            animation: pulse-glow-green 2.5s infinite;
+        }
+
+        @keyframes pulse-glow-yellow {
+            0%, 100% { box-shadow: 0 0 3px rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.6); }
+        }
+        .glow-yellow {
+            animation: pulse-glow-yellow 2.5s infinite;
+        }
+
+        /* Ambient background space grid */
+        #starfield {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #0b1120 0%, #020617 100%);
+            z-index: -2;
+            overflow: hidden;
+        }
+        .grid-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* Node label canvas styling */
+        .node-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.85);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #fff;
+            user-select: none;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="h-full bg-darkbg text-slate-200 overflow-hidden font-sans select-none">
+
+    <!-- Background Layer -->
+    <div id="starfield">
+        <div class="grid-overlay"></div>
+    </div>
+
+    <!-- Left Directory & Search Dock (Floating Sidebar) -->
+    <aside id="left-nav" class="absolute left-5 top-5 bottom-5 w-[330px] glass-panel rounded-2xl flex flex-col p-5 space-y-4 z-20 pointer-events-auto transition-all duration-300 transform-gpu">
+        <!-- Header Section -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800/60">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-gradient-to-tr from-brandpurple to-brandcyan rounded-xl shadow-lg shadow-brandpurple/10">
+                    <i class="fa-solid fa-circle-nodes text-lg text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold font-display tracking-tight text-white leading-tight">Aurex Platform</h1>
+                    <p class="text-[10px] text-slate-400 font-medium tracking-wide">3D Feature & Strategic Moat</p>
+                </div>
+            </div>
+            <button onclick="toggleLeftNav()" class="p-1.5 rounded-lg hover:bg-slate-900/60 text-slate-500 hover:text-slate-300 transition-colors" title="Collapse Sidebar">
+                <i class="fa-solid fa-angles-left text-xs animate-pulse"></i>
+            </button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-[11px] text-slate-500"></i>
+            <input type="text" id="search-input" oninput="handleSearch()" placeholder="Search features..." 
+                   class="w-full bg-slate-950/80 border border-slate-800/80 rounded-lg pl-8 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brandcyan/80 focus:ring-1 focus:ring-brandcyan/30 transition-all shadow-inner">
+            <button id="search-clear-btn" onclick="clearSearch()" class="hidden absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300">
+                <i class="fa-solid fa-circle-xmark text-xs"></i>
+            </button>
+        </div>
+
+        <!-- Filter Dropdowns -->
+        <div class="grid grid-cols-2 gap-2">
+            <select id="filter-category" onchange="applyFilters()" class="bg-slate-950/80 border border-slate-800/80 rounded-lg py-1.5 px-2 text-[10px] text-slate-300 focus:outline-none focus:border-brandcyan/50">
+                <option value="all">All Categories</option>
+                <option value="ingestion">Ingestion & SDKs</option>
+                <option value="detection">Detection Engine</option>
+                <option value="optimization">Optimization Actions</option>
+                <option value="operations">Ops & Guardrails</option>
+                <option value="gtm">Product UX & GTM</option>
+                <option value="security">Security & Gov</option>
+            </select>
+            <select id="filter-status" onchange="applyFilters()" class="bg-slate-950/80 border border-slate-800/80 rounded-lg py-1.5 px-2 text-[10px] text-slate-300 focus:outline-none focus:border-brandcyan/50">
+                <option value="all">All Statuses</option>
+                <option value="built">Built (Green)</option>
+                <option value="future">Future (Yellow)</option>
+            </select>
+        </div>
+
+        <!-- Directory Directory Index -->
+        <div class="flex-grow overflow-y-auto space-y-3 pr-1" id="directory-container">
+            <!-- Dynamically populated via renderDirectory() -->
+        </div>
+
+        <!-- Visual / Force Controls -->
+        <div class="space-y-2 pt-3 border-t border-slate-800/60">
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btn-macro-view" onclick="setViewMode('macro')" class="py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/40 text-[10px] font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-compress text-brandpurple"></i>
+                    <span>Macro View</span>
+                </button>
+                <button id="btn-micro-view" onclick="setViewMode('micro')" class="py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/40 text-[10px] font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-expand text-brandcyan"></i>
+                    <span>Micro View</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="resetGraphView()" class="py-1.5 px-2 rounded-lg border border-slate-900/40 bg-slate-900/20 text-[10px] text-slate-500 hover:text-slate-300 transition-all flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-arrows-spin"></i>
+                    <span>Reset Zoom</span>
+                </button>
+                <button id="btn-pause-force" onclick="toggleForce()" class="py-1.5 px-2 rounded-lg border border-slate-900/40 bg-slate-900/20 text-[10px] text-slate-500 hover:text-slate-300 transition-all flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-pause" id="force-icon"></i>
+                    <span id="force-text">Freeze Layout</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Left Nav expand button -->
+    <button id="left-nav-expand-btn" onclick="toggleLeftNav()" class="hidden absolute left-5 top-5 p-3 rounded-xl glass-panel text-slate-300 hover:text-white z-30 transition-all duration-300 shadow-lg hover:bg-slate-950 pointer-events-auto" title="Expand Sidebar">
+        <i class="fa-solid fa-angles-right"></i>
+    </button>
+
+    <!-- Main Canvas Viewport -->
+    <main class="w-full h-full relative z-10 pointer-events-auto">
+        <div id="graph-3d" class="w-full h-full"></div>
+        
+        <!-- Semantic Zoom indicator on Canvas -->
+        <div class="left-shiftable absolute top-5 left-[350px] pointer-events-none glass-panel py-2 px-3.5 rounded-xl flex items-center space-x-2 text-xs text-slate-400 z-20 transition-all duration-300">
+            <i class="fa-solid fa-video text-brandcyan"></i>
+            <span>Distance: <span id="camera-dist-text" class="text-white font-bold font-display">340</span></span>
+            <span class="text-slate-750">|</span>
+            <span>Zoom Mode: <span id="zoom-indicator" class="text-brandpurple font-bold">Macro</span></span>
+        </div>
+        
+        <!-- Interactive Visual Instructions Toast overlay -->
+        <div class="left-shiftable absolute bottom-5 left-[350px] pointer-events-none glass-panel py-2 px-3 rounded-xl flex items-center space-x-2 text-[10px] text-slate-400 z-20 transition-all duration-300">
+            <span><kbd class="px-1.5 py-0.5 bg-slate-900 rounded text-[9px] border border-slate-800">Left Click</kbd> Rotate/Select</span>
+            <span class="text-slate-700">|</span>
+            <span><kbd class="px-1.5 py-0.5 bg-slate-900 rounded text-[9px] border border-slate-800">Scroll</kbd> Zoom</span>
+        </div>
+    </main>
+
+    <!-- Right HUD Details Dock (KPI stats and selected details) -->
+    <aside id="right-nav" class="absolute right-5 top-5 bottom-5 w-[360px] glass-panel rounded-2xl flex flex-col p-5 space-y-4 z-20 pointer-events-auto transition-all duration-300 transform-gpu">
+        <!-- Right Sidebar Header -->
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800/60">
+            <span class="text-xs font-bold font-display uppercase tracking-wider text-slate-400">Roadmap Overview</span>
+            <button onclick="toggleRightNav()" class="p-1.5 rounded-lg hover:bg-slate-900/60 text-slate-500 hover:text-slate-300 transition-colors" title="Collapse Panel">
+                <i class="fa-solid fa-angles-right text-xs animate-pulse"></i>
+            </button>
+        </div>
+        <!-- Progress Counter -->
+        <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50 space-y-3">
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-400 font-medium">Roadmap Completion</span>
+                <span id="progress-percentage" class="text-brandemerald font-bold font-display text-sm">35%</span>
+            </div>
+            <div class="w-full bg-slate-850 rounded-full h-1.5 overflow-hidden border border-slate-800/50">
+                <div id="progress-bar" class="bg-gradient-to-r from-brandcyan to-brandemerald h-1.5 rounded-full transition-all duration-500 ease-out" style="width: 35%"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+                <div class="bg-slate-950/60 py-2 px-1 rounded-lg border border-slate-850">
+                    <div id="count-total" class="text-sm font-bold font-display text-white">48</div>
+                    <div class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Total Nodes</div>
+                </div>
+                <div class="bg-slate-950/60 py-2 px-1 rounded-lg border border-slate-850 border-b border-b-brandemerald">
+                    <div id="count-built" class="text-sm font-bold font-display text-brandemerald">17</div>
+                    <div class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Built (Green)</div>
+                </div>
+                <div class="bg-slate-950/60 py-2 px-1 rounded-lg border border-slate-850 border-b border-b-brandyellow">
+                    <div id="count-future" class="text-sm font-bold font-display text-brandyellow">31</div>
+                    <div class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Future (Yellow)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selected Node Details -->
+        <div class="flex-grow flex flex-col min-h-0">
+            <div id="detail-card" class="bg-slate-900/80 p-4 rounded-xl border border-slate-850 flex flex-col h-full overflow-y-auto">
+                <!-- Default State -->
+                <div id="detail-placeholder" class="m-auto text-center py-12 space-y-2">
+                    <i class="fa-solid fa-circle-nodes text-3xl text-slate-700 animate-pulse"></i>
+                    <p class="text-xs text-slate-400 max-w-[200px]">Click any node on the graph or in the Directory Index to inspect specs, dependencies, and business moat details.</p>
+                </div>
+
+                <!-- Content State -->
+                <div id="detail-content" class="hidden space-y-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span id="node-category" class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800/80 text-brandcyan">Ingestion & SDKs</span>
+                            <h2 id="node-name" class="text-base font-bold font-display text-white mt-1.5 leading-tight">CSV & JSON Parser</h2>
+                        </div>
+                        <span id="node-badge" class="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full glow-green bg-brandemerald/10 border border-brandemerald/40 text-brandemerald">Built</span>
+                    </div>
+
+                    <p id="node-desc" class="text-xs text-slate-300 leading-relaxed">Streams large CSV outputs in chunks, parses and runs heuristics entirely in-browser or headless via Node CLI.</p>
+                    
+                    <div class="space-y-2 pt-2 border-t border-slate-800/60">
+                        <!-- Token Optimization Core Goal -->
+                        <div>
+                            <div class="text-[9px] uppercase font-semibold text-slate-400 tracking-wider">Token optimization impact</div>
+                            <p id="node-why" class="text-xs text-brandcyan font-medium leading-normal mt-0.5">Determines precise redundant token cost overheads on massive uploads locally without external API latency or fees.</p>
+                        </div>
+                        <!-- Impacted features / Dependencies -->
+                        <div>
+                            <div class="text-[9px] uppercase font-semibold text-slate-400 tracking-wider">Dependencies & System Connections</div>
+                            <div id="node-impact" class="flex flex-wrap gap-1 mt-1">
+                                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Token Waste Calculator</span>
+                            </div>
+                        </div>
+                        <!-- Target Persona -->
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <div>
+                                <div class="text-[9px] uppercase font-semibold text-slate-400 tracking-wider">Target Users</div>
+                                <span id="node-persona" class="text-xs text-slate-200 mt-0.5 block font-medium">Developer, CFO</span>
+                            </div>
+                            <div>
+                                <div class="text-[9px] uppercase font-semibold text-slate-400 tracking-wider">Moat Multiplier</div>
+                                <div id="node-moat-rating" class="text-brandyellow text-xs mt-0.5 flex space-x-0.5">
+                                    <i class="fa-solid fa-star"></i>
+                                    <i class="fa-solid fa-star"></i>
+                                    <i class="fa-solid fa-star"></i>
+                                    <i class="fa-regular fa-star text-slate-600"></i>
+                                    <i class="fa-regular fa-star text-slate-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Button to Toggle Status -->
+                    <div class="pt-2 border-t border-slate-800/60 flex space-x-2">
+                        <button id="toggle-status-btn" onclick="toggleSelectedNodeStatus()" class="flex-grow py-2 px-3 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-lg transition-all flex items-center justify-center space-x-1.5 border border-slate-700/60">
+                            <i class="fa-solid fa-toggle-on"></i>
+                            <span>Toggle Built Status</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="flex justify-between items-center text-[9px] text-slate-500 pt-1.5 border-t border-slate-800/60">
+            <span>Aurex Roadmap Studio</span>
+            <button onclick="resetAllStatuses()" class="hover:text-slate-300 transition-colors">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+    </aside>
+
+    <!-- Right Nav expand button -->
+    <button id="right-nav-expand-btn" onclick="toggleRightNav()" class="hidden absolute right-5 top-5 p-3 rounded-xl glass-panel text-slate-300 hover:text-white z-30 transition-all duration-300 shadow-lg hover:bg-slate-950 pointer-events-auto" title="Expand Panel">
+        <i class="fa-solid fa-angles-left"></i>
+    </button>
+
+    <script>
+        // --- 1. CONFIGURATION AND INITIAL DATA ---
+        
+        // Define Categories & Cluster Nodes
+        const clusters = {
+            ingestion: { id: 'ingestion', name: 'Data Ingestion & SDKs', color: '#06B6D4', val: 16, desc: 'Secure methods to load, stream, and parse logs dynamically.', why: 'Simplifies loading raw data safely locally or in-flight.', persona: 'Platform Engineers', moat: 3 },
+            detection: { id: 'detection', name: 'Detection & Heuristics', color: '#A855F7', val: 16, desc: 'Mathematical analysis and heuristics of token waste.', why: 'Core algorithmic differentiator that parses models and sessions.', persona: 'Data Scientists, CTO', moat: 5 },
+            optimization: { id: 'optimization', name: 'Optimization & Actions', color: '#10B981', val: 16, desc: 'Executing model cost optimization and token reduction paths.', why: 'Takes analysis reports and triggers active saving logic.', persona: 'Engineering Managers', moat: 4 },
+            operations: { id: 'operations', name: 'Operations & Guardrails', color: '#F43F5E', val: 16, desc: 'Real-time proxy routing and token spend boundaries.', why: 'Actively prevents runaway billing directly in production.', persona: 'SecOps, Tech Leads', moat: 4 },
+            gtm: { id: 'gtm', name: 'Product UX & GTM', color: '#EC4899', val: 16, desc: 'Visual dashboards, cost attribution, and lead conversion.', why: 'Demonstrates financial value visually for executive purchase approval.', persona: 'CFO, Product Owners', moat: 3 },
+            security: { id: 'security', name: 'Security & Governance', color: '#3B82F6', val: 16, desc: 'Privacy-focused self-hosting, DNS validation, and billing audits.', why: 'Builds enterprise trust for compliance, MX and domain validation.', persona: 'Compliance Officers, CTO', moat: 5 }
+        };
+
+        // Define Granular Feature Nodes
+        const featuresDefault = [
+            // Data Ingestion & SDKs
+            { id: 'csv_json_parser', name: 'CSV & JSON Parser', clusterId: 'ingestion', built: true, desc: 'In-browser local chunked stream parser for model usage reports.', why: 'Allows processing multi-gigabyte logs instantly on the client side with absolute user privacy.', persona: 'Developers, CFO', moat: 3, deps: ['token_waste_calc'] },
+            { id: 'cli_tool', name: 'Aurex Node CLI', clusterId: 'ingestion', built: true, desc: 'Headless local node command-line script evaluating token metrics.', why: 'Enables engineering teams to inject automated audits directly in continuous integration workflows.', persona: 'DevOps Engineers', moat: 4, deps: ['token_waste_calc'] },
+            { id: 'sdk_monkey_patch', name: 'SDK Auto-Instrumentation', clusterId: 'ingestion', built: true, desc: 'Auto-instrumentation of OpenAI, Anthropic, and Google APIs via monkey-patching in Python and Node SDKs.', why: 'Allows zero-configuration capturing of LLM token metrics on the fly without changing application code.', persona: 'Backend Developers', moat: 5, deps: ['cli_tool'] },
+            { id: 'data_export_guide', name: 'Data Export Wizard', clusterId: 'ingestion', built: true, desc: 'Interactive step-by-step export guides for popular gateways like Helicone, Langsmith, and cloud providers.', why: 'Removes entry barriers, making it simple for new users to migrate historical log streams to Aurex.', persona: 'Platform Engineers', moat: 3, deps: ['csv_json_parser'] },
+            { id: 'otel_sdk', name: 'OpenTelemetry Log SDK', clusterId: 'ingestion', built: false, desc: 'Pre-packaged SDK wrapper to log LLM calls on-the-fly.', why: 'Removes the friction of manual uploads by continuously collecting and auditing tokens.', persona: 'Backend Developers', moat: 5, deps: ['db_ingress'] },
+            { id: 'db_ingress', name: 'Direct Database Ingress', clusterId: 'ingestion', built: false, desc: 'Persistent backend adapters importing logs directly from warehouses (ClickHouse, Postgres).', why: 'Supports massive scale analysis by bypassing CSV handling and scanning databases directly.', persona: 'Data Engineers', moat: 4, deps: ['anomaly_detector'] },
+            { id: 'ci_linter', name: 'Automated CI/CD Prompt Linter', clusterId: 'ingestion', built: false, desc: 'A GitHub Action/GitLab CI runner that parses prompt templates in commits to measure token weight and flag bloat before merge.', why: 'Prevents developers from introducing token-wasteful system prompts or uncompressed templates into production.', persona: 'DevOps, QA Leads', moat: 3, deps: ['token_waste_calc'] },
+            { id: 'langchain_integration', name: 'LangChain & LlamaIndex Plugins', clusterId: 'ingestion', built: false, desc: 'Native middleware plugins automatically logging events from popular LLM orchestration frameworks.', why: 'Reduces developer friction, bringing integration setup time down to under one minute.', persona: 'Developers', moat: 5, deps: ['sdk_monkey_patch'] },
+            { id: 'github_action', name: 'PR Prompt Audit Github Action', clusterId: 'ingestion', built: false, desc: 'GitHub Action run on pull requests to analyze prompt changes and warn developers of token regressions.', why: 'Prevents wasteful system prompts or bloated instructions from ever entering production.', persona: 'DevOps, QA Leads', moat: 4, deps: ['ci_linter'] },
+            
+            // Detection Heuristics
+            { id: 'token_waste_calc', name: 'Token Waste Calculator', clusterId: 'detection', built: true, desc: 'Algorithms summing token waste metrics and pricing offsets.', why: 'Translates raw tokens into exact financial metrics for executive visibility.', persona: 'CTO, CFO', moat: 4, deps: ['mismatch_checker', 'token_credit_score'] },
+            { id: 'mismatch_checker', name: 'Model Mismatch Checker', clusterId: 'detection', built: true, desc: 'Analyzes prompt simplicity and matches it to the cheapest tier.', why: 'Identifies expensive models (e.g. GPT-4) misused for tasks that GPT-4o-mini can resolve.', persona: 'CTO, Tech Leads', moat: 4, deps: ['exec_dashboard'] },
+            { id: 'temporal_sessioning', name: 'Temporal Sessioning', clusterId: 'detection', built: true, desc: 'Reconstitutes user session states from raw logs based on timeframe gaps.', why: 'Surfaces redundant state payloads passed repeatedly in multi-turn chatbot loops.', persona: 'Product Managers', moat: 5, deps: ['exact_redundancy'] },
+            { id: 'exact_redundancy', name: 'Exact Prompt Redundancy', clusterId: 'detection', built: true, desc: 'Detects exact duplicate prompt bodies to surface unnecessary backend queries.', why: 'Exposes applications querying identical instructions multiple times within minutes.', persona: 'QA Engineers', moat: 3, deps: ['semantic_caching'] },
+            { id: 'semantic_redundancy', name: 'Semantic Redundancy Auditor', clusterId: 'detection', built: true, desc: 'Utilizes local client-side WASM embeddings to search similar prompts.', why: 'Surfaces opportunities for cache layers by flagging semantically matching prompt content.', persona: 'Developers, Tech Leads', moat: 5, deps: ['semantic_caching'] },
+            { id: 'anomaly_detector', name: 'Anomaly & Spike Detector', clusterId: 'detection', built: false, desc: 'Analyzes live log streams to flag rapid cost increases, loops, or error surges.', why: 'Protects against buggy code loops generating infinite recursive LLM completions.', persona: 'Platform Engineers', moat: 4, deps: ['alert_bot'] },
+            { id: 'cache_simulator', name: 'Semantic Cache Simulator', clusterId: 'detection', built: false, desc: 'Scans historical prompt logs to calculate exact simulated cost reductions if a semantic cache (like Redis/GPT-Cache) were deployed.', why: 'Proves the financial ROI of caching strategies to engineering managers before they write code.', persona: 'Tech Leads, Engineering Managers', moat: 4, deps: ['semantic_caching'] },
+            { id: 'model_quality_scorer', name: 'Model Output Quality Scorer', clusterId: 'detection', built: false, desc: 'Evaluates output response quality during tier downgrades to ensure cheaper options are viable.', why: 'Provides absolute validation that cost optimization does not compromise end-user experience.', persona: 'Product Managers, QA', moat: 5, deps: ['token_waste_calc'] },
+            
+            // Optimization Actions
+            { id: 'ab_replay', name: 'A/B Model Replay Sandbox', clusterId: 'optimization', built: true, desc: 'Sandbox tool testing cached prompts against cheaper models to compare answers.', why: 'Permits risk-free evaluation of lower-tier models before updating code in production.', persona: 'Developers, PMs', moat: 4, deps: ['mismatch_checker'] },
+            { id: 'copilot_agent', name: 'Optimization Copilot Agent', clusterId: 'optimization', built: true, desc: 'Interactive chat copilot that guides developers and generates code fixes for identified leaks.', why: 'Accelerates remediation from hours of research to one-click copy-paste patterns.', persona: 'Developers, Tech Leads', moat: 4, deps: ['exec_dashboard'] },
+            { id: 'semantic_caching', name: 'Semantic Caching Engine', clusterId: 'optimization', built: false, desc: 'Visual configuration wizard to integrate Redis/GPT-Cache middleware.', why: 'Cuts repetitive prompt bills to zero by matching similar questions to hot cache buffers.', persona: 'Backend Developers', moat: 5, deps: ['prompt_compression'] },
+            { id: 'prompt_compression', name: 'Prompt Compressor', clusterId: 'optimization', built: false, desc: 'Scans prompts and suggests templates that strip fluff and compress instructions.', why: 'Shrinks systemic prompt overhead by 20-40% without losing reasoning ability.', persona: 'Developers', moat: 4, deps: ['dynamic_router'] },
+            { id: 'dynamic_router', name: 'Dynamic LLM Router', clusterId: 'optimization', built: false, desc: 'Lightweight runtime routing logic forwarding prompts based on semantic complexity.', why: 'Achieves massive cost cuts by serving simple queries from cheap models and hard ones from Claude.', persona: 'Architects', moat: 5, deps: ['llm_proxy'] },
+            { id: 'finetune_collector', name: 'Fine-Tuning Data Compiler', clusterId: 'optimization', built: false, desc: 'Automatically tags and exports high-quality, cost-efficient LLM interactions to create datasets for training local, open-source models (e.g. Llama-3-8B).', why: 'Enables developers to transition expensive prompts onto cheap self-hosted models, permanently cutting token costs.', persona: 'Data Scientists, ML Engineers', moat: 5, deps: ['dynamic_router'] },
+            { id: 'playground_sandbox', name: 'Prompt Cost Playground', clusterId: 'optimization', built: false, desc: 'Interactive developer sandbox for testing prompts against multiple models side-by-side with cost analysis.', why: 'Helps developers balance cost and responses during prompt design phase.', persona: 'Developers, PMs', moat: 4, deps: ['ab_replay'] },
+            
+            // Operations & Guardrails
+            { id: 'llm_proxy', name: 'Real-time LLM Proxy', clusterId: 'operations', built: false, desc: 'Reverse proxy validating cost thresholds and routing prompts dynamically.', why: 'Enforces token policies and routing in production dynamically without redeploying code.', persona: 'Platform Engineers', moat: 5, deps: ['rate_limiting'] },
+            { id: 'rate_limiting', name: 'Rate Limiting & Cost Quotas', clusterId: 'operations', built: false, desc: 'Restricts LLM tokens/spend quotas per API key or workspace.', why: 'Prevents third-party integrations or users from abusing LLM endpoints.', persona: 'Product Operations', moat: 4, deps: ['alert_bot'] },
+            { id: 'alert_bot', name: 'Slack & Discord Alert Bot', clusterId: 'operations', built: false, desc: 'Triggers instant alerts to communication hubs when LLM cost anomalies hit.', why: 'Keeps team updated of cost surges instantly before the monthly invoice arrives.', persona: 'Engineering Managers', moat: 3, deps: [] },
+            { id: 'webhook_alerts', name: 'Webhook Event Notification', clusterId: 'operations', built: false, desc: 'Triggers programmatic webhook calls and emails when specific cost or waste conditions are met.', why: 'Integrates real-time spend guardrails into internal operations and auto-scaling setups.', persona: 'SecOps, Platform Engineers', moat: 4, deps: ['alert_bot'] },
+            { id: 'custom_alerts_rules', name: 'Custom Alert Rule Builder', clusterId: 'operations', built: false, desc: 'Let users build complex alerts using conditional statements on token usage and error codes.', why: 'Adapts standard alerts to fit the specific microservice architectures of advanced systems.', persona: 'DevOps Engineers', moat: 4, deps: ['alert_bot'] },
+            { id: 'slack_digest', name: 'Weekly Slack Digest', clusterId: 'operations', built: false, desc: 'Sends automated weekly reports of spend, savings, and key optimizations to Slack channels.', why: 'Keeps cost-conscious design top of mind for teams without requiring logging into the UI.', persona: 'Engineering Managers', moat: 4, deps: ['alert_bot'] },
+            
+            // Product UX & GTM
+            { id: 'token_credit_score', name: 'Token Credit Score Card', clusterId: 'gtm', built: true, desc: 'Radial grading widget scoring engineering teams on cost-conscious design.', why: 'Gamifies token efficiency, encouraging developers to write leaner prompt code.', persona: 'CTO, Tech Leads', moat: 3, deps: ['exec_dashboard'] },
+            { id: 'exec_dashboard', name: 'Executive Savings Dashboard', clusterId: 'gtm', built: true, desc: 'Aggregated view of financial metrics, effort estimates, and audit charts.', why: 'Synthesizes dry code metrics into clear reports that CFOs approve instantly.', persona: 'CFO, CTO', moat: 3, deps: ['multi_tenant'] },
+            { id: 'booking_calendar', name: 'Consultation Calendar', clusterId: 'gtm', built: true, desc: 'In-app appointment picker allowing engineers to book manual expert reviews.', why: 'Converts self-serve audits into high-value professional service contracts.', persona: 'Sales, CTOs', moat: 2, deps: [] },
+            { id: 'sdk_docs_portal', name: 'SDK Documentation Portal', clusterId: 'gtm', built: true, desc: 'Rich in-app documentation portal explaining SDK integration, deployment, and heuristics parameters.', why: 'Improves developer onboarding speed and self-service conversion rates.', persona: 'Developers', moat: 3, deps: ['exec_dashboard'] },
+            { id: 'gtm_calculator', name: 'Viral GTM Cost Calculator', clusterId: 'gtm', built: false, desc: 'Fast, open calculator widget on landing page displaying potential savings.', why: 'Serves as an organic lead generation funnel for potential clients.', persona: 'Growth Marketers', moat: 3, deps: [] },
+            { id: 'multi_tenant', name: 'Multi-Tenant Workspaces', clusterId: 'gtm', built: false, desc: 'Organization controls, workspace spaces, and role-based permissions.', why: 'Adapts Aurex for enterprise-wide deployments across disconnected business units.', persona: 'Enterprise CTOs', moat: 4, deps: [] },
+            { id: 'attribution_engine', name: 'Token Cost Attribution Engine', clusterId: 'gtm', built: false, desc: 'Attributes real-time LLM cost details down to specific tenant accounts, SaaS features, or code files to calculate COGS per user.', why: 'Provides micro-level cost attribution to help product managers calculate unit economics and margin profitability.', persona: 'Product Managers, CFO', moat: 4, deps: ['exec_dashboard'] },
+            { id: 'team_comparison', name: 'Team & Department Benchmarks', clusterId: 'gtm', built: false, desc: 'Compares LLM spend, efficiency scores, and waste profiles across different business teams or groups.', why: 'Drives organization-wide accountability and internal alignment through cost benchmarking.', persona: 'CTO, Engineering Managers', moat: 4, deps: ['exec_dashboard'] },
+            { id: 'budget_forecaster', name: 'AI Spend Forecaster', clusterId: 'gtm', built: false, desc: 'Uses statistical models to project future LLM spend and quota requirements based on historic growth.', why: 'Enables precise cloud budget planning and protects companies from unexpected billing spikes.', persona: 'CFO, Product Owners', moat: 4, deps: ['exec_dashboard'] },
+            { id: 'historical_trends', name: 'Historical Trend Analytics', clusterId: 'gtm', built: false, desc: 'Visualizes historical optimization gains, cost trends, and waste reductions over time.', why: 'Directly demonstrates concrete financial return on investment (ROI) to leadership.', persona: 'CFO, CTO', moat: 4, deps: ['exec_dashboard'] },
+            
+            // Security & Governance
+            { id: 'mx_dns_validator', name: 'MX Domain DNS Validator', clusterId: 'security', built: true, desc: 'Performs DNS checks on user registration emails to ensure mailboxes exist.', why: 'Blocks dummy/fictitious signups, protecting OTP mail budgets and user quality.', persona: 'SecOps, QA', moat: 4, deps: ['dummy_blocklist'] },
+            { id: 'dummy_blocklist', name: 'Dummy Domain Blocklist', clusterId: 'security', built: true, desc: 'Static domain filter blocking common sample domains during OTP signups.', why: 'Bypasses verification tests locally but protects production databases.', persona: 'QA Engineers', moat: 3, deps: ['csv_json_parser'] },
+            { id: 'self_hosted', name: 'Self-Hosted VPC Deployment', clusterId: 'security', built: false, desc: 'Docker Compose / Helm chart patterns to run Aurex within secure intranets.', why: 'Conquers enterprise deals where sharing logs to outside platforms is strictly forbidden.', persona: 'SecOps, CTO', moat: 5, deps: ['db_ingress'] },
+            { id: 'billing_auditor', name: 'Multi-Provider Billing Auditor', clusterId: 'security', built: false, desc: 'Cross-checks API usage logs with direct LLM provider invoicing APIs (OpenAI, Anthropic) to detect double-billing or failed-call invoices.', why: 'Reclaims cash for CFOs by identifying API errors that are charged but never successfully completed.', persona: 'CFO, Finance teams', moat: 5, deps: ['db_ingress'] },
+            { id: 'api_key_mgmt', name: 'API Key & Space Management', clusterId: 'security', built: false, desc: 'Provides API key creation, rotation, and fine-grained quota limits for workspaces.', why: 'Restricts third-party keys and establishes access controls for team sub-entities.', persona: 'Security Engineers', moat: 4, deps: ['self_hosted'] },
+            { id: 'sso_saml', name: 'SSO & SAML Integration', clusterId: 'security', built: false, desc: 'Enterprise-grade user directory synchronization and single sign-on support.', why: 'Unlocks enterprise adoption by meeting standard corporate authentication requirements.', persona: 'Compliance Officers, SecOps', moat: 5, deps: ['api_key_mgmt'] },
+            { id: 'audit_log_trail', name: 'Compliance Audit Trail', clusterId: 'security', built: false, desc: 'Immutable, tamper-evident log capturing all workspace access, configuration shifts, and imports.', why: 'Satisfies SOC2 and industry compliance frameworks for enterprise environments.', persona: 'Compliance Officers, CTO', moat: 5, deps: ['sso_saml'] },
+            { id: 'provider_invoice_sync', name: 'Provider Invoice Reconciliation', clusterId: 'security', built: false, desc: 'Cross-checks recorded event history against actual invoices from OpenAI, Anthropic, and Azure.', why: 'Identifies discrepancies, double billing, or charges incurred from failed/errored calls.', persona: 'CFO, Finance Managers', moat: 5, deps: ['db_ingress'] }
+        ];
+
+        // --- 2. LOCAL STORAGE PERSISTENCE HANDLING ---
+        
+        let features = [];
+        
+        function initData() {
+            const saved = localStorage.getItem('aurex_features_states');
+            if (saved) {
+                try {
+                    const states = JSON.parse(saved);
+                    features = featuresDefault.map(f => ({
+                        ...f,
+                        built: states.hasOwnProperty(f.id) ? states[f.id] : f.built
+                    }));
+                } catch(e) {
+                    features = JSON.parse(JSON.stringify(featuresDefault));
+                }
+            } else {
+                features = JSON.parse(JSON.stringify(featuresDefault));
+            }
+            updateStatsUI();
+        }
+
+        function saveStates() {
+            const states = {};
+            features.forEach(f => {
+                states[f.id] = f.built;
+            });
+            localStorage.setItem('aurex_features_states', JSON.stringify(states));
+            updateStatsUI();
+            
+            // Re-render Left Sidebar Directory
+            renderDirectory();
+        }
+
+        function updateStatsUI() {
+            const total = features.length;
+            const built = features.filter(f => f.built).length;
+            const future = total - built;
+            const pct = Math.round((built / total) * 100);
+
+            document.getElementById('count-total').innerText = total;
+            document.getElementById('count-built').innerText = built;
+            document.getElementById('count-future').innerText = future;
+            document.getElementById('progress-percentage').innerText = pct + '%';
+            document.getElementById('progress-bar').style.width = pct + '%';
+        }
+
+        initData();
+
+        // --- 3. GRAPH DATA PREPARATION ---
+        
+        // Setup initial nodes array combining Clusters + Features
+        const nodesData = [];
+        const linksData = [];
+
+        // Build base clusters
+        Object.values(clusters).forEach(c => {
+            nodesData.push({
+                ...c,
+                isCluster: true
+            });
+        });
+
+        // Add features
+        features.forEach(f => {
+            nodesData.push({
+                ...f,
+                isCluster: false
+            });
+        });
+
+        // Generate Links
+        // A. Structural cluster-to-feature links (faint, used to cluster features physically around their parent clusters)
+        features.forEach(f => {
+            linksData.push({
+                source: f.clusterId,
+                target: f.id,
+                type: 'cluster-feature'
+            });
+        });
+
+        // B. Pipeline/Dependency links between clusters (Macro level connections)
+        const clusterLinks = [
+            { source: 'security', target: 'ingestion' },
+            { source: 'ingestion', target: 'detection' },
+            { source: 'detection', target: 'optimization' },
+            { source: 'optimization', target: 'operations' },
+            { source: 'detection', target: 'gtm' },
+            { source: 'operations', target: 'gtm' }
+        ];
+        clusterLinks.forEach(cl => {
+            linksData.push({
+                source: cl.source,
+                target: cl.target,
+                type: 'cluster-cluster'
+            });
+        });
+
+        // C. Functional dependency links between features (Micro level connections)
+        features.forEach(f => {
+            if (f.deps) {
+                f.deps.forEach(depId => {
+                    linksData.push({
+                        source: f.id,
+                        target: depId,
+                        type: 'feature-feature'
+                    });
+                });
+            }
+        });
+
+        // --- 4. 3D FORCE GRAPH INITIALIZATION ---
+        
+        let viewMode = 'macro'; // Start as macro (zoomed out) by default
+        let forceRunning = true;
+        let selectedNode = null;
+        let hoveredNode = null;
+        
+        const Graph = ForceGraph3D()(document.getElementById('graph-3d'))
+            .graphData({ nodes: nodesData, links: linksData })
+            .backgroundColor('rgba(0,0,0,0)') // Transparent to reveal starfield background
+            .showNavInfo(false)
+            .nodeLabel(null) // Handled via our custom Three.js sprite labels
+            .cooldownTicks(150)
+            
+            // Link styling
+            .linkWidth(link => {
+                if (viewMode === 'macro') {
+                    return link.type === 'cluster-cluster' ? 3.0 : 0.0;
+                } else {
+                    if (link.type === 'feature-feature') return 1.5;
+                    if (link.type === 'cluster-feature') return 0.5;
+                    return 0.2; // Cluster-cluster faint in micro view
+                }
+            })
+            .linkColor(link => {
+                if (viewMode === 'macro') {
+                    if (link.type !== 'cluster-cluster') return 'rgba(0,0,0,0)';
+                    return 'rgba(168, 85, 247, 0.4)';
+                } else {
+                    if (link.type === 'feature-feature') return 'rgba(255, 255, 255, 0.2)';
+                    if (link.type === 'cluster-feature') {
+                        // Match cluster color
+                        const c = clusters[link.source.id || link.source];
+                        return c ? `${c.color}22` : 'rgba(255,255,255,0.05)';
+                    }
+                    return 'rgba(255, 255, 255, 0.04)';
+                }
+            })
+            // Animated particle flows representing impact paths
+            .linkDirectionalParticles(link => {
+                if (viewMode === 'macro') {
+                    return link.type === 'cluster-cluster' ? 3 : 0;
+                } else {
+                    return link.type === 'feature-feature' ? 2 : 0;
+                }
+            })
+            .linkDirectionalParticleWidth(link => {
+                if (viewMode === 'macro') return 3.5;
+                return 1.8;
+            })
+            .linkDirectionalParticleSpeed(0.005)
+            
+            // Click interactions
+            .onNodeClick(node => {
+                selectNode(node);
+            })
+            .onBackgroundClick(() => {
+                deselectNode();
+            })
+            // Hover interactions
+            .onNodeHover(node => {
+                hoverNode(node);
+            });
+
+        // Configure Force simulation parameters
+        Graph.d3Force('charge').strength(-150);
+        Graph.d3Force('link').distance(link => {
+            if (link.type === 'cluster-feature') return 45;
+            if (link.type === 'cluster-cluster') return 120;
+            return 60; // feature-feature
+        });
+
+        // --- 5. CUSTOM 3D OBJECT RENDER (GLOWING SPHERES & TEXT SPRITES) ---
+        
+        Graph.nodeThreeObject(node => {
+            const group = new THREE.Group();
+            
+            // Sphere mesh sizing based on type
+            let radius = node.isCluster ? 12 : 5;
+            const sphereGeom = new THREE.SphereGeometry(radius, 24, 24);
+            
+            // Determine Node Color
+            let hexColor = '#ffffff';
+            if (node.isCluster) {
+                hexColor = node.color;
+            } else {
+                hexColor = node.built ? '#10B981' : '#F59E0B'; // Green vs Yellow
+            }
+            
+            const mat = new THREE.MeshStandardMaterial({
+                color: hexColor,
+                emissive: hexColor,
+                emissiveIntensity: node.isCluster ? 0.35 : 0.15,
+                roughness: 0.15,
+                metalness: 0.85,
+                transparent: true,
+                opacity: 1.0
+            });
+            
+            const sphere = new THREE.Mesh(sphereGeom, mat);
+            group.add(sphere);
+            
+            // Custom Label Sprite (Crisp 2D Billboard in 3D scene)
+            const textSprite = makeTextSprite(node.name, {
+                fontsize: node.isCluster ? 24 : 17,
+                fontWeight: node.isCluster ? 'bold' : 'normal',
+                textColor: '#ffffff',
+                bgColor: node.isCluster ? 'rgba(15,23,42,0.85)' : 'rgba(3,7,18,0.75)'
+            });
+            textSprite.position.y = node.isCluster ? 18 : 9;
+            group.add(textSprite);
+            
+            // Stash references directly on node structure for runtime property updates
+            node._sphere = sphere;
+            node._label = textSprite;
+            node._group = group;
+            
+            return group;
+        });
+
+        // --- 6. TEXT SPRITE HELPER FUNCTION ---
+        function makeTextSprite(message, params) {
+            const font = params.fontWeight + " " + params.fontsize + "px Inter, Outfit, sans-serif";
+            const canvas = document.createElement('canvas');
+            
+            // Set scale for high DPI crisp rendering
+            const scaleFactor = 2;
+            canvas.width = 320 * scaleFactor;
+            canvas.height = 70 * scaleFactor;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scaleFactor, scaleFactor);
+            
+            // Measure text width
+            ctx.font = font;
+            const metrics = ctx.measureText(message);
+            const textWidth = metrics.width;
+            
+            // Center box background dimensions
+            const padX = 14;
+            const padY = 8;
+            const boxW = textWidth + padX * 2;
+            const boxH = params.fontsize + padY * 2;
+            const boxX = (320 - boxW) / 2;
+            const boxY = (70 - boxH) / 2;
+            
+            // Draw glassmorphic label background bubble
+            ctx.fillStyle = params.bgColor || 'rgba(15,23,42,0.8)';
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+            } else {
+                ctx.rect(boxX, boxY, boxW, boxH);
+            }
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw Text
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            ctx.fillStyle = params.textColor || '#ffffff';
+            ctx.fillText(message, 160, 35);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            const spriteMat = new THREE.SpriteMaterial({ 
+                map: texture,
+                transparent: true
+            });
+            
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(36, 8, 1);
+            return sprite;
+        }
+
+        // --- 7. SEMANTIC ZOOMING TRACKER ENGINE ---
+        
+        // Frame listener checking zoom camera distance
+        setInterval(() => {
+            const camera = Graph.camera();
+            if (!camera) return;
+            
+            const dist = Math.round(Math.sqrt(
+                Math.pow(camera.position.x, 2) +
+                Math.pow(camera.position.y, 2) +
+                Math.pow(camera.position.z, 2)
+            ));
+            
+            document.getElementById('camera-dist-text').innerText = dist;
+            
+            // Automatic Zoom Level threshold transitions with hysteresis (zoom quite in to trigger micro)
+            const upperThreshold = 280; // Distance to switch back to clusters
+            const lowerThreshold = 220; // Distance to expand to features
+            if (dist > upperThreshold && viewMode === 'micro') {
+                setViewMode('macro', true);
+            } else if (dist <= lowerThreshold && viewMode === 'macro') {
+                setViewMode('micro', true);
+            }
+        }, 150);
+
+        // --- 8. MODE SWITCHING AND GRAPH REPAINTING ---
+        
+        function setViewMode(mode, isAuto = false) {
+            if (viewMode === mode) return;
+            viewMode = mode;
+            
+            // Update HUD controls active status
+            const btnMacro = document.getElementById('btn-macro-view');
+            const btnMicro = document.getElementById('btn-micro-view');
+            const zoomInd = document.getElementById('zoom-indicator');
+            
+            if (mode === 'macro') {
+                btnMacro.className = "py-1.5 px-2 rounded-lg border border-brandpurple bg-slate-950/80 text-[10px] font-medium text-white shadow-[0_0_8px_rgba(168,85,247,0.15)] hover:bg-slate-950 transition-all flex items-center justify-center space-x-1";
+                btnMicro.className = "py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/40 text-[10px] font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1";
+                zoomInd.className = "text-brandpurple font-bold";
+                zoomInd.innerText = "Macro";
+                
+                // Camera positioning adjustment if triggered manually
+                if (!isAuto) {
+                    const camera = Graph.camera();
+                    const scale = 340 / Math.sqrt(camera.position.x**2 + camera.position.y**2 + camera.position.z**2);
+                    Graph.cameraPosition({
+                        x: camera.position.x * scale,
+                        y: camera.position.y * scale,
+                        z: camera.position.z * scale
+                    }, { x: 0, y: 0, z: 0 }, 1000);
+                }
+            } else {
+                btnMicro.className = "py-1.5 px-2 rounded-lg border border-brandcyan bg-slate-950/80 text-[10px] font-medium text-white shadow-[0_0_8px_rgba(6,182,212,0.15)] hover:bg-slate-950 transition-all flex items-center justify-center space-x-1";
+                btnMacro.className = "py-1.5 px-2 rounded-lg border border-slate-800 bg-slate-900/40 text-[10px] font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1";
+                zoomInd.className = "text-brandcyan font-bold";
+                zoomInd.innerText = "Micro";
+                
+                // Camera positioning adjustment if triggered manually
+                if (!isAuto) {
+                    const camera = Graph.camera();
+                    const scale = 180 / Math.sqrt(camera.position.x**2 + camera.position.y**2 + camera.position.z**2);
+                    Graph.cameraPosition({
+                        x: camera.position.x * scale,
+                        y: camera.position.y * scale,
+                        z: camera.position.z * scale
+                    }, { x: 0, y: 0, z: 0 }, 1000);
+                }
+            }
+            
+            // Refresh visual representation values
+            repaintGraphVisuals();
+            
+            // Adjust zoom speed based on view mode (zoom faster in micro/feature view)
+            const controls = Graph.controls();
+            if (controls) {
+                controls.zoomSpeed = (mode === 'micro') ? 2.5 : 1.0;
+            }
+            
+            // Fast trigger link repaints without rebuilding the entire node canvas tree
+            Graph.linkWidth(Graph.linkWidth());
+            Graph.linkColor(Graph.linkColor());
+            Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
+        }
+
+        // Mutation updates on Three.js materials to execute smooth transitions without resets
+        function repaintGraphVisuals() {
+            nodesData.forEach(node => {
+                if (!node._group || !node._sphere || !node._label) return;
+                
+                if (viewMode === 'macro') {
+                    // Macro: Hide features entirely, display solid clusters
+                    if (!node.isCluster) {
+                        node._group.visible = false;
+                    } else {
+                        node._group.visible = true;
+                        node._sphere.material.opacity = 1.0;
+                        node._sphere.material.emissiveIntensity = 0.55;
+                        node._label.visible = true;
+                        node._label.scale.set(36, 8, 1);
+                    }
+                } else {
+                    // Micro: Render features fully, turn clusters into translucent envelopes
+                    node._group.visible = true;
+                    if (node.isCluster) {
+                        node._sphere.material.opacity = 0.15;
+                        node._sphere.material.emissiveIntensity = 0.05;
+                        node._label.visible = true;
+                        // Shrink cluster label in micro view to avoid crowding
+                        node._label.scale.set(22, 5, 1);
+                    } else {
+                        node._sphere.material.opacity = 1.0;
+                        node._sphere.material.emissiveIntensity = 0.2;
+                        node._label.visible = true;
+                        node._label.scale.set(30, 6.5, 1);
+                    }
+                }
+                
+                // Dim down non-highlighted items if search/hover filters exist
+                applySelectionOpacity(node);
+            });
+        }
+
+        function applySelectionOpacity(node) {
+            if (!node._sphere || !node._label) return;
+            
+            let targetOpacity = (viewMode === 'macro' && !node.isCluster) ? 0.0 : (node.isCluster ? 0.15 : 1.0);
+            if (viewMode === 'macro' && node.isCluster) targetOpacity = 1.0;
+            
+            if (selectedNode) {
+                // If node is selected, dim everything except selected node, and its connections
+                const isSelected = selectedNode.id === node.id;
+                const isConnected = isNodeConnected(selectedNode.id, node.id);
+                
+                if (!isSelected && !isConnected) {
+                    node._sphere.material.opacity = targetOpacity * 0.22;
+                    node._label.material.opacity = 0.22;
+                } else {
+                    node._sphere.material.opacity = targetOpacity;
+                    node._label.material.opacity = 1.0;
+                    if (isSelected && !node.isCluster) {
+                        node._sphere.material.emissiveIntensity = 0.6; // Glow focus
+                    }
+                }
+            } else if (hoveredNode) {
+                // If node is hovered, dim others
+                const isHovered = hoveredNode.id === node.id;
+                const isConnected = isNodeConnected(hoveredNode.id, node.id);
+                
+                if (!isHovered && !isConnected) {
+                    node._sphere.material.opacity = targetOpacity * 0.3;
+                    node._label.material.opacity = 0.3;
+                } else {
+                    node._sphere.material.opacity = targetOpacity;
+                    node._label.material.opacity = 1.0;
+                }
+            } else {
+                // No filters, restore normal
+                node._sphere.material.opacity = targetOpacity;
+                node._label.material.opacity = 1.0;
+            }
+        }
+
+        function isNodeConnected(idA, idB) {
+            if (idA === idB) return true;
+            // Check links
+            return linksData.some(link => {
+                const sId = link.source.id || link.source;
+                const tId = link.target.id || link.target;
+                return (sId === idA && tId === idB) || (sId === idB && tId === idA);
+            });
+        }
+
+        // --- 9. INTERACTIVE SELECTION ACTIONS ---
+        
+        function selectNode(node) {
+            selectedNode = node;
+            
+            // Focus and zoom camera to the node
+            const camera = Graph.camera();
+            const distance = Math.sqrt(camera.position.x**2 + camera.position.y**2 + camera.position.z**2);
+            
+            // Adjust camera focus depth depending on node type
+            const zoomDist = node.isCluster ? 260 : 160;
+            const factor = zoomDist / distance;
+            
+            Graph.cameraPosition(
+                { 
+                    x: node.x * 1.4 || camera.position.x * factor, 
+                    y: node.y * 1.4 || camera.position.y * factor, 
+                    z: node.z * 1.4 || camera.position.z * factor 
+                }, 
+                node, 
+                1200
+            );
+
+            // Populate Sidebar HUD details on the Right Panel
+            document.getElementById('detail-placeholder').classList.add('hidden');
+            const content = document.getElementById('detail-content');
+            content.classList.remove('hidden');
+            
+            document.getElementById('node-name').innerText = node.name;
+            
+            const categoryLabel = document.getElementById('node-category');
+            const clData = node.isCluster ? node : clusters[node.clusterId];
+            categoryLabel.innerText = clData ? clData.name : 'Unknown';
+            
+            // Category badges colors mapping
+            const categoryColors = {
+                ingestion: 'text-brandcyan bg-brandcyan/10 border-brandcyan/30',
+                detection: 'text-brandpurple bg-brandpurple/10 border-brandpurple/30',
+                optimization: 'text-brandemerald bg-brandemerald/10 border-brandemerald/30',
+                operations: 'text-brandrose bg-brandrose/10 border-brandrose/30',
+                gtm: 'text-brandpink bg-brandpink/10 border-brandpink/30',
+                security: 'text-brandblue bg-brandblue/10 border-brandblue/30'
+            };
+            categoryLabel.className = `text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${categoryColors[node.clusterId || node.id] || 'bg-slate-800'}`;
+
+            // Status Badge & Action buttons
+            const badge = document.getElementById('node-badge');
+            const toggleBtn = document.getElementById('toggle-status-btn');
+            
+            if (node.isCluster) {
+                badge.classList.add('hidden');
+                toggleBtn.classList.add('hidden');
+            } else {
+                badge.classList.remove('hidden');
+                toggleBtn.classList.remove('hidden');
+                
+                if (node.built) {
+                    badge.innerText = "Built (Green)";
+                    badge.className = "text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full glow-green bg-brandemerald/10 border border-brandemerald/40 text-brandemerald";
+                } else {
+                    badge.innerText = "Roadmap (Yellow)";
+                    badge.className = "text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full glow-yellow bg-brandyellow/10 border border-brandyellow/40 text-brandyellow";
+                }
+            }
+
+            // Description text
+            document.getElementById('node-desc').innerText = node.desc || node.description || '';
+            document.getElementById('node-why').innerText = node.why || '';
+            
+            // System Connections / Dependencies UI mapping
+            const impactContainer = document.getElementById('node-impact');
+            impactContainer.innerHTML = '';
+            
+            const nodeDeps = node.isCluster ? [] : (node.deps || []);
+            if (nodeDeps.length === 0) {
+                const span = document.createElement('span');
+                span.className = "text-[9px] px-2 py-0.5 rounded bg-slate-850 text-slate-500 italic";
+                span.innerText = "No system linkages";
+                impactContainer.appendChild(span);
+            } else {
+                nodeDeps.forEach(depId => {
+                    const targetNode = nodesData.find(nd => nd.id === depId);
+                    if (targetNode) {
+                        const span = document.createElement('span');
+                        span.className = `text-[9px] px-2 py-0.5 rounded cursor-pointer transition-colors ${targetNode.built ? 'bg-brandemerald/20 text-brandemerald hover:bg-brandemerald/30 border border-brandemerald/20' : 'bg-brandyellow/20 text-brandyellow hover:bg-brandyellow/30 border border-brandyellow/20'}`;
+                        span.innerText = targetNode.name;
+                        span.onclick = (e) => {
+                            e.stopPropagation();
+                            selectNode(targetNode);
+                        };
+                        impactContainer.appendChild(span);
+                    }
+                });
+            }
+
+            // Target user persona
+            document.getElementById('node-persona').innerText = node.persona || 'Developers, CTO';
+            
+            // Moat Multiplier Ratings
+            const moatContainer = document.getElementById('node-moat-rating');
+            moatContainer.innerHTML = '';
+            const rating = node.moat || 3;
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('i');
+                if (i <= rating) {
+                    star.className = "fa-solid fa-star";
+                } else {
+                    star.className = "fa-regular fa-star text-slate-600";
+                }
+                moatContainer.appendChild(star);
+            }
+
+            repaintGraphVisuals();
+            
+            // Re-render list elements to show active selection border
+            renderDirectory();
+        }
+
+        function deselectNode() {
+            selectedNode = null;
+            
+            // Hide detail card
+            document.getElementById('detail-placeholder').classList.remove('hidden');
+            document.getElementById('detail-content').classList.add('hidden');
+            
+            repaintGraphVisuals();
+            
+            // Remove active highlighting from sidebar index
+            renderDirectory();
+        }
+
+        function hoverNode(node) {
+            hoveredNode = node;
+            repaintGraphVisuals();
+            
+            // Cursor pointer adjustments on canvas nodes
+            document.getElementById('graph-3d').style.cursor = node ? 'pointer' : 'default';
+        }
+
+        // Toggle feature built status
+        function toggleSelectedNodeStatus() {
+            if (!selectedNode || selectedNode.isCluster) return;
+            
+            selectedNode.built = !selectedNode.built;
+            
+            // Sync with local memory copy
+            const featMem = features.find(f => f.id === selectedNode.id);
+            if (featMem) featMem.built = selectedNode.built;
+            
+            // Color spheres in real-time
+            let hexColor = selectedNode.built ? '#10B981' : '#F59E0B';
+            if (selectedNode._sphere) {
+                selectedNode._sphere.material.color.set(hexColor);
+                selectedNode._sphere.material.emissive.set(hexColor);
+            }
+            
+            // Save state to localStorage & redraw stats count + sidebar details
+            saveStates();
+            selectNode(selectedNode);
+        }
+
+        function resetAllStatuses() {
+            if (confirm("Reset roadmap states back to default (Aurex current features vs future features)?")) {
+                localStorage.removeItem('aurex_features_states');
+                
+                // Reload memory copy
+                features = JSON.parse(JSON.stringify(featuresDefault));
+                
+                // Repaint Three.js spheres
+                nodesData.forEach(n => {
+                    if (n.isCluster) return;
+                    const defState = featuresDefault.find(fd => fd.id === n.id);
+                    if (defState) {
+                        n.built = defState.built;
+                        if (n._sphere) {
+                            const col = n.built ? '#10B981' : '#F59E0B';
+                            n._sphere.material.color.set(col);
+                            n._sphere.material.emissive.set(col);
+                        }
+                    }
+                });
+                
+                saveStates();
+                deselectNode();
+            }
+        }
+
+        // --- 10. DIRECTORY LIST RENDER (LEFT SIDEBAR NAVIGATION) ---
+        
+        function renderDirectory() {
+            const container = document.getElementById('directory-container');
+            container.innerHTML = '';
+            
+            const catFilter = document.getElementById('filter-category').value;
+            const statusFilter = document.getElementById('filter-status').value;
+            
+            Object.values(clusters).forEach(cluster => {
+                // Category Filter
+                if (catFilter !== 'all' && catFilter !== cluster.id) return;
+                
+                // Get features in this category
+                const clusterFeatures = features.filter(f => f.clusterId === cluster.id);
+                
+                // Filter features by Status Filter
+                const filteredFeatures = clusterFeatures.filter(f => {
+                    if (statusFilter === 'all') return true;
+                    if (statusFilter === 'built') return f.built;
+                    if (statusFilter === 'future') return !f.built;
+                    return true;
+                });
+                
+                // Skip rendering empty categories if filtering status
+                if (filteredFeatures.length === 0 && statusFilter !== 'all') return;
+                
+                // Create Directory Section
+                const section = document.createElement('div');
+                section.className = "space-y-1";
+                
+                // Directory Category Header (Cluster Focus Trigger)
+                const header = document.createElement('div');
+                header.className = `flex items-center justify-between text-[11px] font-semibold px-2 py-1.5 rounded-lg cursor-pointer hover:bg-slate-900/40 text-slate-200 transition-colors group ${selectedNode && selectedNode.id === cluster.id ? 'bg-slate-900/50 border border-slate-800' : ''}`;
+                
+                header.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full" style="background-color: ${cluster.color}"></span>
+                        <span class="font-display tracking-wide uppercase">${cluster.name}</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 group-hover:text-slate-300 transition-transform"></i>
+                `;
+                
+                header.onclick = () => {
+                    const clNode = nodesData.find(n => n.id === cluster.id && n.isCluster);
+                    if (clNode) selectNode(clNode);
+                };
+                
+                section.appendChild(header);
+                
+                // List of sub-features
+                const list = document.createElement('div');
+                list.className = "pl-3 space-y-0.5 border-l border-slate-800/40 ml-3.5 mt-0.5";
+                
+                filteredFeatures.forEach(feat => {
+                    const item = document.createElement('div');
+                    const isSelected = selectedNode && selectedNode.id === feat.id;
+                    item.className = `flex items-center justify-between text-[10px] px-2 py-1 rounded-md cursor-pointer transition-colors ${isSelected ? 'bg-slate-800 text-white font-medium shadow-[0_0_8px_rgba(255,255,255,0.03)]' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'}`;
+                    
+                    const dotColor = feat.built ? 'bg-brandemerald' : 'bg-brandyellow';
+                    
+                    item.innerHTML = `
+                        <div class="flex items-center space-x-2 truncate">
+                            <span class="w-1.5 h-1.5 rounded-full ${dotColor} ${feat.built ? 'glow-green' : 'glow-yellow'} shrink-0"></span>
+                            <span class="truncate">${feat.name}</span>
+                        </div>
+                        ${feat.built ? '<i class="fa-solid fa-circle-check text-[9px] text-brandemerald/80 ml-1"></i>' : ''}
+                    `;
+                    
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        const fNode = nodesData.find(n => n.id === feat.id && !n.isCluster);
+                        if (fNode) selectNode(fNode);
+                    };
+                    
+                    list.appendChild(item);
+                });
+                
+                section.appendChild(list);
+                container.appendChild(section);
+            });
+        }
+
+        // Render initially
+        renderDirectory();
+
+        // --- 11. SEARCH AND FILTER FUNCTIONALITY ---
+        
+        function handleSearch() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            const clearBtn = document.getElementById('search-clear-btn');
+            
+            if (query.length > 0) {
+                clearBtn.classList.remove('hidden');
+                
+                // Find node matching name or description
+                const matchedNode = nodesData.find(node => {
+                    const matchesName = node.name.toLowerCase().includes(query);
+                    const matchesDesc = (node.desc || node.description || '').toLowerCase().includes(query);
+                    return matchesName || matchesDesc;
+                });
+                
+                if (matchedNode) {
+                    selectedNode = matchedNode;
+                    repaintGraphVisuals();
+                }
+            } else {
+                clearBtn.classList.add('hidden');
+                selectedNode = null;
+                repaintGraphVisuals();
+            }
+            
+            renderDirectory();
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('search-clear-btn').classList.add('hidden');
+            deselectNode();
+        }
+
+        function applyFilters() {
+            const cat = document.getElementById('filter-category').value;
+            const status = document.getElementById('filter-status').value;
+            
+            nodesData.forEach(node => {
+                if (!node._group) return;
+                
+                let matchesCategory = (cat === 'all') || (node.clusterId === cat) || (node.id === cat);
+                let matchesStatus = (status === 'all') || 
+                                    (status === 'built' && node.built) || 
+                                    (status === 'future' && !node.built);
+                
+                if (node.isCluster) matchesStatus = true; // Categories stay on canvas
+                
+                if (matchesCategory && matchesStatus) {
+                    node._group.visible = true;
+                    if (viewMode === 'macro' && !node.isCluster) {
+                        node._group.visible = false;
+                    }
+                } else {
+                    node._group.visible = false;
+                }
+            });
+            
+            renderDirectory();
+        }
+
+        // --- 12. GRAPH SIMULATION STATE CONTROLS ---
+        
+        function toggleForce() {
+            forceRunning = !forceRunning;
+            const icon = document.getElementById('force-icon');
+            const txt = document.getElementById('force-text');
+            
+            if (forceRunning) {
+                Graph.resumeAnimation();
+                icon.className = "fa-solid fa-pause";
+                txt.innerText = "Freeze Layout";
+            } else {
+                Graph.pauseAnimation();
+                icon.className = "fa-solid fa-play text-brandemerald";
+                txt.innerText = "Resume Physics";
+            }
+        }
+
+        function resetGraphView() {
+            Graph.cameraPosition({ x: 0, y: 0, z: 340 }, { x: 0, y: 0, z: 0 }, 1000);
+            deselectNode();
+        }
+
+        // Triggers initial camera position fly-in
+        setTimeout(() => {
+            resetGraphView();
+        }, 1200);
+
+        // --- 13. SIDEBAR DOCK COLLAPSIBILITY HANDLERS ---
+        let leftNavCollapsed = false;
+        let rightNavCollapsed = false;
+
+        function toggleLeftNav() {
+            leftNavCollapsed = !leftNavCollapsed;
+            const leftNav = document.getElementById('left-nav');
+            const expandBtn = document.getElementById('left-nav-expand-btn');
+            const overlays = document.querySelectorAll('.left-shiftable');
+            
+            if (leftNavCollapsed) {
+                leftNav.classList.add('-translate-x-[360px]');
+                expandBtn.classList.remove('hidden');
+                overlays.forEach(el => {
+                    el.classList.remove('left-[350px]');
+                    el.classList.add('left-5');
+                });
+            } else {
+                leftNav.classList.remove('-translate-x-[360px]');
+                expandBtn.classList.add('hidden');
+                overlays.forEach(el => {
+                    el.classList.remove('left-5');
+                    el.classList.add('left-[350px]');
+                });
+            }
+        }
+
+        function toggleRightNav() {
+            rightNavCollapsed = !rightNavCollapsed;
+            const rightNav = document.getElementById('right-nav');
+            const expandBtn = document.getElementById('right-nav-expand-btn');
+            
+            if (rightNavCollapsed) {
+                rightNav.classList.add('translate-x-[400px]');
+                expandBtn.classList.remove('hidden');
+            } else {
+                rightNav.classList.remove('translate-x-[400px]');
+                expandBtn.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
