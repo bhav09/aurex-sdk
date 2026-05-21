@@ -1,0 +1,42 @@
+[
+  {
+    "id": "req_01j1a",
+    "timestamp": "2026-05-20T22:00:01Z",
+    "model": "gemini-1.5-flash",
+    "prompt": "How do I fix a React useEffect memory leak?",
+    "response": "To fix a React useEffect memory leak, you should return a cleanup function in your useEffect.",
+    "input_token_count": 128,
+    "candidates_token_count": 450,
+    "status_code": 200
+  },
+  {
+    "id": "req_01j1b",
+    "timestamp": "2026-05-20T22:01:05Z",
+    "model": "gemini-1.5-pro",
+    "prompt": "Write a fast sorting algorithm in TypeScript.",
+    "response": "Here is the implementation of QuickSort in TypeScript:\n\n```typescript\nfunction quickSort(arr: number[]): number[] { ... }\n```",
+    "input_token_count": 95,
+    "candidates_token_count": 680,
+    "status_code": 200
+  },
+  {
+    "id": "req_01j1c",
+    "timestamp": "2026-05-20T22:02:12Z",
+    "model": "gemini-1.5-flash",
+    "prompt": "Explain rate limiting.",
+    "response": "Rate limiting is a strategy for limiting network traffic. It puts a cap on how often someone can repeat an action.",
+    "input_token_count": 42,
+    "candidates_token_count": 120,
+    "status_code": 200
+  },
+  {
+    "id": "req_01j1d",
+    "timestamp": "2026-05-20T22:03:00Z",
+    "model": "gemini-1.5-flash",
+    "prompt": "How do I fix a React useEffect memory leak?",
+    "response": "To fix a React useEffect memory leak, you should return a cleanup function in your useEffect.",
+    "input_token_count": 128,
+    "candidates_token_count": 450,
+    "status_code": 200
+  }
+]
