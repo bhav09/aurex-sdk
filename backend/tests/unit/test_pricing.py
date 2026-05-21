@@ -63,3 +63,24 @@ class TestPricingUtils:
         )
         assert abs(cost - 17.535) < 1e-4
 
+        # Test OpenAI GPT-4o cache read (0.50x) & creation (1.00x)
+        cost_openai = calculate_cost(
+            model="gpt-4o",
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
+            cache_read_tokens=200_000,
+            cache_creation_tokens=100_000
+        )
+        assert abs(cost_openai - 12.25) < 1e-4
+
+        # Test Google Gemini 1.5 Pro cache read (0.25x) & creation (1.00x)
+        cost_google = calculate_cost(
+            model="gemini-1.5-pro",
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
+            cache_read_tokens=200_000,
+            cache_creation_tokens=100_000
+        )
+        assert abs(cost_google - 6.0625) < 1e-4
+
+

@@ -43,7 +43,7 @@ const TABLE: Record<string, PriceKey> = {
   "claude-3-sonnet": { inputPerMillion: 3, outputPerMillion: 15 },
   "claude-3-5-haiku": { inputPerMillion: 0.8, outputPerMillion: 4 },
   "claude-3-haiku": { inputPerMillion: 0.25, outputPerMillion: 1.25 },
-  default: { inputPerMillion: 3, outputPerMillion: 12 },
+  default: { inputPerMillion: 1.5, outputPerMillion: 6 },
 };
 
 function lookupEmbedded(model: string): PriceKey {

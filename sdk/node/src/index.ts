@@ -19,6 +19,10 @@ export interface AurexEvent {
   model: string;
   input_tokens: number;
   output_tokens: number;
+  cached_tokens: number;
+  cache_write_tokens: number;
+  reasoning_tokens: number;
+  is_batch: boolean;
   total_tokens: number;
   cost: number;
   workflow_id?: string;
@@ -66,6 +70,11 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 
 export function normalizeModelName(m: string): string {
   let model = m.trim().toLowerCase();
+  // Strip fine-tuned model prefixes (e.g. "ft:gpt-4o-mini-2024-07-18:my-org::abc123" → base model)
+  const ftMatch = model.match(/^ft:([^:]+)/);
+  if (ftMatch) {
+    model = ftMatch[1];
+  }
   // Remove common prefixes
   model = model.replace(/^(models\/|publishers\/google\/models\/|anthropic\.|amazon\.|bedrock\/)/g, "");
   model = model.replace(/[\s_]+/g, "-");
@@ -73,7 +82,7 @@ export function normalizeModelName(m: string): string {
 }
 
 export function getModelPricing(model: string): [number, number] {
-  if (!model) return [3.00, 12.00];
+  if (!model) return [1.50, 6.00];
   const queryNorm = normalizeModelName(model);
   const pricing = MODEL_PRICING[queryNorm];
   if (pricing) return [pricing.input, pricing.output];
@@ -84,12 +93,58 @@ export function getModelPricing(model: string): [number, number] {
       return [MODEL_PRICING[key].input, MODEL_PRICING[key].output];
     }
   }
-  return [15.00, 60.00];
+  // Moderate fallback — avoids extreme overcharging for unknown/new models
+  return [1.50, 6.00];
 }
 
-export function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
+/**
+ * Cache-aware cost calculation.
+ * @param cachedTokens - tokens served from provider cache
+ * @param cacheWriteTokens - tokens written to cache
+ * @param isBatch - if true, applies 50% discount (OpenAI Batch API)
+ */
+export function calculateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cachedTokens: number = 0,
+  cacheWriteTokens: number = 0,
+  isBatch: boolean = false,
+): number {
   const [inputPrice, outputPrice] = getModelPricing(model);
-  return (inputTokens / 1_000_000 * inputPrice) + (outputTokens / 1_000_000 * outputPrice);
+  const provider = extractProvider(model);
+  
+  const nonCachedInput = Math.max(0, inputTokens - cachedTokens - cacheWriteTokens);
+  
+  let cacheReadMult = 1.0;
+  let cacheCreateMult = 1.0;
+  
+  if (provider === "anthropic") {
+    cacheReadMult = 0.10;
+    cacheCreateMult = 1.25;
+  } else if (provider === "openai") {
+    cacheReadMult = 0.50;
+    cacheCreateMult = 1.0;
+  } else if (provider === "google") {
+    cacheReadMult = 0.25;
+    cacheCreateMult = 1.0;
+  } else {
+    cacheReadMult = 0.25;
+    cacheCreateMult = 1.0;
+  }
+  
+  let cost = (
+    (nonCachedInput / 1_000_000 * inputPrice) +
+    (cachedTokens / 1_000_000 * inputPrice * cacheReadMult) +
+    (cacheWriteTokens / 1_000_000 * inputPrice * cacheCreateMult) +
+    (outputTokens / 1_000_000 * outputPrice)
+  );
+  
+  if (isBatch) {
+    cost *= 0.50; // 50% Batch API discount
+  }
+  
+  return cost;
 }
 
 export function extractProvider(model: string): string {
@@ -159,13 +214,21 @@ export class AurexAuditor {
     response?: string;
     inputTokens?: number;
     outputTokens?: number;
+    cachedTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
+    isBatch?: boolean;
     workflowId?: string;
     systemPrompt?: string;
     extraMetadata?: Record<string, any>;
   }) {
     const inputT = params.inputTokens || 0;
     const outputT = params.outputTokens || 0;
-    const cost = calculateCost(params.model, inputT, outputT);
+    const cachedT = params.cachedTokens || 0;
+    const cacheWriteT = params.cacheWriteTokens || 0;
+    const reasoningT = params.reasoningTokens || 0;
+    const isBatch = params.isBatch || false;
+    const cost = calculateCost(params.model, inputT, outputT, cachedT, cacheWriteT, isBatch);
     const provider = extractProvider(params.model);
 
     const event: AurexEvent = {
@@ -174,6 +237,10 @@ export class AurexAuditor {
       model: params.model,
       input_tokens: inputT,
       output_tokens: outputT,
+      cached_tokens: cachedT,
+      cache_write_tokens: cacheWriteT,
+      reasoning_tokens: reasoningT,
+      is_batch: isBatch,
       total_tokens: inputT + outputT,
       cost,
       workflow_id: params.workflowId,

@@ -318,6 +318,13 @@ async def upload_csv(
     from datetime import datetime
     import uuid
     from src.utils.pricing import calculate_cost, extract_provider_from_model
+    from sqlalchemy import delete
+    from src.models import LLMEvent
+    
+    # Delete existing events for the session_id to allow clean re-upload and prevent duplicate sessions
+    if session_id:
+        await db.execute(delete(LLMEvent).where(LLMEvent.upload_session_id == session_id))
+        await db.commit()
     
     contents = await file.read()
     filename = file.filename.lower()
@@ -353,6 +360,7 @@ async def upload_csv(
             return 0
             
     events_inserted = 0
+    seen_in_file = set()
     import json
     
     for chunk in chunks:
@@ -558,6 +566,21 @@ async def upload_csv(
             extra_metadata["cache_read_tokens"] = cache_read_tokens
             extra_metadata["cache_creation_tokens"] = cache_creation_tokens
 
+            prompt_val = str(row.get("prompt")) if "prompt" in row and pd.notna(row["prompt"]) else None
+            response_val = str(row.get("response")) if "response" in row and pd.notna(row["response"]) else None
+            
+            # File-level duplicate check (timestamp, model, input_tokens, output_tokens, first 200 chars of prompt)
+            fingerprint = (
+                ts_val.isoformat() if hasattr(ts_val, "isoformat") else str(ts_val),
+                model_val,
+                input_tokens,
+                output_tokens,
+                prompt_val[:200] if prompt_val else None
+            )
+            if fingerprint in seen_in_file:
+                continue
+            seen_in_file.add(fingerprint)
+            
             from src.models import LLMEvent
             event = LLMEvent(
                 id=str(uuid.uuid4()),
@@ -570,8 +593,8 @@ async def upload_csv(
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
                 cost=cost_val,
-                prompt=str(row.get("prompt")) if "prompt" in row and pd.notna(row["prompt"]) else None,
-                response=str(row.get("response")) if "response" in row and pd.notna(row["response"]) else None,
+                prompt=prompt_val,
+                response=response_val,
                 system_prompt_hash=system_prompt_hash,
                 context_length=context_length,
                 extra_metadata=extra_metadata
