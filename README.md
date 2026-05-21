@@ -1,4 +1,4 @@
-# Lumina / Aurex
+# Lumina / Aurex 
 
 **Analyze LLM usage, surface waste, and estimate savings — two complementary stacks in one repository.**
 
