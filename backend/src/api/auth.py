@@ -33,22 +33,41 @@ class MockRedis:
     def __init__(self):
         self.store = {}
         self.lists = {}
+        self.expiry = {}
+    
+    def _check_expiry(self, key):
+        if key in self.expiry and time.time() > self.expiry[key]:
+            self.store.pop(key, None)
+            self.lists.pop(key, None)
+            self.expiry.pop(key, None)
+            
     async def get(self, key):
+        self._check_expiry(key)
         return self.store.get(key)
+        
     async def setex(self, key, ttl, value):
         self.store[key] = value
+        self.expiry[key] = time.time() + ttl
+        
     async def delete(self, key):
         self.store.pop(key, None)
         self.lists.pop(key, None)
+        self.expiry.pop(key, None)
+        
     async def lrange(self, key, start, end):
+        self._check_expiry(key)
         return self.lists.get(key, [])
+        
     async def rpush(self, key, *values):
+        self._check_expiry(key)
         if key not in self.lists:
             self.lists[key] = []
         self.lists[key].extend(values)
         return len(self.lists[key])
+        
     async def expire(self, key, ttl):
-        pass
+        self.expiry[key] = time.time() + ttl
+        return 1
 
 class SmartRedis:
     def __init__(self, redis_url: str):

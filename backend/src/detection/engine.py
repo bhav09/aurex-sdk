@@ -165,7 +165,9 @@ class EnhancedDetectionEngine:
                 self.events = []
                 return
         else:
-            query = select(LLMEvent)
+            # Prevent tenant isolation bypass: do not load all events
+            self.events = []
+            return
             
         result = await self.db.execute(query)
         self.events = result.scalars().all()
