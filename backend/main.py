@@ -67,9 +67,8 @@ app = FastAPI(
 # Instrument FastAPI for OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
 
-# Configure rate limiter with Redis backend
-REDIS_URL = getattr(settings, "redis_url", "redis://localhost:6379/0")
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"], storage_uri=REDIS_URL)
+# Configure rate limiter with in-memory storage to avoid Redis connection issues locally
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)

@@ -200,10 +200,14 @@ npm run build
 
 Deploy the **`dist/`** directory to any static host (S3, Cloudflare Pages, Netlify, GitHub Pages, etc.).
 
-### Features (high level)
+---
 
+## Features (High Level)
+
+- **Temporal clustering & statistical heuristics** (Aurex backend) to infer sessions and detect waste on generic provider CSVs that lack `Automation ID` or `system_prompt` labels.
+- **Founder-focused insights** (Aurex UI) with clear executive summaries, projected annual savings, exact mathematical waste models, and engineering effort/confidence scores.
 - **Exact + semantic redundancy** (semantic via local embeddings).  
-- **Time-bucket “runaway”** spend signals, model-mismatch heuristics, Token Credit Score-style readout.  
+- **Time-bucket “runaway”** spend signals, model-mismatch heuristics, and Token Credit Score-style readouts.  
 - **D3** timeline and donut charts.  
 - **LangSmith / Helicone** optional pull via user-supplied keys in the browser.  
 - **A/B replay** (optional user OpenAI key): replay a flagged prompt against a cheaper model and compare output in the UI.

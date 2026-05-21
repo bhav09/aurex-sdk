@@ -10,7 +10,7 @@ export type WorkerMessage =
   | { type: "error"; message: string };
 
 self.onmessage = async (e) => {
-  const { file, revenueUSD } = e.data;
+  const { file, revenueUSD, userMapping } = e.data;
   
   if (!(file instanceof File)) {
     self.postMessage({ type: "error", message: "Invalid file object received." });
@@ -21,6 +21,7 @@ self.onmessage = async (e) => {
   
   try {
     runIngestionPipeline(file, {
+      userMapping,
       onProgress: (rowsProcessed) => {
         self.postMessage({ type: "progress", rowsProcessed });
       },

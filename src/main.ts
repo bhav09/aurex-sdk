@@ -13,6 +13,8 @@ import { initModelCatalog } from "./catalog";
 import { renderTimelineChart, renderDonutChart } from "./charts";
 import { fetchLangSmithLogs, fetchHeliconeLogs } from "./integrations";
 import { fetchCheaperModel } from "./ab-replay";
+import { selectNormalizer } from "./ingestion/pipeline";
+import type { UserColumnMapping } from "./ingestion/normalizers/user_mapped_csv";
 import sampleCsvRaw from "./demo/sample-usage.csv?raw";
 import "./styles.css";
 
@@ -104,7 +106,8 @@ function buildAudit(records: Record<string, unknown>[], revenue?: number): Audit
 function handleFile(
   file: File,
   revenueStr: string,
-  onProgress: (progress: string | number) => void
+  onProgress: (progress: string | number) => void,
+  userMapping?: UserColumnMapping
 ): Promise<Parsed> {
   return new Promise((resolve, reject) => {
     const revenue = revenueStr.trim() === "" ? undefined : Number(revenueStr.replace(/[^0-9.-]/g, ""));
@@ -130,7 +133,7 @@ function handleFile(
       reject(new Error(`Worker error: ${err.message}`));
     };
     
-    worker.postMessage({ file, revenueUSD: rev });
+    worker.postMessage({ file, revenueUSD: rev, userMapping });
   });
 }
 
@@ -496,7 +499,137 @@ function render(): void {
     });
   }
 
-  async function processFile(file: File): Promise<void> {
+  async function sniffHeaders(file: File): Promise<string[]> {
+    if (file.name.toLowerCase().endsWith('.json')) return [];
+    return new Promise((resolve) => {
+      Papa.parse(file, {
+        header: true,
+        preview: 5,
+        complete: (results) => {
+          resolve(results.meta.fields || Object.keys(results.data[0] || {}));
+        },
+        error: () => resolve([])
+      });
+    });
+  }
+
+  function showMappingModal(headers: string[], file: File, onMap: (mapping: UserColumnMapping) => void, onCancel: () => void) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    
+    const optionsHtml = headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join("");
+    const tagOptionsHtml = headers.map(h => `<div class="tag-option" data-val="${esc(h)}">${esc(h)}</div>`).join("");
+
+    overlay.innerHTML = `
+      <div class="modal-content honey-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Map Custom Columns</h3>
+        </div>
+        <div class="modal-body">
+          <p class="muted-note">We couldn't automatically detect the standard columns in <strong>${esc(file.name)}</strong>. Please map them below.</p>
+          
+          <div class="field">
+            <label>Timestamp Column <span style="color:var(--danger)">*</span></label>
+            <select id="map-timestamp" required>
+              <option value="">-- Select --</option>
+              ${optionsHtml}
+            </select>
+          </div>
+          
+          <div class="field">
+            <label>Model Column <span style="color:var(--danger)">*</span></label>
+            <select id="map-model" required>
+              <option value="">-- Select --</option>
+              ${optionsHtml}
+            </select>
+          </div>
+          
+          <div class="field">
+            <label>Input Tokens <span style="color:var(--danger)">*</span> <span class="muted-note">(Select multiple if split across caches)</span></label>
+            <div class="tag-selector" id="map-inputs">
+              ${tagOptionsHtml}
+            </div>
+            <p class="microcopy" style="margin-top:0.25rem;">Selected tags will be summed up.</p>
+          </div>
+          
+          <div class="field">
+            <label>Output Tokens <span style="color:var(--danger)">*</span></label>
+            <select id="map-output" required>
+              <option value="">-- Select --</option>
+              ${optionsHtml}
+            </select>
+          </div>
+          
+          <div class="field">
+            <label>Total Tokens <span class="muted-note">(Optional)</span></label>
+            <select id="map-total">
+              <option value="">-- Select --</option>
+              ${optionsHtml}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" id="map-cancel">Cancel</button>
+          <button type="button" class="btn btn-honey" id="map-submit">Apply Mapping</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const inputTags = overlay.querySelectorAll<HTMLDivElement>("#map-inputs .tag-option");
+    inputTags.forEach(tag => {
+      tag.addEventListener("click", () => {
+        tag.classList.toggle("selected");
+      });
+    });
+
+    overlay.querySelector("#map-cancel")?.addEventListener("click", () => {
+      document.body.removeChild(overlay);
+      onCancel();
+    });
+
+    overlay.querySelector("#map-submit")?.addEventListener("click", () => {
+      const ts = (overlay.querySelector("#map-timestamp") as HTMLSelectElement).value;
+      const mod = (overlay.querySelector("#map-model") as HTMLSelectElement).value;
+      const out = (overlay.querySelector("#map-output") as HTMLSelectElement).value;
+      const tot = (overlay.querySelector("#map-total") as HTMLSelectElement).value;
+      
+      const inps = Array.from(overlay.querySelectorAll<HTMLDivElement>("#map-inputs .tag-option.selected")).map(t => t.dataset.val!);
+
+      if (!ts || !mod || !out || inps.length === 0) {
+        alert("Please map Timestamp, Model, Input Tokens, and Output Tokens.");
+        return;
+      }
+
+      document.body.removeChild(overlay);
+      onMap({
+        timestamp: ts,
+        model: mod,
+        inputTokens: inps,
+        outputTokens: out,
+        totalTokens: tot || undefined
+      });
+    });
+  }
+
+  async function processFile(file: File, userMapping?: UserColumnMapping): Promise<void> {
+    if (!userMapping && !file.name.toLowerCase().endsWith('.json')) {
+      const headers = await sniffHeaders(file);
+      if (headers.length > 0) {
+        const norm = selectNormalizer(headers);
+        if (!norm) {
+          // Needs manual mapping
+          showMappingModal(headers, file, (mapping) => {
+            void processFile(file, mapping);
+          }, () => {
+            reportRoot.innerHTML = `<div class="panel warnings honey-card">Upload cancelled.</div>`;
+          });
+          return;
+        }
+      }
+    }
+
     reportRoot.innerHTML = `<div class="panel panel-loading honey-card">
       <div style="text-align:center; padding:2rem;">
         <p style="color:var(--text); font-weight:600; margin-bottom: 0.5rem;">Streaming File Locally</p>
@@ -510,7 +643,7 @@ function render(): void {
         if (progressEl) {
           progressEl.textContent = typeof rowsProcessed === "number" ? `Parsed ${fmtNum(rowsProcessed)} rows...` : String(rowsProcessed);
         }
-      });
+      }, userMapping);
       renderReport(reportRoot, state, unlocked, { mode: "user" });
       reportRoot.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
