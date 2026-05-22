@@ -49,7 +49,7 @@ def _fetch(url: str, timeout: float = 30.0) -> str:
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "Aurex-Pricing-Scraper/1.0 (https://github.com/bhav09/lumina-token)",
+            "User-Agent": "Aurex-Pricing-Scraper/1.0 (https://github.com/bhav09/tbank)",
             "Accept": "text/html,application/xhtml+xml",
         },
     )

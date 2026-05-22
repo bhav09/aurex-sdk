@@ -83,4 +83,25 @@ class TestPricingUtils:
         )
         assert abs(cost_google - 6.0625) < 1e-4
 
+    def test_pricing_overrides_integration(self):
+        overrides = {
+            "gpt-4o": (1.00, 4.00),
+            "claude-3-5-sonnet": (2.00, 8.00)
+        }
+        
+        # Test override matches
+        input_price, output_price = get_model_pricing("gpt-4o", pricing_overrides=overrides)
+        assert input_price == 1.00
+        assert output_price == 4.00
+        
+        # Test substring override matches
+        input_price_sub, output_price_sub = get_model_pricing("claude-3-5-sonnet-20241022", pricing_overrides=overrides)
+        assert input_price_sub == 2.00
+        assert output_price_sub == 8.00
+        
+        # Test cost calculation uses override
+        cost = calculate_cost("gpt-4o", 1_000_000, 1_000_000, pricing_overrides=overrides)
+        assert cost == 1.00 + 4.00
+
+
 

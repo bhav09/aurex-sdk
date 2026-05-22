@@ -15,11 +15,15 @@ class LocalHeuristicsEngine:
     Runs entirely offline on the local ledger dataset.
     """
     
-    def __init__(self, ledger_path: str):
-        self.ledger_path = ledger_path
-        self.events: List[Dict[str, Any]] = []
+    def __init__(self, ledger_path_or_events: Any):
         self.issues: List[Dict[str, Any]] = []
-        self.load_ledger()
+        self.events: List[Dict[str, Any]] = []
+        if isinstance(ledger_path_or_events, list):
+            self.ledger_path = None
+            self.events = list(ledger_path_or_events)
+        else:
+            self.ledger_path = ledger_path_or_events
+            self.load_ledger()
 
     def load_ledger(self):
         """Read all JSONL lines from the local ledger"""
@@ -94,8 +98,10 @@ class LocalHeuristicsEngine:
 
     def _get_inferred_sessions(self) -> Dict[str, List[Tuple[str, Dict[str, Any]]]]:
         """Group ledger events into workflow sessions using timestamps (5-min fallback)"""
+        gap_seconds = int(os.getenv("SESSION_GAP_SECONDS", "300"))
         sessions = defaultdict(list)
-        unassigned = []
+        unassigned_with_user = []
+        unassigned_without_user = []
 
         # Parse and sort events
         parsed_events = []
@@ -116,27 +122,62 @@ class LocalHeuristicsEngine:
             if not wf_id and e.get("extra_metadata"):
                 wf_id = e.get("extra_metadata", {}).get("session_id")
                 
+            if wf_id and str(wf_id).startswith("inferred_"):
+                wf_id = None
+                
             if wf_id:
+                e["session_confidence"] = "high"
                 sessions[wf_id].append((eid, e))
             else:
-                unassigned.append((ts, eid, e))
+                user_id = None
+                if e.get("extra_metadata"):
+                    user_id = e.get("extra_metadata", {}).get("user_id")
+                if user_id:
+                    unassigned_with_user.append((ts, eid, e, str(user_id)))
+                else:
+                    unassigned_without_user.append((ts, eid, e))
 
-        # Perform temporal clustering (5-minute inactivity threshold)
-        if unassigned:
-            # Group by model type to represent independent pipelines
-            model_groups = defaultdict(list)
-            for ts, eid, e in unassigned:
-                model_groups[e.get("model")].append((ts, eid, e))
-
-            for model, evs in model_groups.items():
+        # Group by (model, user_id)
+        if unassigned_with_user:
+            user_groups = defaultdict(list)
+            for ts, eid, e, uid in unassigned_with_user:
+                user_groups[(e.get("model", "unknown"), uid)].append((ts, eid, e))
+                
+            for (model, uid), evs in user_groups.items():
                 current_session_id = None
                 last_time = None
-
                 for ts, eid, e in evs:
-                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > 300:
-                        current_session_id = f"inferred_session_{uuid.uuid4().hex[:8]}"
-                    
+                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > gap_seconds:
+                        current_session_id = f"inferred_user_{uuid.uuid4().hex[:8]}"
                     e["workflow_id"] = current_session_id
+                    e["session_confidence"] = "medium"
+                    sessions[current_session_id].append((eid, e))
+                    last_time = ts
+
+        # Group by (model, token_bucket)
+        if unassigned_without_user:
+            def get_token_bucket(tokens):
+                if tokens < 500:
+                    return "0-500"
+                elif tokens < 2000:
+                    return "500-2000"
+                elif tokens < 10000:
+                    return "2000-10000"
+                return "10000+"
+
+            bucket_groups = defaultdict(list)
+            for ts, eid, e in unassigned_without_user:
+                bucket = get_token_bucket(e.get("input_tokens", 0))
+                bucket_groups[(e.get("model", "unknown"), bucket)].append((ts, eid, e))
+
+            for (model, bucket), evs in bucket_groups.items():
+                current_session_id = None
+                last_time = None
+                for ts, eid, e in evs:
+                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > gap_seconds:
+                        current_session_id = f"inferred_bucket_{uuid.uuid4().hex[:8]}"
+                    e["workflow_id"] = current_session_id
+                    e["session_confidence"] = "low"
                     sessions[current_session_id].append((eid, e))
                     last_time = ts
 
@@ -152,21 +193,23 @@ class LocalHeuristicsEngine:
             if phash:
                 prompts[phash].append((eid, e))
 
-        # 2. Fallback: identical input token counts in inferred sessions
+        # 2. Fallback: identical input token counts AND model in inferred sessions
         if not prompts:
             sessions = self._get_inferred_sessions()
             for session_id, evs in sessions.items():
                 if len(evs) < 3:
                     continue
-                token_clusters = defaultdict(list)
+                # Key by (input_tokens, model) to avoid false positives from different tokenizers
+                token_model_clusters = defaultdict(list)
                 for eid, e in evs:
                     input_tokens = e.get("input_tokens", 0)
+                    model = e.get("model", "unknown")
                     if input_tokens > 100:
-                        token_clusters[input_tokens].append((eid, e))
+                        token_model_clusters[(input_tokens, model)].append((eid, e))
                 
-                for tokens, cluster in token_clusters.items():
+                for key, cluster in token_model_clusters.items():
                     if len(cluster) >= 3:
-                        inferred_hash = f"inferred_sys_prompt_{tokens}"
+                        inferred_hash = f"inferred_sys_prompt_{key[0]}_{key[1]}"
                         prompts[inferred_hash].extend(cluster)
 
         for prompt_hash, evs in prompts.items():
@@ -175,6 +218,15 @@ class LocalHeuristicsEngine:
 
             repetitions = len(evs) - 1
             avg_input_tokens = sum(e.get("input_tokens", 0) for _, e in evs) / len(evs)
+            
+            # Check if caching is already active for these events
+            total_cached = sum(e.get("cached_tokens", 0) for _, e in evs)
+            caching_active = total_cached > 0
+            
+            if caching_active:
+                # If prompt caching is already active, skip or significantly downgrade
+                # The user is already following best practice
+                continue
             
             # Cost of redundant transmissions
             total_input_cost = sum(
@@ -187,12 +239,19 @@ class LocalHeuristicsEngine:
             if avg_input_tokens < 100:
                 continue
 
+            # Downgrade severity when we can't confirm caching status
+            has_cache_data = any("cached_tokens" in e for _, e in evs)
+            severity = "HIGH" if not has_cache_data else "CRITICAL"
+            if any(e.get("session_confidence") == "low" for _, e in evs):
+                severity = "MEDIUM"
+            summary_suffix = "" if has_cache_data else " (cache status unknown)"
+
             self.issues.append({
                 "issue_type": "redundant_system_prompt",
                 "title": "System Prompt Waste",
-                "severity": "CRITICAL",
+                "severity": severity,
                 "cost_impact": round(wasted_cost, 4),
-                "summary": f"Sending redundant prompt (~{int(avg_input_tokens)} tokens) {repetitions} times",
+                "summary": f"Sending redundant prompt (~{int(avg_input_tokens)} tokens) {repetitions} times{summary_suffix}",
                 "fix_effort": "5 minutes",
                 "fix_confidence": "HIGH",
                 "cta": "Enable Prompt Caching",
@@ -200,7 +259,8 @@ class LocalHeuristicsEngine:
                 "metadata": {
                     "prompt_hash": prompt_hash,
                     "repetitions": repetitions,
-                    "avg_tokens": avg_input_tokens
+                    "avg_tokens": avg_input_tokens,
+                    "caching_detected": caching_active
                 }
             })
 
@@ -219,16 +279,27 @@ class LocalHeuristicsEngine:
 
             doublings = 0
             for i in range(1, len(contexts)):
-                if contexts[i] >= contexts[i-1] * 1.8 and contexts[i-1] > 50:
+                if contexts[i] >= contexts[i-1] * 2.5 and contexts[i-1] > 50:
                     doublings += 1
 
             if doublings >= 2:
-                loop_cost = sum(e.get("cost", 0.0) for _, e in evs)
+                # Calculate INCREMENTAL cost above baseline, not entire session cost
+                baseline_cost = evs[0][1].get("cost", 0.0) if evs else 0.0
+                incremental_cost = sum(
+                    max(0, e.get("cost", 0.0) - baseline_cost)
+                    for _, e in evs[1:]
+                )
+                
+                # Tier severity: 3+ doublings = CRITICAL, 2 = HIGH
+                severity = "CRITICAL" if doublings >= 3 else "HIGH"
+                if any(e.get("session_confidence") == "low" for _, e in evs):
+                    severity = "MEDIUM"
+                
                 self.issues.append({
                     "issue_type": "agent_loop",
                     "title": "Agent Runaway Loop",
-                    "severity": "CRITICAL",
-                    "cost_impact": round(loop_cost, 4),
+                    "severity": severity,
+                    "cost_impact": round(incremental_cost, 4),
                     "summary": f"Prompt context doubled {doublings} times in consecutive requests.",
                     "fix_effort": "10 minutes",
                     "fix_confidence": "HIGH",
@@ -251,7 +322,11 @@ class LocalHeuristicsEngine:
             
             input_price, _ = get_model_pricing(model)
             is_expensive = input_price > 2.00 # > $2.00 per 1M tokens
-            is_simple = e.get("input_tokens", 0) < 500 and e.get("output_tokens", 0) < 100
+            
+            # Subtract reasoning tokens from output when checking simplicity
+            # Reasoning models (o1/o3) inflate output_tokens with internal thinking
+            effective_output = e.get("output_tokens", 0) - e.get("reasoning_tokens", 0)
+            is_simple = e.get("input_tokens", 0) < 500 and effective_output < 100
 
             if is_expensive and is_simple:
                 wf_id = e.get("workflow_id") or "default_workflow"
@@ -308,7 +383,7 @@ class LocalHeuristicsEngine:
                 self.issues.append({
                     "issue_type": "context_explosion",
                     "title": "Context Explosion",
-                    "severity": "HIGH",
+                    "severity": "MEDIUM" if any(e.get("session_confidence") == "low" for _, e in evs) else "HIGH",
                     "cost_impact": round(wasted_cost, 4),
                     "summary": f"Context length grew {max_context / min_context:.1f}x from baseline",
                     "fix_effort": "15 minutes",

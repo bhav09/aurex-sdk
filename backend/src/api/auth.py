@@ -374,3 +374,28 @@ async def verify_otp(data: OTPVerify):
         "access_token": access_token,
         "token_type": "bearer"
     }
+
+class SSOLoginRequest(BaseModel):
+    email: EmailStr
+    user_name: str
+    company_name: str
+    provider: str
+
+@router.post("/sso-login")
+async def sso_login(data: SSOLoginRequest):
+    email = data.email.lower()
+    access_token = create_access_token(data={"sub": email})
+    
+    logger.info("SSO login successful", email=email, provider=data.provider)
+    from src.utils.analytics import log_analytics_event
+    log_analytics_event(event_type="sso_login", email=email)
+    return {
+        "status": "success",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_info": {
+            "user_name": data.user_name,
+            "email": data.email,
+            "company_name": data.company_name
+        }
+    }

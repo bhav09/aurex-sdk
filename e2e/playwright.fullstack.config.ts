@@ -19,7 +19,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd ../backend && uvicorn main:app --port 8000',
+      command: 'cd ../backend && .venv/bin/uvicorn main:app --port 8000',
       url: 'http://127.0.0.1:8000/health',
       reuseExistingServer: !process.env.CI,
     },

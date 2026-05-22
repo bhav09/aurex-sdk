@@ -55,7 +55,7 @@ crontab -l
 
 **View logs:**
 ```bash
-tail -f /tmp/lumina-pricing-update.log
+tail -f /tmp/aurex-pricing-update.log
 ```
 
 **Remove cron job:**
@@ -234,7 +234,7 @@ def check_pricing_freshness():
 ### Pricing data not updating
 
 1. Check cron job is running: `crontab -l`
-2. Check logs: `tail -f /tmp/lumina-pricing-update.log`
+2. Check logs: `tail -f /tmp/aurex-pricing-update.log`
 3. Run manually: `python scripts/update_pricing.py`
 4. Verify file permissions: `ls -la backend/data/model_pricing.json`
 

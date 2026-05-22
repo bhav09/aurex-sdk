@@ -10,7 +10,7 @@ const footerLinks = {
     { name: "Pricing", href: "/#pricing" },
   ],
   Resources: [
-    { name: "Documentation", href: "/" },
+    { name: "Documentation", href: "/docs" },
     { name: "Support", href: "mailto:contact@heyaurex.com" },
     { name: "Contact", href: "mailto:contact@heyaurex.com" },
   ],
@@ -136,6 +136,7 @@ export function FooterSection() {
                   {links.map((link) => (
                     <li key={link.name}>
                       <a
+                        id={`footer-link-${link.name.toLowerCase().replace(/\s+/g, "-")}`}
                         href={link.href}
                         className="text-sm text-white/40 hover:text-white transition-colors"
                       >

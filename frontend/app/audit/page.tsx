@@ -8,6 +8,8 @@ import { UploadZone } from "@/components/audit/upload-zone";
 import { CreditScoreCard } from "@/components/audit/credit-score-card";
 import { BentoMetricCard } from "@/components/audit/bento-metric-card";
 import { AgentPlanPanel } from "@/components/audit/agent-plan-panel";
+import { SettingsPanel } from "@/components/audit/settings-panel";
+import { SavingsPanel } from "@/components/audit/savings-panel";
 import { AuditCopilotDock } from "@/components/audit/audit-copilot-dock";
 import { aurixAPI, ExecutiveSummary, Issue, LLMEvent } from "@/lib/api-client";
 import { Card } from "@/components/ui/card";
@@ -85,7 +87,7 @@ export default function AuditPage() {
     const [progressSteps, setProgressSteps] = useState<string[]>([]);
     const [data, setData] = useState<ExecutiveSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<"overview" | "data" | "compare" | "insights">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "data" | "compare" | "insights" | "savings" | "settings">("overview");
     const [events, setEvents] = useState<LLMEvent[]>([]);
     const [loadingEvents, setLoadingEvents] = useState(false);
     const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
@@ -96,10 +98,75 @@ export default function AuditPage() {
     const [copilotOpen, setCopilotOpen] = useState(false);
     const [copilotIssue, setCopilotIssue] = useState<Issue | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [companyName, setCompanyName] = useState<string>("");
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [pendingUserInfo, setPendingUserInfo] = useState<{ user_name: string; email: string; company_name: string } | null>(null);
     const [authRequired, setAuthRequired] = useState(false);
     const [authRequiredMessage, setAuthRequiredMessage] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const userInfo = aurixAPI.getUserInfo();
+        if (userInfo) {
+            setCompanyName(userInfo.company_name);
+            setUserEmail(userInfo.email);
+        }
+    }, []);
+
+    const handleRefreshAnalysis = async () => {
+        const activeEmail = userEmail || aurixAPI.getUserInfo()?.email;
+        if (!activeEmail) return;
+        setAnalyzing(true);
+        setProgress(0);
+        setProgressSteps(["Querying updated pricing overrides...", "Recalculating event costs...", "Regenerating executive summary..."]);
+        try {
+            const summary = await aurixAPI.getExecutiveSummary(activeEmail);
+            setData(summary);
+            // Also reload events if they are currently loaded
+            await loadEvents();
+        } catch (e) {
+            console.error("Failed to refresh analysis:", e);
+            setError("Failed to refresh analysis with updated pricing");
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
+    const handleDownloadReport = async () => {
+        let activeSessionId = sessionId;
+        const activeEmail = userEmail || aurixAPI.getUserInfo()?.email;
+        
+        if (!activeSessionId && activeEmail) {
+            try {
+                const history = await aurixAPI.getAuditHistory(activeEmail, 0, 1);
+                if (history.sessions && history.sessions.length > 0) {
+                    activeSessionId = history.sessions[0].id;
+                }
+            } catch (err) {
+                console.error("Failed to load audit history for report download:", err);
+            }
+        }
+        
+        if (!activeSessionId) {
+            alert("No audit session found to download. Please perform an audit first.");
+            return;
+        }
+        
+        try {
+            const blob = await aurixAPI.downloadExecutiveReport(activeSessionId);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `aurex-executive-report-${activeSessionId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Failed to download PDF report:", err);
+            alert("Failed to download PDF report. Please try again.");
+        }
+    };
 
     const simulateProgress = () => {
         const steps = [
@@ -143,7 +210,9 @@ export default function AuditPage() {
         const progressInterval = simulateProgress();
         try {
             setUserEmail(userInfo.email);
-            const { summary } = await aurixAPI.completeAudit(file, userInfo);
+            setCompanyName(userInfo.company_name);
+            const { session, summary } = await aurixAPI.completeAudit(file, userInfo);
+            setSessionId(session.id);
             clearInterval(progressInterval);
             setProgressSteps((prev) => [...prev, "Finalizing analysis..."]);
             setProgress(100);
@@ -453,7 +522,7 @@ export default function AuditPage() {
                             variants={itemVariants}
                             className="flex flex-wrap gap-2 border-b border-white/10"
                         >
-                            {(["overview", "data", "compare", "insights"] as const).map((tab) => (
+                            {(["overview", "data", "compare", "insights", "savings", "settings"] as const).map((tab) => (
                                 <button
                                     key={tab}
                                     type="button"
@@ -464,7 +533,7 @@ export default function AuditPage() {
                                             : "text-white/45 hover:text-white/80"
                                     }`}
                                 >
-                                    {tab === "data" ? "Data view" : tab === "compare" ? "Comparison view" : tab}
+                                    {tab === "data" ? "Data view" : tab === "compare" ? "Comparison view" : tab === "savings" ? "Savings Realization" : tab}
                                 </button>
                             ))}
                         </motion.div>
@@ -488,7 +557,14 @@ export default function AuditPage() {
                                                 <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10">
                                                     <Share2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="text-white/60 hover:bg-white/10" 
+                                                    onClick={handleDownloadReport}
+                                                    title="Download PDF Report"
+                                                    aria-label="Download PDF Report"
+                                                >
                                                     <Download className="h-4 w-4" />
                                                 </Button>
                                                 <Button
@@ -1168,7 +1244,7 @@ export default function AuditPage() {
                                         );
                                     })()}
                                 </motion.div>
-                            ) : (
+                            ) : activeTab === "insights" ? (
                                 <motion.div
                                     key="insights"
                                     initial={{ opacity: 0, y: 20 }}
@@ -1190,6 +1266,29 @@ export default function AuditPage() {
                                                 .toFixed(2)}
                                         </span>
                                     </p>
+                                </motion.div>
+                            ) : activeTab === "savings" ? (
+                                <motion.div
+                                    key="savings"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                >
+                                    <SavingsPanel
+                                        companyName={companyName || "Aurex Corp"}
+                                    />
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="settings"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                >
+                                    <SettingsPanel
+                                        companyName={companyName || "Aurex Corp"}
+                                        onRefreshAnalysis={handleRefreshAnalysis}
+                                    />
                                 </motion.div>
                             )}
                         </AnimatePresence>

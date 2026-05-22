@@ -3,7 +3,7 @@ import jwt
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
-from src.api.auth import create_access_token, get_current_user, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_MINUTES
+from src.api.auth import create_access_token, get_current_user, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_MINUTES, sso_login, SSOLoginRequest
 
 @pytest.mark.asyncio
 async def test_create_access_token():
@@ -52,3 +52,18 @@ async def test_get_current_user_invalid_token():
         
     assert exc.value.status_code == 401
     assert exc.value.detail == "Could not validate credentials"
+
+@pytest.mark.asyncio
+async def test_sso_login_endpoint():
+    request_data = SSOLoginRequest(
+        email="sso.test@example.com",
+        user_name="SSO Tester",
+        company_name="SSO Org",
+        provider="google"
+    )
+    result = await sso_login(request_data)
+    assert result["status"] == "success"
+    assert "access_token" in result
+    assert result["token_type"] == "bearer"
+    assert result["user_info"]["user_name"] == "SSO Tester"
+    assert result["user_info"]["email"] == "sso.test@example.com"

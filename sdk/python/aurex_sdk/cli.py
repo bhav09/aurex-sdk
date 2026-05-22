@@ -33,16 +33,31 @@ def run_cli():
 
     args = parser.parse_args()
 
+    has_policy = (
+        (args.fail_under is not None and args.fail_under > 0) or 
+        (args.max_waste_usd is not None and args.max_waste_usd != float("inf")) or 
+        (args.max_spend_usd is not None and args.max_spend_usd != float("inf"))
+    )
+
     if not os.path.exists(args.ledger):
-        print(f"\033[93m[Aurex Warning] Local ledger not found at: {args.ledger}\033[0m")
-        print("Run some LLM requests first using AurexAuditor to populate the ledger.")
-        sys.exit(0)
+        if has_policy:
+            print(f"\033[91m🚨 POLICY ENFORCEMENT ERROR: Local ledger not found at: {args.ledger}\033[0m")
+            print("Cannot verify build policies without local ledger telemetry. Build failed.")
+            sys.exit(1)
+        else:
+            print(f"\033[93m[Aurex Warning] Local ledger not found at: {args.ledger}\033[0m")
+            print("Run some LLM requests first using AurexAuditor to populate the ledger.")
+            sys.exit(0)
 
     # Trigger heuristics analysis
     engine = LocalHeuristicsEngine(args.ledger)
     report = engine.analyze()
 
     total_events = report["total_events"]
+    if total_events == 0 and has_policy:
+        print(f"\033[91m🚨 POLICY ENFORCEMENT ERROR: Local ledger at {args.ledger} is empty.\033[0m")
+        print("Cannot verify build policies with zero telemetry events. Build failed.")
+        sys.exit(1)
     total_cost = report["total_cost"]
     wasted_cost = report["wasted_cost"]
     waste_percentage = report["waste_percentage"]

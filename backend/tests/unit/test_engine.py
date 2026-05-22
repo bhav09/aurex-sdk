@@ -98,11 +98,11 @@ class TestEnhancedDetectionEngine:
         engine = EnhancedDetectionEngine(mock_db, session_id="test-session")
         
         now = datetime.utcnow()
-        # Double the context length repeatedly in a workflow
+        # Double the context length repeatedly in a workflow (growing by >= 2.5x)
         engine.events = [
             LLMEvent(id="e1", timestamp=now, provider="openai", model="gpt-4o", workflow_id="wf1", input_tokens=100, output_tokens=50, total_tokens=150, cost=0.1, context_length=100),
-            LLMEvent(id="e2", timestamp=now + timedelta(seconds=1), provider="openai", model="gpt-4o", workflow_id="wf1", input_tokens=200, output_tokens=50, total_tokens=250, cost=0.2, context_length=200),
-            LLMEvent(id="e3", timestamp=now + timedelta(seconds=2), provider="openai", model="gpt-4o", workflow_id="wf1", input_tokens=400, output_tokens=50, total_tokens=450, cost=0.4, context_length=400)
+            LLMEvent(id="e2", timestamp=now + timedelta(seconds=1), provider="openai", model="gpt-4o", workflow_id="wf1", input_tokens=260, output_tokens=50, total_tokens=310, cost=0.2, context_length=260),
+            LLMEvent(id="e3", timestamp=now + timedelta(seconds=2), provider="openai", model="gpt-4o", workflow_id="wf1", input_tokens=680, output_tokens=50, total_tokens=730, cost=0.4, context_length=680)
         ]
         
         analysis = await engine.analyze_complete()
@@ -123,3 +123,103 @@ class TestEnhancedDetectionEngine:
         analysis = await engine.analyze_complete()
         assert len(analysis["top_issues"]) > 0
         assert any(issue["issue_type"] == "context_explosion" for issue in analysis["top_issues"])
+
+    async def test_engine_detects_tool_bloat(self):
+        mock_db = AsyncMock()
+        engine = EnhancedDetectionEngine(mock_db, session_id="test-session")
+        
+        now = datetime.utcnow()
+        # Events with tools_available_count > 10 and few used, total wasted tokens > 10000
+        engine.events = [
+            LLMEvent(
+                id=f"e{i}",
+                timestamp=now + timedelta(seconds=i),
+                provider="openai",
+                model="gpt-4o",
+                workflow_id="wf1",
+                input_tokens=1000,
+                output_tokens=100,
+                total_tokens=1100,
+                cost=0.5,
+                extra_metadata={
+                    "tools_available_count": 15,
+                    "tool_definitions_tokens": 1200,
+                    "tool_invocations": []
+                }
+            ) for i in range(10) # 10 events * 1200 wasted tokens = 12000 > 10000
+        ]
+        
+        analysis = await engine.analyze_complete()
+        assert any(issue["issue_type"] == "tool_bloat" for issue in analysis["top_issues"])
+
+    async def test_engine_detects_retry_cascades(self):
+        mock_db = AsyncMock()
+        engine = EnhancedDetectionEngine(mock_db, session_id="test-session")
+        
+        now = datetime.utcnow()
+        # 6 rapid events with http_status >= 500
+        engine.events = []
+        for i in range(7):
+            engine.events.append(
+                LLMEvent(
+                    id=f"e{i}",
+                    timestamp=now + timedelta(seconds=i * 2), # 2 seconds < 5 seconds
+                    provider="openai",
+                    model="gpt-4o",
+                    workflow_id="wf1",
+                    input_tokens=500,
+                    output_tokens=0,
+                    total_tokens=500,
+                    cost=0.01,
+                    extra_metadata={"http_status": 500}
+                )
+            )
+            
+        analysis = await engine.analyze_complete()
+        assert any(issue["issue_type"] == "retry_cascades" for issue in analysis["top_issues"])
+
+    async def test_engine_detects_output_verbosity(self):
+        mock_db = AsyncMock()
+        engine = EnhancedDetectionEngine(mock_db, session_id="test-session")
+        
+        now = datetime.utcnow()
+        # 21 chatty events
+        engine.events = [
+            LLMEvent(
+                id=f"e{i}",
+                timestamp=now + timedelta(seconds=i),
+                provider="openai",
+                model="gpt-4o",
+                workflow_id="wf1",
+                input_tokens=100,
+                output_tokens=100,
+                total_tokens=200,
+                cost=0.02,
+                response="Certainly! Here's the information you requested. Let me know if you need anything else."
+            ) for i in range(22)
+        ]
+        
+        analysis = await engine.analyze_complete()
+        assert any(issue["issue_type"] == "output_verbosity" for issue in analysis["top_issues"])
+
+    async def test_engine_clustering_and_severity_capping(self):
+        mock_db = AsyncMock()
+        engine = EnhancedDetectionEngine(mock_db, session_id="test-session")
+        
+        now = datetime.utcnow()
+        # Create unassigned events with no user_id (low confidence clustering fallback)
+        # We will trigger a runaway agent loop in a low-confidence (inferred) session (growing by >= 2.5x)
+        engine.events = [
+            LLMEvent(id="e1", timestamp=now, provider="openai", model="gpt-4o", input_tokens=60, output_tokens=50, total_tokens=110, cost=0.1, context_length=60),
+            LLMEvent(id="e2", timestamp=now + timedelta(seconds=1), provider="openai", model="gpt-4o", input_tokens=160, output_tokens=50, total_tokens=210, cost=0.2, context_length=160),
+            LLMEvent(id="e3", timestamp=now + timedelta(seconds=2), provider="openai", model="gpt-4o", input_tokens=410, output_tokens=50, total_tokens=460, cost=0.4, context_length=410)
+        ]
+        
+        analysis = await engine.analyze_complete()
+        # Find the agent loop issue
+        agent_loop_issues = [issue for issue in analysis["top_issues"] if issue["issue_type"] == "agent_loop"]
+        assert len(agent_loop_issues) == 1
+        # The severity should be capped at MEDIUM instead of CRITICAL because it's a low confidence session!
+        assert agent_loop_issues[0]["severity"] == "MEDIUM"
+
+

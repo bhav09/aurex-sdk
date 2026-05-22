@@ -5,13 +5,10 @@ dist
 venv/
 .venv/
 sample_data/
-# Optional ~1.3MB LiteLLM mirror for air-gapped builds: run `npm run sync-model-catalog`
-public/model-catalog.json
 aurix.db
 
 # Google service accounts
 aurex-*.json
-*.json
 
 # Coverage & backend data
 .coverage
@@ -20,8 +17,6 @@ backend/.venv/
 
 # CSV and database files
 *.csv
-!examples/**/*.csv
-!src/demo/**/*.csv
 *.db
 *.sqlite
 *.sqlite3

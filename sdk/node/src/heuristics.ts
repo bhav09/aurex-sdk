@@ -107,8 +107,10 @@ export class LocalHeuristicsEngine {
   }
 
   private getInferredSessions(): Map<string, Array<{ id: string; event: any }>> {
+    const gapSeconds = parseInt(process.env.SESSION_GAP_SECONDS || "300", 10);
     const sessions = new Map<string, Array<{ id: string; event: any }>>();
-    const unassigned: Array<{ ts: number; id: string; event: any }> = [];
+    const unassignedWithUser: Array<{ ts: number; id: string; event: any; userId: string }> = [];
+    const unassignedWithoutUser: Array<{ ts: number; id: string; event: any }> = [];
 
     const sortedEvents = this.events
       .map((e, idx) => {
@@ -121,33 +123,76 @@ export class LocalHeuristicsEngine {
     for (const wrapper of sortedEvents) {
       const e = wrapper.event;
       let wfId = e.workflow_id || e.extra_metadata?.session_id;
+      if (wfId && String(wfId).startsWith("inferred_")) {
+        wfId = undefined;
+      }
       if (wfId) {
+        e.session_confidence = "high";
         if (!sessions.has(wfId)) sessions.set(wfId, []);
         sessions.get(wfId)!.push({ id: wrapper.id, event: e });
       } else {
-        unassigned.push(wrapper);
+        const userId = e.extra_metadata?.user_id;
+        if (userId) {
+          unassignedWithUser.push({ ...wrapper, userId: String(userId) });
+        } else {
+          unassignedWithoutUser.push(wrapper);
+        }
       }
     }
 
-    if (unassigned.length > 0) {
-      // Group by model
-      const modelGroups = new Map<string, Array<{ ts: number; id: string; event: any }>>();
-      for (const wrapper of unassigned) {
+    // Group by (model, userId)
+    if (unassignedWithUser.length > 0) {
+      const userGroups = new Map<string, Array<{ ts: number; id: string; event: any }>>();
+      for (const wrapper of unassignedWithUser) {
         const m = wrapper.event.model || "unknown";
-        if (!modelGroups.has(m)) modelGroups.set(m, []);
-        modelGroups.get(m)!.push(wrapper);
+        const key = `${m}_${wrapper.userId}`;
+        if (!userGroups.has(key)) userGroups.set(key, []);
+        userGroups.get(key)!.push(wrapper);
       }
 
-      for (const [model, evs] of modelGroups.entries()) {
+      for (const [key, evs] of userGroups.entries()) {
         let currentSessionId = "";
         let lastTime = 0;
-
         for (const wrapper of evs) {
-          if (!currentSessionId || !lastTime || wrapper.ts - lastTime > 300 * 1000) {
-            currentSessionId = `inferred_session_${Math.random().toString(36).substring(2, 10)}`;
+          if (!currentSessionId || !lastTime || wrapper.ts - lastTime > gapSeconds * 1000) {
+            currentSessionId = `inferred_user_${Math.random().toString(36).substring(2, 10)}`;
           }
-
           wrapper.event.workflow_id = currentSessionId;
+          wrapper.event.session_confidence = "medium";
+          if (!sessions.has(currentSessionId)) sessions.set(currentSessionId, []);
+          sessions.get(currentSessionId)!.push({ id: wrapper.id, event: wrapper.event });
+          lastTime = wrapper.ts;
+        }
+      }
+    }
+
+    // Group by (model, token_bucket)
+    if (unassignedWithoutUser.length > 0) {
+      const getTokenBucket = (tokens: number) => {
+        if (tokens < 500) return "0-500";
+        if (tokens < 2000) return "500-2000";
+        if (tokens < 10000) return "2000-10000";
+        return "10000+";
+      };
+
+      const bucketGroups = new Map<string, Array<{ ts: number; id: string; event: any }>>();
+      for (const wrapper of unassignedWithoutUser) {
+        const m = wrapper.event.model || "unknown";
+        const bucket = getTokenBucket(wrapper.event.input_tokens || 0);
+        const key = `${m}_${bucket}`;
+        if (!bucketGroups.has(key)) bucketGroups.set(key, []);
+        bucketGroups.get(key)!.push(wrapper);
+      }
+
+      for (const [key, evs] of bucketGroups.entries()) {
+        let currentSessionId = "";
+        let lastTime = 0;
+        for (const wrapper of evs) {
+          if (!currentSessionId || !lastTime || wrapper.ts - lastTime > gapSeconds * 1000) {
+            currentSessionId = `inferred_bucket_${Math.random().toString(36).substring(2, 10)}`;
+          }
+          wrapper.event.workflow_id = currentSessionId;
+          wrapper.event.session_confidence = "low";
           if (!sessions.has(currentSessionId)) sessions.set(currentSessionId, []);
           sessions.get(currentSessionId)!.push({ id: wrapper.id, event: wrapper.event });
           lastTime = wrapper.ts;
@@ -171,25 +216,28 @@ export class LocalHeuristicsEngine {
       }
     });
 
-    // Fallback: identical tokens inside sessions
+    // Fallback: identical tokens AND model inside sessions
     if (prompts.size === 0) {
       const sessions = this.getInferredSessions();
       for (const [sid, evs] of sessions.entries()) {
         if (evs.length < 3) continue;
-        const tokenClusters = new Map<number, Array<{ id: string; event: any }>>();
+        // Key by "inputTokens_model" to avoid false positives from different tokenizers
+        const tokenModelClusters = new Map<string, Array<{ id: string; event: any }>>();
         for (const item of evs) {
           const t = item.event.input_tokens || 0;
+          const m = item.event.model || "unknown";
           if (t > 100) {
-            if (!tokenClusters.has(t)) tokenClusters.set(t, []);
-            tokenClusters.get(t)!.push(item);
+            const key = `${t}_${m}`;
+            if (!tokenModelClusters.has(key)) tokenModelClusters.set(key, []);
+            tokenModelClusters.get(key)!.push(item);
           }
         }
 
-        for (const [tokens, cluster] of tokenClusters.entries()) {
+        for (const [key, cluster] of tokenModelClusters.entries()) {
           if (cluster.length >= 3) {
-            const key = `inferred_sys_prompt_${tokens}`;
-            if (!prompts.has(key)) prompts.set(key, []);
-            prompts.get(key)!.push(...cluster);
+            const promptKey = `inferred_sys_prompt_${key}`;
+            if (!prompts.has(promptKey)) prompts.set(promptKey, []);
+            prompts.get(promptKey)!.push(...cluster);
           }
         }
       }
@@ -204,6 +252,15 @@ export class LocalHeuristicsEngine {
 
       if (avgInputTokens < 100) continue;
 
+      // Check if caching is already active for these events
+      const totalCached = evs.reduce((sum, item) => sum + (item.event.cached_tokens || 0), 0);
+      const cachingActive = totalCached > 0;
+      
+      if (cachingActive) {
+        // User is already following best practice — skip
+        continue;
+      }
+
       // Estimate waste
       const totalInputCost = evs.reduce((sum, item) => {
         const e = item.event;
@@ -214,12 +271,20 @@ export class LocalHeuristicsEngine {
 
       const wastedCost = (totalInputCost / evs.length) * repetitions;
 
+      // Downgrade severity when we can't confirm caching status
+      const hasCacheData = evs.some(item => "cached_tokens" in item.event);
+      let severity = hasCacheData ? "CRITICAL" : "HIGH";
+      if (evs.some(item => item.event.session_confidence === "low")) {
+        severity = "MEDIUM";
+      }
+      const summarySuffix = hasCacheData ? "" : " (cache status unknown)";
+
       this.issues.push({
         issue_type: "redundant_system_prompt",
         title: "System Prompt Waste",
-        severity: "CRITICAL",
+        severity,
         cost_impact: Number(wastedCost.toFixed(4)),
-        summary: `Sending redundant prompt (~${Math.round(avgInputTokens)} tokens) ${repetitions} times`,
+        summary: `Sending redundant prompt (~${Math.round(avgInputTokens)} tokens) ${repetitions} times${summarySuffix}`,
         fix_effort: "5 minutes",
         fix_confidence: "HIGH",
         cta: "Enable Prompt Caching",
@@ -228,6 +293,7 @@ export class LocalHeuristicsEngine {
           prompt_hash: hash,
           repetitions,
           avg_tokens: avgInputTokens,
+          caching_detected: cachingActive,
         },
       });
     }
@@ -242,18 +308,30 @@ export class LocalHeuristicsEngine {
       const contexts = evs.map(item => item.event.input_tokens || 0);
       let doublings = 0;
       for (let i = 1; i < contexts.length; i++) {
-        if (contexts[i] >= contexts[i - 1] * 1.8 && contexts[i - 1] > 50) {
+        if (contexts[i] >= contexts[i - 1] * 2.5 && contexts[i - 1] > 50) {
           doublings++;
         }
       }
 
       if (doublings >= 2) {
-        const loopCost = evs.reduce((sum, item) => sum + (item.event.cost || 0.0), 0.0);
+        // Calculate INCREMENTAL cost above baseline, not entire session cost
+        const baselineCost = evs[0]?.event.cost || 0.0;
+        const incrementalCost = evs.slice(1).reduce(
+          (sum, item) => sum + Math.max(0, (item.event.cost || 0.0) - baselineCost),
+          0.0
+        );
+        
+        // Tier severity: 3+ doublings = CRITICAL, 2 = HIGH
+        let severity = doublings >= 3 ? "CRITICAL" : "HIGH";
+        if (evs.some(item => item.event.session_confidence === "low")) {
+          severity = "MEDIUM";
+        }
+        
         this.issues.push({
           issue_type: "agent_loop",
           title: "Agent Runaway Loop",
-          severity: "CRITICAL",
-          cost_impact: Number(loopCost.toFixed(4)),
+          severity,
+          cost_impact: Number(incrementalCost.toFixed(4)),
           summary: `Prompt context doubled ${doublings} times in consecutive requests.`,
           fix_effort: "10 minutes",
           fix_confidence: "HIGH",
@@ -277,7 +355,11 @@ export class LocalHeuristicsEngine {
       const model = e.model || "";
       const [inputPrice] = getModelPricing(model);
       const isExpensive = inputPrice > 2.00;
-      const isSimple = (e.input_tokens || 0) < 500 && (e.output_tokens || 0) < 100;
+      
+      // Subtract reasoning tokens from output when checking simplicity
+      // Reasoning models (o1/o3) inflate output_tokens with internal thinking
+      const effectiveOutput = (e.output_tokens || 0) - (e.reasoning_tokens || 0);
+      const isSimple = (e.input_tokens || 0) < 500 && effectiveOutput < 100;
 
       if (isExpensive && isSimple) {
         const wfId = e.workflow_id || "default_workflow";
@@ -345,7 +427,7 @@ export class LocalHeuristicsEngine {
         this.issues.push({
           issue_type: "context_explosion",
           title: "Context Explosion",
-          severity: "HIGH",
+          severity: evs.some(item => item.event.session_confidence === "low") ? "MEDIUM" : "HIGH",
           cost_impact: Number(wastedCost.toFixed(4)),
           summary: `Context length grew ${(maxContext / minContext).toFixed(1)}x from baseline`,
           fix_effort: "15 minutes",

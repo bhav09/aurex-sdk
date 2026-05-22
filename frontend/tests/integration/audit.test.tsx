@@ -24,6 +24,19 @@ vi.mock('../../lib/api-client', () => ({
   }
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: () => '/audit',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe('Audit Integration Flow', () => {
     it('renders audit page and simulates upload flow', async () => {
         // Minimal integration test for the page rendering

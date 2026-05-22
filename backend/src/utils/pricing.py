@@ -10,7 +10,7 @@ Run `python scripts/sync_pricing.py` to refresh the catalog.
 import json
 import re
 import os
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from pathlib import Path
 
 # Path to the auto-synced pricing catalog
@@ -98,32 +98,41 @@ def normalize_model_name(m: str) -> str:
     return m
 
 
-def get_model_pricing(model: str) -> Tuple[float, float]:
+def get_model_pricing(model: str, pricing_overrides: Optional[Dict[str, Tuple[float, float]]] = None) -> Tuple[float, float]:
     """
     Get pricing for a model.
     Returns (input_price, output_price) per 1M tokens.
 
     Resolution order:
-    1. Synced LiteLLM catalog (1,900+ models)
-    2. Built-in fallback table
-    3. Median-tier fallback ($1.50/$6.00) instead of max-tier
+    1. Custom pricing overrides (company-level)
+    2. Synced LiteLLM catalog (1,900+ models)
+    3. Built-in fallback table
+    4. Median-tier fallback ($1.50/$6.00) instead of max-tier
     """
     if not model:
         return _MEDIAN_FALLBACK
+
+    query_norm = normalize_model_name(model)
+
+    # 1. Custom pricing overrides
+    if pricing_overrides:
+        if query_norm in pricing_overrides:
+            return pricing_overrides[query_norm]
+        for key, val in pricing_overrides.items():
+            if key in query_norm or query_norm in key:
+                return val
 
     # Lazy-load the synced catalog on first call
     global _catalog_loaded
     if not _catalog_loaded:
         _load_synced_catalog()
 
-    query_norm = normalize_model_name(model)
-
-    # 1. Try synced catalog (exact match)
+    # 2. Try synced catalog (exact match)
     if query_norm in _synced_catalog:
         entry = _synced_catalog[query_norm]
         return entry["input_price_per_1m"], entry["output_price_per_1m"]
 
-    # 2. Try synced catalog (substring match, longest key first)
+    # 3. Try synced catalog (substring match, longest key first)
     if _synced_catalog:
         sorted_keys = sorted(_synced_catalog.keys(), key=len, reverse=True)
         for key in sorted_keys:
@@ -131,18 +140,18 @@ def get_model_pricing(model: str) -> Tuple[float, float]:
                 entry = _synced_catalog[key]
                 return entry["input_price_per_1m"], entry["output_price_per_1m"]
 
-    # 3. Try built-in table (exact match)
+    # 4. Try built-in table (exact match)
     pricing = BUILTIN_PRICING.get(query_norm)
     if pricing:
         return pricing["input"], pricing["output"]
 
-    # 4. Try built-in table (substring match)
+    # 5. Try built-in table (substring match)
     sorted_builtin = sorted(BUILTIN_PRICING.keys(), key=len, reverse=True)
     for key in sorted_builtin:
         if key in query_norm:
             return BUILTIN_PRICING[key]["input"], BUILTIN_PRICING[key]["output"]
 
-    # 5. Median fallback for truly unknown models (not max-tier)
+    # 6. Median fallback for truly unknown models (not max-tier)
     return _MEDIAN_FALLBACK
 
 
@@ -171,12 +180,13 @@ def calculate_cost(
     input_tokens: int, 
     output_tokens: int,
     cache_read_tokens: int = 0,
-    cache_creation_tokens: int = 0
+    cache_creation_tokens: int = 0,
+    pricing_overrides: Optional[Dict[str, Tuple[float, float]]] = None
 ) -> float:
     """
     Calculate cost for a given model and token usage, accounting for prompt caching
     """
-    input_price, output_price = get_model_pricing(model)
+    input_price, output_price = get_model_pricing(model, pricing_overrides=pricing_overrides)
     provider = extract_provider_from_model(model)
     
     standard_input = max(0, input_tokens - cache_read_tokens - cache_creation_tokens)
