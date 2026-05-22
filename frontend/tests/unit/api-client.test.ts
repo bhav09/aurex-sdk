@@ -235,4 +235,78 @@ describe('AurexAPI', () => {
             expect(result).toEqual(mockResponse);
         });
     });
+
+    describe('loginWithSSO', () => {
+        it('should call sso-login endpoint and persist token + user info', async () => {
+            const mockResponse = {
+                status: 'success',
+                access_token: 'sso_token_123',
+                token_type: 'bearer',
+                user_info: {
+                    user_name: 'SSO User',
+                    email: 'sso@example.com',
+                    company_name: 'SSO Company'
+                }
+            };
+
+            (global.fetch as any).mockResolvedValueOnce({
+                ok: true,
+                json: async () => mockResponse,
+            });
+
+            const result = await api.loginWithSSO('sso@example.com', 'SSO User', 'SSO Company', 'google');
+
+            expect(global.fetch).toHaveBeenCalledWith(`${mockBaseUrl}/auth/sso-login`, expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    email: 'sso@example.com',
+                    user_name: 'SSO User',
+                    company_name: 'SSO Company',
+                    provider: 'google'
+                })
+            }));
+            expect(result).toEqual(mockResponse);
+            expect(api.hasActiveSession()).toBe(true);
+            expect(api.getUserInfo()).toEqual(mockResponse.user_info);
+        });
+    });
+
+    describe('pricingOverrides', () => {
+        it('should fetch pricing overrides', async () => {
+            const mockResponse = [
+                { id: '1', company_name: 'Acme', model_name: 'gpt-4o', input_price_per_1m: 1.0, output_price_per_1m: 4.0 }
+            ];
+
+            (global.fetch as any).mockResolvedValueOnce({
+                ok: true,
+                json: async () => mockResponse,
+            });
+
+            const result = await api.getPricingOverrides('Acme');
+
+            expect(global.fetch).toHaveBeenCalledWith(`${mockBaseUrl}/pricing/overrides?company_name=Acme`, expect.objectContaining({
+                method: 'GET'
+            }));
+            expect(result).toEqual(mockResponse);
+        });
+
+        it('should upload pricing overrides file', async () => {
+            const mockFile = new File(['{"overrides":[]}'], 'overrides.json', { type: 'application/json' });
+            const mockResponse = { status: 'success', overrides_added: 0 };
+
+            (global.fetch as any).mockResolvedValueOnce({
+                ok: true,
+                json: async () => mockResponse,
+            });
+
+            const result = await api.uploadPricingOverrides(mockFile, 'Acme');
+
+            expect(global.fetch).toHaveBeenCalledWith(`${mockBaseUrl}/pricing/overrides?company_name=Acme`, expect.objectContaining({
+                method: 'POST',
+                body: expect.any(FormData)
+            }));
+            expect(result).toEqual(mockResponse);
+        });
+    });
 });
+

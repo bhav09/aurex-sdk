@@ -2,6 +2,16 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
+export interface BudgetGuardConfig {
+  maxCostPerMinute?: number;      // e.g. 5.00
+  maxCostPerSession?: number;     // e.g. 50.00
+  maxRequestsPerMinute?: number;  // e.g. 100
+  maxContextTokens?: number;      // e.g. 128000
+  onBudgetExceeded?: 'throw' | 'warn' | 'webhook'; // 'throw' | 'warn' | 'webhook'
+  webhookUrl?: string;
+  dryRun?: boolean;
+}
+
 export interface AurexConfig {
   apiKey?: string;
   project?: string;
@@ -11,6 +21,7 @@ export interface AurexConfig {
   flushIntervalMs?: number;
   maxBatchSize?: number;
   localOnly?: boolean;
+  budgetGuard?: BudgetGuardConfig;
 }
 
 export interface AurexEvent {
@@ -162,6 +173,9 @@ export class AurexAuditor {
   private config: Required<AurexConfig>;
   private queue: AurexEvent[] = [];
   private flushIntervalId: NodeJS.Timeout | null = null;
+  private lastMinuteEvents: { timestamp: number; cost: number }[] = [];
+  private sessionCosts: Record<string, number> = {};
+  private budgetConfig: BudgetGuardConfig | null = null;
 
   private constructor(config?: AurexConfig) {
     const defaultLedger = ".aurex/ledger.jsonl";
@@ -174,7 +188,12 @@ export class AurexAuditor {
       flushIntervalMs: config?.flushIntervalMs || 1000,
       maxBatchSize: config?.maxBatchSize || 50,
       localOnly: config?.localOnly ?? true,
+      budgetGuard: config?.budgetGuard || {},
     };
+
+    if (config?.budgetGuard) {
+      this.budgetConfig = config.budgetGuard;
+    }
 
     // Ensure ledger directory exists
     const ledgerDir = path.dirname(this.config.ledgerPath);
@@ -184,6 +203,54 @@ export class AurexAuditor {
       } catch (err) {
         console.error(`[Aurex Warning] Could not create ledger directory:`, err);
       }
+    }
+
+    // Queue crash recovery: check if pending.jsonl exists, load events, then delete file
+    const pendingPath = path.join(ledgerDir || ".", "pending.jsonl");
+    if (fs.existsSync(pendingPath)) {
+      try {
+        const content = fs.readFileSync(pendingPath, "utf-8");
+        const lines = content.split("\n").filter(line => line.trim().length > 0);
+        const recoveredEvents: AurexEvent[] = [];
+        for (const line of lines) {
+          try {
+            recoveredEvents.push(JSON.parse(line));
+          } catch (e) {}
+        }
+        if (recoveredEvents.length > 0) {
+          // Write recovered events directly to ledger
+          const dataStr = recoveredEvents.map(e => JSON.stringify(e)).join("\n") + "\n";
+          fs.appendFileSync(this.config.ledgerPath, dataStr, "utf-8");
+          // Optionally sync to cloud
+          if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
+            this.syncToCloud(recoveredEvents).catch(() => {});
+          }
+        }
+        fs.unlinkSync(pendingPath);
+      } catch (err) {
+        console.error(`[Aurex Warning] Failed to recover pending events:`, err);
+      }
+    }
+
+    // Register process exit listeners for graceful shutdown and queue persistence
+    if (typeof process !== "undefined") {
+      let exitHandled = false;
+      const handleExit = () => {
+        if (exitHandled) return;
+        exitHandled = true;
+        this.persistPendingAndShutdown();
+      };
+      
+      process.on("beforeExit", handleExit);
+      process.on("exit", handleExit);
+      process.on("SIGINT", () => {
+        handleExit();
+        process.exit(0);
+      });
+      process.on("SIGTERM", () => {
+        handleExit();
+        process.exit(0);
+      });
     }
 
     // Spawn non-blocking background queue flush loop
@@ -250,10 +317,96 @@ export class AurexAuditor {
       extra_metadata: params.extraMetadata || {},
     };
 
+    // Track metrics for the sliding window
+    this.lastMinuteEvents.push({ timestamp: Date.now(), cost });
+    if (params.workflowId) {
+      this.sessionCosts[params.workflowId] = (this.sessionCosts[params.workflowId] || 0) + cost;
+    }
+
     this.queue.push(event);
 
     if (this.queue.length >= this.config.maxBatchSize) {
       this.flush();
+    }
+
+    // Evaluate budget and trigger circuit breaker if exceeded
+    this.checkBudget(cost, inputT, params.workflowId);
+  }
+
+  public configureCircuitBreaker(config: BudgetGuardConfig): void {
+    this.budgetConfig = config;
+  }
+
+  private checkBudget(newEventCost: number, inputTokens: number, workflowId?: string): void {
+    if (!this.budgetConfig) return;
+
+    const now = Date.now();
+    // Keep sliding 60s window
+    this.lastMinuteEvents = this.lastMinuteEvents.filter(e => now - e.timestamp < 60000);
+
+    const minuteCost = this.lastMinuteEvents.reduce((sum, e) => sum + e.cost, 0);
+    const minuteRequests = this.lastMinuteEvents.length;
+
+    let currentSessionCost = 0;
+    if (workflowId) {
+      currentSessionCost = this.sessionCosts[workflowId] || 0;
+    }
+
+    let budgetExceeded = false;
+    let reason = "";
+
+    if (this.budgetConfig.maxCostPerMinute !== undefined && minuteCost > this.budgetConfig.maxCostPerMinute) {
+      budgetExceeded = true;
+      reason += `Cost per minute limit exceeded: $${minuteCost.toFixed(4)} > $${this.budgetConfig.maxCostPerMinute.toFixed(4)}. `;
+    }
+
+    if (this.budgetConfig.maxRequestsPerMinute !== undefined && minuteRequests > this.budgetConfig.maxRequestsPerMinute) {
+      budgetExceeded = true;
+      reason += `Requests per minute limit exceeded: ${minuteRequests} > ${this.budgetConfig.maxRequestsPerMinute}. `;
+    }
+
+    if (workflowId && this.budgetConfig.maxCostPerSession !== undefined && currentSessionCost > this.budgetConfig.maxCostPerSession) {
+      budgetExceeded = true;
+      reason += `Cost per session limit exceeded for workflow "${workflowId}": $${currentSessionCost.toFixed(4)} > $${this.budgetConfig.maxCostPerSession.toFixed(4)}. `;
+    }
+
+    if (this.budgetConfig.maxContextTokens !== undefined && inputTokens > this.budgetConfig.maxContextTokens) {
+      budgetExceeded = true;
+      reason += `Input context token limit exceeded: ${inputTokens} > ${this.budgetConfig.maxContextTokens}. `;
+    }
+
+    if (budgetExceeded) {
+      const mode = this.budgetConfig.onBudgetExceeded || "warn";
+      const message = `[Aurex SDK Budget Guard] ${reason}`;
+
+      if (this.budgetConfig.dryRun) {
+        console.warn(`[Aurex SDK Budget Guard DRY RUN] Would block: ${reason}`);
+        return;
+      }
+
+      if (mode === "warn") {
+        console.warn(message);
+      } else if (mode === "webhook" && this.budgetConfig.webhookUrl) {
+        const payload = {
+          event: "budget_exceeded",
+          reason,
+          timestamp: new Date().toISOString(),
+          details: {
+            minuteCost,
+            minuteRequests,
+            sessionCost: workflowId ? currentSessionCost : undefined,
+            inputTokens,
+            workflowId
+          }
+        };
+        fetch(this.budgetConfig.webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(err => console.error("[Aurex SDK Budget Guard] Webhook failed:", err));
+      } else if (mode === "throw") {
+        throw new Error(message);
+      }
     }
   }
 
@@ -304,12 +457,26 @@ export class AurexAuditor {
     }
   }
 
-  /** Tear down the auditor instance and clean up queue loops */
-  public shutdown() {
-    this.flush();
+  public persistPendingAndShutdown() {
     if (this.flushIntervalId) {
       clearInterval(this.flushIntervalId);
       this.flushIntervalId = null;
     }
+    if (this.queue.length > 0) {
+      const ledgerDir = path.dirname(this.config.ledgerPath);
+      const pendingPath = path.join(ledgerDir || ".", "pending.jsonl");
+      try {
+        const dataStr = this.queue.map(e => JSON.stringify(e)).join("\n") + "\n";
+        fs.appendFileSync(pendingPath, dataStr, "utf-8");
+        this.queue = [];
+      } catch (err) {
+        console.error(`[Aurex Warning] Failed to persist pending events:`, err);
+      }
+    }
+  }
+
+  /** Tear down the auditor instance and clean up queue loops */
+  public shutdown() {
+    this.persistPendingAndShutdown();
   }
 }

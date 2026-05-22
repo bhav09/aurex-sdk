@@ -8,7 +8,7 @@ PYTHON_PATH=$(which python3)
 
 # Cron job: Every Sunday at 2am UTC
 CRON_SCHEDULE="0 2 * * 0"
-CRON_COMMAND="cd $PROJECT_ROOT/backend && $PYTHON_PATH scripts/update_pricing.py >> /tmp/lumina-pricing-update.log 2>&1"
+CRON_COMMAND="cd $PROJECT_ROOT/backend && $PYTHON_PATH scripts/update_pricing.py >> /tmp/aurex-pricing-update.log 2>&1"
 
 echo "Setting up pricing update cron job..."
 echo "Schedule: $CRON_SCHEDULE (Sunday 2am UTC)"
@@ -32,7 +32,7 @@ echo "To verify:"
 echo "  crontab -l"
 echo ""
 echo "To view logs:"
-echo "  tail -f /tmp/lumina-pricing-update.log"
+echo "  tail -f /tmp/aurex-pricing-update.log"
 echo ""
 echo "To remove:"
 echo "  crontab -e"

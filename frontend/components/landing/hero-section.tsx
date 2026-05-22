@@ -178,10 +178,20 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.9 }}
+            className="flex items-center justify-center gap-4 flex-wrap"
           >
             <a href="/audit">
               <Button className="rounded-full bg-white hover:bg-white/90 text-black px-6 sm:px-8 h-11 sm:h-12 text-sm sm:text-base font-medium shadow-lg hover:shadow-xl transition-all">
                 Run Free Audit
+              </Button>
+            </a>
+            <a href="/docs">
+              <Button 
+                id="hero-link-docs"
+                variant="outline" 
+                className="rounded-full border border-white/20 hover:border-white/40 text-white bg-transparent hover:bg-white/5 px-6 sm:px-8 h-11 sm:h-12 text-sm sm:text-base font-medium transition-all"
+              >
+                SDK Docs
               </Button>
             </a>
           </motion.div>

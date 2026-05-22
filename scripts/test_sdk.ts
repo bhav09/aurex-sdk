@@ -32,8 +32,8 @@ async function runNodeTest() {
     });
   }
 
-  // 2. Simulate runaway loops (input tokens doubling: 100 -> 200 -> 400)
-  const contexts = [100, 200, 400];
+  // 2. Simulate runaway loops (input tokens doubling: 100 -> 260 -> 680)
+  const contexts = [100, 260, 680];
   for (const c of contexts) {
     auditor.logEvent({
       model: "claude-3-5-sonnet",

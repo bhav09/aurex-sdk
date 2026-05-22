@@ -146,7 +146,8 @@ class AurexConfig:
         flush_interval_seconds: float = 1.0,
         max_batch_size: int = 50,
         local_only: bool = True,
-        storage_mode: str = "file" # "file" or "memory"
+        storage_mode: str = "file", # "file" or "memory"
+        budget_guard: Optional[Dict[str, Any]] = None
     ):
         self.api_key = api_key or os.getenv("AUREX_API_KEY")
         self.project = project
@@ -157,6 +158,7 @@ class AurexConfig:
         self.max_batch_size = max_batch_size
         self.local_only = local_only
         self.storage_mode = storage_mode
+        self.budget_guard = budget_guard or {}
 
 
 class AurexAuditor:
@@ -178,6 +180,9 @@ class AurexAuditor:
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._memory_events = []
+        self._last_minute_events = []
+        self._session_costs = {}
+        self._budget_config = self.config.budget_guard or {}
         
         # Create ledger folder structure if not exists (only if file storage mode)
         if self.config.storage_mode == "file":
@@ -187,6 +192,44 @@ class AurexAuditor:
                     os.makedirs(ledger_dir, exist_ok=True)
                 except Exception as e:
                     print(f"[Aurex Warning] Could not create ledger directory: {e}", file=sys.stderr)
+
+            # Queue crash recovery
+            pending_path = os.path.join(ledger_dir or ".", "pending.jsonl")
+            if os.path.exists(pending_path):
+                try:
+                    recovered_events = []
+                    with open(pending_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                try:
+                                    recovered_events.append(json.loads(line))
+                                except Exception:
+                                    pass
+                    if recovered_events:
+                        with open(self.config.ledger_path, "a", encoding="utf-8") as f:
+                            for event in recovered_events:
+                                f.write(json.dumps(event) + "\n")
+                        if self.config.cloud_sync and not self.config.local_only and self.config.api_key:
+                            self._sync_to_cloud(recovered_events)
+                    os.remove(pending_path)
+                except Exception as e:
+                    print(f"[Aurex Warning] Failed to recover pending events: {e}", file=sys.stderr)
+
+        # Register atexit handler for graceful shutdown
+        import atexit
+        atexit.register(self.persist_pending_and_shutdown)
+
+        # Register signal handlers for clean exits
+        import signal
+        def handle_signal(signum, frame):
+            self.persist_pending_and_shutdown()
+            sys.exit(0)
+        try:
+            signal.signal(signal.SIGINT, handle_signal)
+            signal.signal(signal.SIGTERM, handle_signal)
+        except ValueError:
+            # signal only works in main thread, ignore if sub-thread
+            pass
 
         self._thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._thread.start()
@@ -270,8 +313,122 @@ class AurexAuditor:
             "extra_metadata": extra_metadata or {}
         }
         
+        # Track metrics for sliding window and session tracking under lock
+        with self._lock:
+            self._last_minute_events.append({"timestamp": time.time(), "cost": cost})
+            if workflow_id:
+                self._session_costs[workflow_id] = self._session_costs.get(workflow_id, 0) + cost
+
         # Push to async worker queue - returns immediately, taking < 0.1 ms
         self._queue.put(event)
+
+        # Trigger budget check & circuit breaker
+        self._check_budget(cost, input_tokens, workflow_id)
+
+    def configure_circuit_breaker(self, config: Dict[str, Any]):
+        """Configure circuit breaker thresholds and limits"""
+        # Normalize keys from camelCase to snake_case
+        normalized = {}
+        mapping = {
+            "maxCostPerMinute": "max_cost_per_minute",
+            "maxCostPerSession": "max_cost_per_session",
+            "maxRequestsPerMinute": "max_requests_per_minute",
+            "maxContextTokens": "max_context_tokens",
+            "onBudgetExceeded": "on_budget_exceeded",
+            "webhookUrl": "webhook_url",
+            "dryRun": "dry_run"
+        }
+        for k, v in config.items():
+            snake_k = mapping.get(k, k)
+            normalized[snake_k] = v
+        with self._lock:
+            self._budget_config = normalized
+
+    def configureCircuitBreaker(self, config: Dict[str, Any]):
+        """Alias for configure_circuit_breaker"""
+        self.configure_circuit_breaker(config)
+
+    def _check_budget(self, new_event_cost: float, input_tokens: int, workflow_id: Optional[str] = None):
+        with self._lock:
+            if not self._budget_config:
+                return
+
+            now = time.time()
+            # Keep sliding 60s window
+            self._last_minute_events = [e for e in self._last_minute_events if now - e["timestamp"] < 60]
+
+            minute_cost = sum(e["cost"] for e in self._last_minute_events)
+            minute_requests = len(self._last_minute_events)
+
+            current_session_cost = 0
+            if workflow_id:
+                current_session_cost = self._session_costs.get(workflow_id, 0)
+
+            budget_exceeded = False
+            reason = ""
+
+            max_cost_pm = self._budget_config.get("max_cost_per_minute")
+            if max_cost_pm is not None and minute_cost > max_cost_pm:
+                budget_exceeded = True
+                reason += f"Cost per minute limit exceeded: ${minute_cost:.4f} > ${max_cost_pm:.4f}. "
+
+            max_reqs_pm = self._budget_config.get("max_requests_per_minute")
+            if max_reqs_pm is not None and minute_requests > max_reqs_pm:
+                budget_exceeded = True
+                reason += f"Requests per minute limit exceeded: {minute_requests} > {max_reqs_pm}. "
+
+            max_cost_ps = self._budget_config.get("max_cost_per_session")
+            if workflow_id and max_cost_ps is not None and current_session_cost > max_cost_ps:
+                budget_exceeded = True
+                reason += f"Cost per session limit exceeded for workflow \"{workflow_id}\": ${current_session_cost:.4f} > ${max_cost_ps:.4f}. "
+
+            max_ctx_toks = self._budget_config.get("max_context_tokens")
+            if max_ctx_toks is not None and input_tokens > max_ctx_toks:
+                budget_exceeded = True
+                reason += f"Input context token limit exceeded: {input_tokens} > {max_ctx_toks}. "
+
+            if budget_exceeded:
+                mode = self._budget_config.get("on_budget_exceeded", "warn")
+                message = f"[Aurex SDK Budget Guard] {reason}"
+
+                if self._budget_config.get("dry_run"):
+                    print(f"[Aurex SDK Budget Guard DRY RUN] Would block: {reason}", file=sys.stderr)
+                    return
+
+                if mode == "warn":
+                    print(message, file=sys.stderr)
+                elif mode == "webhook" and self._budget_config.get("webhook_url"):
+                    payload = {
+                        "event": "budget_exceeded",
+                        "reason": reason,
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "details": {
+                            "minuteCost": minute_cost,
+                            "minuteRequests": minute_requests,
+                            "sessionCost": current_session_cost if workflow_id else None,
+                            "inputTokens": input_tokens,
+                            "workflowId": workflow_id
+                        }
+                    }
+                    
+                    def fire_webhook():
+                        try:
+                            req_data = json.dumps(payload).encode("utf-8")
+                            req = urllib.request.Request(
+                                self._budget_config["webhook_url"],
+                                data=req_data,
+                                headers={"Content-Type": "application/json"},
+                                method="POST"
+                            )
+                            with urllib.request.urlopen(req, timeout=3.0) as response:
+                                response.read()
+                        except Exception as ex:
+                            print(f"[Aurex SDK Budget Guard] Webhook failed: {ex}", file=sys.stderr)
+
+                    threading.Thread(target=fire_webhook, daemon=True).start()
+
+                elif mode == "throw":
+                    raise Exception(message)
 
     def _worker_loop(self):
         """Asynchronous worker that batches operations and writes to file / cloud sync"""
@@ -297,6 +454,13 @@ class AurexAuditor:
                     last_flush = now
             except Exception as e:
                 print(f"[Aurex SDK Worker Error] {e}", file=sys.stderr)
+
+        # Flush any remaining items in batch on exit
+        if batch:
+            try:
+                self._flush_batch(batch)
+            except Exception as e:
+                print(f"[Aurex SDK Worker Error on exit] {e}", file=sys.stderr)
 
     def _flush_batch(self, batch: List[Dict[str, Any]]):
         """Append to the local JSONL ledger file or memory buffer"""
@@ -343,11 +507,33 @@ class AurexAuditor:
             # Fail silently to not impact production application
             pass
 
-    def shutdown(self):
-        """Flush the queue and terminate background worker thread"""
+    def persist_pending_and_shutdown(self):
+        """Persist outstanding queue events to pending.jsonl and terminate background worker thread"""
         self._stop_event.set()
         if self._thread.is_alive():
             self._thread.join(timeout=3.0)
+        
+        # Drain whatever is left in self._queue
+        leftover = []
+        while not self._queue.empty():
+            try:
+                leftover.append(self._queue.get_nowait())
+            except queue.Empty:
+                break
+                
+        if leftover and self.config.storage_mode == "file":
+            ledger_dir = os.path.dirname(self.config.ledger_path)
+            pending_path = os.path.join(ledger_dir or ".", "pending.jsonl")
+            try:
+                with open(pending_path, "a", encoding="utf-8") as f:
+                    for event in leftover:
+                        f.write(json.dumps(event) + "\n")
+            except Exception as e:
+                print(f"[Aurex Warning] Failed to persist pending events: {e}", file=sys.stderr)
+
+    def shutdown(self):
+        """Flush the queue and terminate background worker thread"""
+        self.persist_pending_and_shutdown()
             
     def __enter__(self):
         return self

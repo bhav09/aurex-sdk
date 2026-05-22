@@ -76,8 +76,7 @@ async def init_db():
     """
     Initialize database tables with retry logic
     """
-    from src.models import Base
-    from src.models.audit_session import AuditSession
+    from src.models import Base, LLMEvent, AuditSession, PricingOverride, AlertRule
     
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

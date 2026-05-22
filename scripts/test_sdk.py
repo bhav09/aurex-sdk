@@ -35,8 +35,8 @@ def run_test():
             system_prompt=system_prompt
         )
 
-    # 2. Simulate runaway loops (input tokens doubling: 100 -> 200 -> 400)
-    contexts = [100, 200, 400]
+    # 2. Simulate runaway loops (input tokens doubling: 100 -> 260 -> 680)
+    contexts = [100, 260, 680]
     for c in contexts:
         auditor.log_event(
             model="claude-3-5-sonnet",

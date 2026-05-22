@@ -9,6 +9,7 @@ const navLinks = [
   { name: "Features", href: "/#features" },
   { name: "How It Works", href: "/#how-it-works" },
   { name: "Pricing", href: "/#pricing" },
+  { name: "Docs", href: "/docs" },
 ];
 
 export function Navigation() {
@@ -63,6 +64,7 @@ export function Navigation() {
             {navLinks.map((link) => (
               <a
                 key={link.name}
+                id={`nav-link-${link.name.toLowerCase().replace(/\s+/g, "-")}`}
                 href={link.href}
                 className={`text-sm transition-colors duration-300 relative group ${isScrolled ? "text-foreground/70 hover:text-foreground" : "text-white/70 hover:text-white"}`}
               >
@@ -114,6 +116,7 @@ export function Navigation() {
             {navLinks.map((link, i) => (
               <a
                 key={link.name}
+                id={`mobile-nav-link-${link.name.toLowerCase().replace(/\s+/g, "-")}`}
                 href={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`text-5xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${isMobileMenuOpen

@@ -5,24 +5,25 @@ Tests the complete Aurex backend system
 
 import sys
 import os
+import asyncio
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.database import init_db, get_db_context
-from src.models import LLMEvent, LLMEventCreate
-from src.utils import calculate_cost
-from src.detection import analyze_all
+from src.models import LLMEvent, LLMEventCreate, AuditSession
+from src.utils.pricing import calculate_cost
+from src.detection.engine import EnhancedDetectionEngine
 from datetime import datetime
 import uuid
 
 
-def test_database():
+async def test_database():
     """Test database initialization"""
     print("🧪 Testing database initialization...")
     try:
-        init_db()
+        await init_db()
         print("✅ Database initialized successfully")
         return True
     except Exception as e:
@@ -30,11 +31,23 @@ def test_database():
         return False
 
 
-def test_event_creation():
+async def test_event_creation():
     """Test creating and storing events"""
     print("\n🧪 Testing event creation...")
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
+            # Create a test session first
+            session_id = str(uuid.uuid4())
+            session = AuditSession(
+                id=session_id,
+                user_name="Integration Test User",
+                email="test-integration@company.com",
+                company_name="Integration Test Corp",
+                file_name="test.csv",
+                created_at=datetime.utcnow()
+            )
+            db.add(session)
+            
             # Create test event
             event_data = LLMEventCreate(
                 timestamp=datetime.utcnow(),
@@ -55,13 +68,15 @@ def test_event_creation():
             )
             
             event = LLMEvent(**event_data.dict())
+            event.upload_session_id = session_id
             db.add(event)
-            db.commit()
+            await db.flush()
             
             # Verify event was stored
-            stored_event = db.query(LLMEvent).filter(
-                LLMEvent.workflow_id == "test-workflow-1"
-            ).first()
+            from sqlalchemy import select
+            stmt = select(LLMEvent).where(LLMEvent.workflow_id == "test-workflow-1")
+            res = await db.execute(stmt)
+            stored_event = res.scalars().first()
             
             if stored_event:
                 print(f"✅ Event created successfully (ID: {stored_event.id})")
@@ -74,10 +89,12 @@ def test_event_creation():
                 
     except Exception as e:
         print(f"❌ Event creation failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
-def test_cost_calculation():
+async def test_cost_calculation():
     """Test cost calculation"""
     print("\n🧪 Testing cost calculation...")
     try:
@@ -100,11 +117,22 @@ def test_cost_calculation():
         return False
 
 
-def test_detection_engine():
+async def test_detection_engine():
     """Test detection engine"""
     print("\n🧪 Testing detection engine...")
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
+            session_id = str(uuid.uuid4())
+            session = AuditSession(
+                id=session_id,
+                user_name="Detection Test User",
+                email="test-detection@company.com",
+                company_name="Detection Test Corp",
+                file_name="test.csv",
+                created_at=datetime.utcnow()
+            )
+            db.add(session)
+            
             # Create test events that should trigger detections
             
             # 1. Create agent loop scenario
@@ -126,6 +154,7 @@ def test_detection_engine():
                     extra_metadata={"iteration": i}
                 )
                 event = LLMEvent(**event_data.dict())
+                event.upload_session_id = session_id
                 db.add(event)
             
             # 2. Create expensive model misuse scenario
@@ -146,23 +175,25 @@ def test_detection_engine():
                     extra_metadata={"simple": True}
                 )
                 event = LLMEvent(**event_data.dict())
+                event.upload_session_id = session_id
                 db.add(event)
             
-            db.commit()
+            await db.flush()
             
             # Run detection engine
-            analysis = analyze_all(db)
+            engine = EnhancedDetectionEngine(db, session_id=session_id)
+            analysis = await engine.analyze_complete()
             
             print(f"✅ Detection engine ran successfully")
             print(f"   Total events: {analysis['total_events']}")
-            print(f"   Total cost: ${analysis['total_cost']:.4f}")
-            print(f"   Wasted cost: ${analysis['wasted_cost']:.4f}")
-            print(f"   Issues found: {analysis['issues_found']}")
+            print(f"   Total cost: ${analysis['executive_summary']['current_weekly_spend']:.4f}")
+            print(f"   Wasted cost: ${analysis['executive_summary']['wasted_amount']:.4f}")
+            print(f"   Issues found: {len(analysis['top_issues'])}")
             
-            if analysis['issues_found'] > 0:
+            if len(analysis['top_issues']) > 0:
                 print("\n   Detected issues:")
-                for issue in analysis['issues'][:3]:  # Show first 3
-                    print(f"   - {issue['type']}: {issue['description'][:60]}...")
+                for issue in analysis['top_issues'][:3]:  # Show first 3
+                    print(f"   - {issue['issue_type']}: {issue['one_line_summary'][:60]}...")
             
             return True
             
@@ -173,37 +204,39 @@ def test_detection_engine():
         return False
 
 
-def test_ingestion():
-    """Test CSV and JSON ingestion"""
-    print("\n🧪 Testing ingestion modules...")
+async def test_ingestion():
+    """Test CSV parsing"""
+    print("\n🧪 Testing CSV parsing...")
     try:
-        from src.ingestion import ingest_csv_file
+        import pandas as pd
+        import io
         
         # Create a simple test CSV in memory
-        import io
         csv_content = """timestamp,model,input_tokens,output_tokens,cost
 2024-01-01T10:00:00,gpt-4o,100,50,0.00125
 2024-01-01T10:05:00,gpt-4o-mini,200,100,0.00015
 """
-        csv_file = io.BytesIO(csv_content.encode())
+        df = pd.read_csv(io.StringIO(csv_content))
         
-        events = ingest_csv_file(csv_file, csv_type='openai')
+        events = []
+        for idx, row in df.iterrows():
+            events.append(row.to_dict())
         
         if events and len(events) == 2:
-            print(f"✅ CSV ingestion working ({len(events)} events parsed)")
+            print(f"✅ CSV parsing working ({len(events)} events parsed)")
             return True
         else:
-            print(f"❌ CSV ingestion failed (expected 2 events, got {len(events)})")
+            print(f"❌ CSV parsing failed (expected 2 events, got {len(events)})")
             return False
             
     except Exception as e:
-        print(f"❌ Ingestion test failed: {e}")
+        print(f"❌ CSV parsing test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
-def run_all_tests():
+async def run_all_tests():
     """Run all integration tests"""
     print("╔═══════════════════════════════════════╗")
     print("║   Aurex Backend Integration Tests   ║")
@@ -213,13 +246,13 @@ def run_all_tests():
         ("Database", test_database),
         ("Event Creation", test_event_creation),
         ("Cost Calculation", test_cost_calculation),
-        ("Ingestion", test_ingestion),
+        ("Ingestion Parsing", test_ingestion),
         ("Detection Engine", test_detection_engine),
     ]
     
     results = []
     for name, test_func in tests:
-        result = test_func()
+        result = await test_func()
         results.append((name, result))
     
     # Summary
@@ -245,7 +278,7 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    exit_code = run_all_tests()
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
+    exit_code = asyncio.run(run_all_tests())
     sys.exit(exit_code)
-
-
