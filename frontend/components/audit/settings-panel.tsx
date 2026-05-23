@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-    Upload, 
-    Trash2, 
-    CheckCircle2, 
-    AlertCircle, 
-    Download, 
-    FileText, 
-    Coins, 
+import {
+    Upload,
+    Trash2,
+    CheckCircle2,
+    AlertCircle,
+    Download,
+    FileText,
+    Coins,
     RefreshCw,
     KeyRound,
     Copy,
@@ -17,13 +17,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
 } from "@/components/ui/table";
 import { aurixAPI } from "@/lib/api-client";
 
@@ -187,7 +187,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
             // Send empty JSON blob to POST /pricing/overrides to clear all overrides
             const emptyBlob = new Blob([JSON.stringify({})], { type: "application/json" });
             const file = new File([emptyBlob], "clear.json", { type: "application/json" });
-            
+
             await aurixAPI.uploadPricingOverrides(file, companyName);
             setSuccess("All custom pricing overrides cleared successfully.");
             await fetchOverrides();
@@ -234,10 +234,50 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
                     Pricing & Cost Settings
                 </h2>
                 <p className="text-sm text-white/50">
-                    Configure custom model pricing overrides for <strong className="text-white">{companyName}</strong>. 
+                    Configure custom model pricing overrides for <strong className="text-white">{companyName}</strong>.
                     These prices take priority over standard public API prices during cost calculations.
                 </p>
             </div>
+
+            {/* Pricing Overrides Info Banner */}
+            <Card className="border-blue-500/20 bg-gradient-to-r from-blue-500/10 to-violet-500/10 p-5 backdrop-blur-md">
+                <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Coins className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                        <h3 className="font-semibold text-white text-sm">Why Custom Pricing Matters</h3>
+                        <p className="text-xs text-white/70 leading-relaxed">
+                            Enterprise customers often negotiate <strong className="text-blue-400">20-50% discounts</strong> with LLM providers.
+                            Without custom pricing, Aurex would calculate costs using public rates, making your savings projections <strong className="text-red-400">inaccurate</strong>.
+                            Upload your negotiated rates to ensure <strong className="text-emerald-400">precise cost tracking</strong> and realistic optimization recommendations.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 pt-3 border-t border-white/10">
+                            <div className="flex items-start gap-2">
+                                <span className="text-emerald-400 text-lg">💰</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Accurate Costs</p>
+                                    <p className="text-[10px] text-white/50">Reflects your actual negotiated rates</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="text-violet-400 text-lg">📈</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Better Insights</p>
+                                    <p className="text-[10px] text-white/50">More precise waste detection & savings</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="text-blue-400 text-lg">🎯</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Real ROI</p>
+                                    <p className="text-[10px] text-white/50">Accurate annual savings projections</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Left Card: JSON Upload */}
@@ -245,19 +285,19 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
                     <div>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold text-white text-lg">Upload Pricing JSON</h3>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={downloadSampleJSON} 
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={downloadSampleJSON}
                                 className="h-8 gap-1.5 border-white/10 bg-white/5 text-xs text-white hover:bg-white/10"
                             >
                                 <Download className="h-3.5 w-3.5" />
                                 Schema Template
                             </Button>
                         </div>
-                        
+
                         <p className="text-xs text-white/50 leading-relaxed mb-4">
-                            Upload a JSON file containing model cost overrides mapping model names to custom costs. 
+                            Upload a JSON file containing model cost overrides mapping model names to custom costs.
                             Costs are specified per million (1,000,000) tokens. Supported format:
                         </p>
 
@@ -275,26 +315,25 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
                         </div>
 
                         {/* Drag and Drop Zone */}
-                        <div 
+                        <div
                             onDragEnter={handleDrag}
                             onDragOver={handleDrag}
                             onDragLeave={handleDrag}
                             onDrop={handleDrop}
-                            className={`border border-dashed rounded-xl px-6 py-8 text-center transition-all ${
-                                dragActive 
-                                ? "border-violet-500 bg-violet-500/10" 
+                            className={`border border-dashed rounded-xl px-6 py-8 text-center transition-all ${dragActive
+                                ? "border-violet-500 bg-violet-500/10"
                                 : "border-white/10 hover:border-white/20 bg-white/[0.01]"
-                            }`}
+                                }`}
                         >
-                            <input 
-                                type="file" 
-                                id="pricing-json-file" 
-                                accept=".json" 
-                                className="hidden" 
+                            <input
+                                type="file"
+                                id="pricing-json-file"
+                                accept=".json"
+                                className="hidden"
                                 onChange={handleFileChange}
                             />
-                            <label 
-                                htmlFor="pricing-json-file" 
+                            <label
+                                htmlFor="pricing-json-file"
                                 className="cursor-pointer flex flex-col items-center justify-center gap-2"
                             >
                                 <div className="h-10 w-10 rounded-full bg-violet-500/10 flex items-center justify-center mb-1 text-violet-400">
@@ -343,9 +382,9 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
                                 Active Overrides
                             </h3>
                             {overrides.length > 0 && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={handleClearOverrides}
                                     className="h-8 gap-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                 >
@@ -403,12 +442,52 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
                 </Card>
             </div>
 
-            <Card className="border-white/10 bg-white/[0.03] p-6 backdrop-blur-md mt-8">
+            {/* API Keys Info Banner */}
+            <Card className="border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 p-5 backdrop-blur-md mt-8">
+                <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <KeyRound className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                        <h3 className="font-semibold text-white text-sm">Enable Real-Time Cost Tracking with SDK</h3>
+                        <p className="text-xs text-white/70 leading-relaxed">
+                            API keys allow your application to <strong className="text-emerald-400">automatically send LLM usage data</strong> to Aurex in real-time.
+                            Instead of manually uploading CSV files, integrate our <strong className="text-blue-400">Python or Node.js SDK</strong> to track every LLM call,
+                            detect waste instantly, and get <strong className="text-violet-400">continuous cost optimization insights</strong>.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 pt-3 border-t border-white/10">
+                            <div className="flex items-start gap-2">
+                                <span className="text-emerald-400 text-lg">⚡</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Real-Time Tracking</p>
+                                    <p className="text-[10px] text-white/50">Automatic data ingestion from your app</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="text-blue-400 text-lg">🔒</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Secure Auth</p>
+                                    <p className="text-[10px] text-white/50">Revocable keys with prefix identification</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="text-violet-400 text-lg">📦</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Easy Integration</p>
+                                    <p className="text-[10px] text-white/50">2-line SDK setup in Python/Node.js</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <Card className="border-white/10 bg-white/[0.03] p-6 backdrop-blur-md">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/10 pb-4 mb-6">
                     <div className="space-y-1">
                         <h3 className="font-semibold text-white text-lg flex items-center gap-2">
                             <KeyRound className="h-5 w-5 text-violet-400" />
-                            Aurex SDK API Keys
+                            Manage API Keys
                         </h3>
                         <p className="text-xs text-white/50">
                             Create and manage API keys to authenticate Node.js and Python SDK integrations.
@@ -507,6 +586,73 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
                                 </Table>
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* SDK Integration Examples */}
+                <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+                    <h4 className="font-medium text-white text-sm flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-violet-400" />
+                        Quick Start: SDK Integration
+                    </h4>
+                    <p className="text-xs text-white/60 leading-relaxed">
+                        Once you've generated an API key, integrate Aurex into your application with just a few lines of code:
+                    </p>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {/* Python Example */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-blue-400">Python</span>
+                                <span className="text-[10px] text-white/40">pip install aurex-sdk</span>
+                            </div>
+                            <div className="bg-black/60 rounded-lg p-3 border border-white/5 font-mono text-[10px] leading-relaxed text-white/80 overflow-x-auto">
+                                <pre>{`from aurex_sdk import AurexClient
+
+client = AurexClient(
+    api_key="your_api_key_here"
+)
+
+# Track LLM calls automatically
+response = client.track_llm_call(
+    model="gpt-4o",
+    prompt_tokens=1500,
+    completion_tokens=500,
+    workflow_id="document_analysis"
+)`}</pre>
+                            </div>
+                        </div>
+
+                        {/* Node.js Example */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-emerald-400">Node.js</span>
+                                <span className="text-[10px] text-white/40">npm install @aurex/sdk</span>
+                            </div>
+                            <div className="bg-black/60 rounded-lg p-3 border border-white/5 font-mono text-[10px] leading-relaxed text-white/80 overflow-x-auto">
+                                <pre>{`import { AurexClient } from '@aurex/sdk';
+
+const client = new AurexClient({
+  apiKey: 'your_api_key_here'
+});
+
+// Track LLM calls automatically
+await client.trackLLMCall({
+  model: 'gpt-4o',
+  promptTokens: 1500,
+  completionTokens: 500,
+  workflowId: 'document_analysis'
+});`}</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 pt-3 border-t border-white/5">
+                        <AlertCircle className="h-4 w-4 text-violet-400 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-white/50 leading-relaxed">
+                            <strong className="text-white/70">Pro Tip:</strong> Use different API keys for development, staging, and production environments.
+                            You can revoke keys anytime without affecting other environments.
+                        </p>
                     </div>
                 </div>
             </Card>

@@ -21,6 +21,71 @@ _synced_catalog: Dict[str, Dict] = {}
 _catalog_loaded: bool = False
 
 
+# Semantic field mapping for pricing data
+# Maps various possible field names to our standard format
+PRICING_FIELD_MAPPINGS = {
+    "input": [
+        "input_price_per_1m",
+        "input_cost_per_token",
+        "input_price_per_million",
+        "input_cost_per_1m_tokens",
+        "prompt_price_per_1m",
+        "prompt_cost_per_token",
+        "input_token_price",
+        "input",
+    ],
+    "output": [
+        "output_price_per_1m",
+        "output_cost_per_token",
+        "output_price_per_million",
+        "output_cost_per_1m_tokens",
+        "completion_price_per_1m",
+        "completion_cost_per_token",
+        "output_token_price",
+        "output",
+    ],
+}
+
+
+def _extract_pricing_from_entry(entry: Dict) -> Optional[Tuple[float, float]]:
+    """
+    Extract input and output pricing from a catalog entry using semantic field mapping.
+    Handles various field name formats and converts to per-1M token pricing.
+    
+    Returns:
+        Tuple of (input_price_per_1m, output_price_per_1m) or None if not found
+    """
+    input_price = None
+    output_price = None
+    
+    # Try to find input price using semantic mapping
+    for field_name in PRICING_FIELD_MAPPINGS["input"]:
+        if field_name in entry:
+            value = entry[field_name]
+            # If it's per-token pricing (very small numbers), convert to per-1M
+            if "per_token" in field_name or (isinstance(value, (int, float)) and value < 0.01):
+                input_price = value * 1_000_000
+            else:
+                input_price = value
+            break
+    
+    # Try to find output price using semantic mapping
+    for field_name in PRICING_FIELD_MAPPINGS["output"]:
+        if field_name in entry:
+            value = entry[field_name]
+            # If it's per-token pricing (very small numbers), convert to per-1M
+            if "per_token" in field_name or (isinstance(value, (int, float)) and value < 0.01):
+                output_price = value * 1_000_000
+            else:
+                output_price = value
+            break
+    
+    if input_price is not None and output_price is not None:
+        return (input_price, output_price)
+    
+    return None
+
+
 def _load_synced_catalog():
     """Load the auto-synced LiteLLM pricing JSON if available."""
     global _synced_catalog, _catalog_loaded
@@ -130,7 +195,9 @@ def get_model_pricing(model: str, pricing_overrides: Optional[Dict[str, Tuple[fl
     # 2. Try synced catalog (exact match)
     if query_norm in _synced_catalog:
         entry = _synced_catalog[query_norm]
-        return entry["input_price_per_1m"], entry["output_price_per_1m"]
+        pricing = _extract_pricing_from_entry(entry)
+        if pricing:
+            return pricing
 
     # 3. Try synced catalog (substring match, longest key first)
     if _synced_catalog:
@@ -138,7 +205,9 @@ def get_model_pricing(model: str, pricing_overrides: Optional[Dict[str, Tuple[fl
         for key in sorted_keys:
             if key in query_norm or query_norm in key:
                 entry = _synced_catalog[key]
-                return entry["input_price_per_1m"], entry["output_price_per_1m"]
+                pricing = _extract_pricing_from_entry(entry)
+                if pricing:
+                    return pricing
 
     # 4. Try built-in table (exact match)
     pricing = BUILTIN_PRICING.get(query_norm)

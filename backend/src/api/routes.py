@@ -28,9 +28,10 @@ from src.models import (
     ApiKeyResponse
 )
 from src.utils.logger import get_logger
+from src.ingestion.field_mapper import field_mapper
 
 from . import auth
-from .auth import get_current_user, get_current_user_optional
+from .auth import get_current_user, get_current_user_optional, get_current_user_or_api_key, verify_api_key
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -312,11 +313,13 @@ async def upload_csv(
     file: UploadFile = File(...),
     session_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_or_api_key)
 ):
     """
     Upload and parse LLM usage CSV/JSON log file.
     Inserts parsed events into database linked to the session_id.
+    
+    Authentication: Supports both JWT tokens (web dashboard) and API keys (SDK).
     """
     import pandas as pd
     import io
@@ -360,8 +363,22 @@ async def upload_csv(
         if filename.endswith(".json"):
             import json
             raw_data = json.loads(contents.decode("utf-8"))
+            
+            # Handle nested JSON structures (e.g., {"meta": {...}, "logs": [...]})
             if isinstance(raw_data, dict):
-                raw_data = [raw_data]
+                # Check for common nested array keys
+                if "logs" in raw_data and isinstance(raw_data["logs"], list):
+                    raw_data = raw_data["logs"]
+                elif "events" in raw_data and isinstance(raw_data["events"], list):
+                    raw_data = raw_data["events"]
+                elif "data" in raw_data and isinstance(raw_data["data"], list):
+                    raw_data = raw_data["data"]
+                elif "records" in raw_data and isinstance(raw_data["records"], list):
+                    raw_data = raw_data["records"]
+                else:
+                    # If no nested array found, treat the dict as a single record
+                    raw_data = [raw_data]
+            
             chunks = [pd.DataFrame(raw_data)]
         else:
             chunks = pd.read_csv(io.BytesIO(contents), chunksize=1000)
@@ -548,7 +565,7 @@ async def upload_csv(
             provider_val = extract_provider_from_model(model_val)
             
             workflow_id = None
-            for col in ["workflow_id", "workflow", "session_id", "session"]:
+            for col in ["workflow_id", "workflow", "feature", "feature_tag", "feature_name", "use_case", "session_id", "session"]:
                 if col in row and pd.notna(row[col]) and col != "session_id" and not isinstance(row[col], dict):
                     workflow_id = str(row[col])
                     break
@@ -575,15 +592,20 @@ async def upload_csv(
                 if col not in ["timestamp", "date", "created", "starting_at", "ending_at", "time", "logging_time",
                                "model", "model_id", "modelid", "input_tokens", "prompt_tokens", 
                                "input_token_count", "inputtokencount", "n_context_tokens_total", "prompt_token_count",
-                               "output_tokens", "completion_tokens", "output_token_count", "outputtokencount", 
-                               "n_generated_tokens_total", "completion_token_count", "total_tokens", "tokens", 
-                               "total_token_count", "totaltokencount", "cost", "amount", "total_cost", 
+                               "output_tokens", "completion_tokens", "output_token_count", "outputtokencount",
+                               "n_generated_tokens_total", "completion_token_count", "total_tokens", "tokens",
+                               "total_token_count", "totaltokencount", "cost", "amount", "total_cost",
                                "cost_usd", "total_cost_usd", "price", "workflow_id", "workflow", "session_id", "session"]:
-                    if pd.notna(row[col]):
+                    try:
                         val = row[col]
+                        # Convert to scalar if it's a numpy/pandas type
                         if hasattr(val, "item"):
                             val = val.item()
-                        extra_metadata[col] = val
+                        # Check if value is not null (now it's a scalar)
+                        if val is not None and not (isinstance(val, float) and pd.isna(val)):
+                            extra_metadata[col] = val
+                    except (KeyError, AttributeError, ValueError):
+                        pass
                         
             if meta_dict:
                 extra_metadata.update(meta_dict)
@@ -648,6 +670,163 @@ async def upload_csv(
         "status": "success",
         "events_ingested": events_inserted,
         "upload_session_id": session_id
+    }
+
+
+# ============================================================================
+# SDK ENDPOINTS (API Key Authentication)
+# ============================================================================
+
+class SDKEventBatch(BaseModel):
+    """Batch of events from SDK"""
+    project: str = "default"
+    events: List[Dict]
+
+@router.post("/sdk/events")
+async def ingest_sdk_events(
+    batch: SDKEventBatch,
+    db: AsyncSession = Depends(get_db),
+    owner_email: str = Depends(verify_api_key)
+):
+    """
+    Ingest events from SDK (Python/Node) in real-time.
+    Authenticated via API key only (not JWT).
+    
+    This endpoint is optimized for SDK cloud sync with:
+    - Batch processing (up to 50 events per request)
+    - Automatic session management
+    - Zero-PII validation (prompts should be hashed)
+    - Rate limiting per API key
+    
+    Args:
+        batch: Batch of events with project name
+        owner_email: Extracted from API key (via verify_api_key dependency)
+        
+    Returns:
+        Success status with ingestion count
+    """
+    from src.models import LLMEvent, AuditSession
+    from src.utils.pricing import calculate_cost, extract_provider_from_model
+    from datetime import datetime
+    import uuid
+    
+    if not batch.events:
+        raise HTTPException(status_code=400, detail="No events provided")
+    
+    if len(batch.events) > 50:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Batch size too large. Maximum 50 events per request, got {len(batch.events)}"
+        )
+    
+    # Get or create audit session for this API key owner + project
+    session_query = select(AuditSession).where(
+        func.lower(AuditSession.email) == func.lower(owner_email),
+        AuditSession.file_name == f"sdk_{batch.project}"
+    ).order_by(desc(AuditSession.created_at)).limit(1)
+    
+    result = await db.execute(session_query)
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        # Create new session for SDK events
+        session = AuditSession(
+            id=str(uuid.uuid4()),
+            email=owner_email,
+            user_name=f"SDK User ({owner_email})",
+            company_name=f"SDK Project: {batch.project}",
+            file_name=f"sdk_{batch.project}",
+            file_type="sdk",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(session)
+        await db.commit()
+        await db.refresh(session)
+    
+    session_id = session.id
+    events_inserted = 0
+    
+    # Process each event in the batch
+    for event_data in batch.events:
+        try:
+            # Extract required fields
+            model = event_data.get("model", "unknown")
+            provider = event_data.get("provider") or extract_provider_from_model(model)
+            
+            input_tokens = int(event_data.get("input_tokens", 0))
+            output_tokens = int(event_data.get("output_tokens", 0))
+            cached_tokens = int(event_data.get("cached_tokens", 0))
+            cache_write_tokens = int(event_data.get("cache_write_tokens", 0))
+            reasoning_tokens = int(event_data.get("reasoning_tokens", 0))
+            is_batch = bool(event_data.get("is_batch", False))
+            
+            # Calculate cost if not provided
+            cost = event_data.get("cost")
+            if cost is None:
+                cost = calculate_cost(
+                    model,
+                    input_tokens,
+                    output_tokens,
+                    cache_read_tokens=cached_tokens,
+                    cache_creation_tokens=cache_write_tokens,
+                    is_batch=is_batch
+                )
+            
+            # Parse timestamp
+            timestamp_str = event_data.get("timestamp")
+            if timestamp_str:
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                except:
+                    timestamp = datetime.utcnow()
+            else:
+                timestamp = datetime.utcnow()
+            
+            # Create LLM event
+            event = LLMEvent(
+                id=str(uuid.uuid4()),
+                timestamp=timestamp,
+                provider=provider,
+                model=model,
+                workflow_id=event_data.get("workflow_id"),
+                step_id=event_data.get("step_id"),
+                parent_step_id=event_data.get("parent_step_id"),
+                upload_session_id=session_id,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+                cost=cost,
+                prompt=None,  # SDK should send hashes, not raw prompts (Zero-PII)
+                response=None,  # SDK should send hashes, not raw responses
+                system_prompt_hash=event_data.get("system_prompt_hash"),
+                context_length=input_tokens,
+                extra_metadata=event_data.get("extra_metadata", {}),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            db.add(event)
+            events_inserted += 1
+            
+        except Exception as e:
+            logger.error("Error processing SDK event", error=str(e), event=event_data)
+            # Continue processing other events
+            continue
+    
+    await db.commit()
+    
+    logger.info("SDK events ingested successfully",
+               count=events_inserted,
+               session_id=session_id,
+               owner_email=owner_email,
+               project=batch.project)
+    
+    return {
+        "status": "success",
+        "events_ingested": events_inserted,
+        "session_id": session_id,
+        "project": batch.project
     }
 
 
