@@ -90,7 +90,7 @@ export default function PrivacyPolicy() {
                             If you have questions about this Privacy Policy, our data practices, or how your Token Credit Score is calculated, please contact us at:
                         </p>
                         <p className="mt-4 font-mono text-sm">
-                            Email: privacy@aurex.com<br />
+                            Email: contact@heyaurex.com<br />
                             Website: www.heyaurex.com
                         </p>
                     </section>

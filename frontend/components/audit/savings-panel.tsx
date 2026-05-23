@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-    TrendingUp, 
-    DollarSign, 
-    Calendar, 
-    PieChart as PieIcon, 
-    RefreshCw, 
+import {
+    TrendingUp,
+    DollarSign,
+    Calendar,
+    PieChart as PieIcon,
+    RefreshCw,
     AlertCircle,
     CheckCircle2
 } from "lucide-react";
@@ -85,8 +85,8 @@ export function SavingsPanel({ companyName }: SavingsPanelProps) {
                 <AlertCircle className="h-10 w-10 text-red-400 mx-auto" />
                 <h3 className="font-semibold text-white text-lg">Failed to load Savings Realization</h3>
                 <p className="text-sm text-white/50">{error}</p>
-                <Button 
-                    onClick={fetchSavingsData} 
+                <Button
+                    onClick={fetchSavingsData}
                     className="bg-violet-600 hover:bg-violet-500 text-white font-medium"
                 >
                     Retry
@@ -128,6 +128,45 @@ export function SavingsPanel({ companyName }: SavingsPanelProps) {
                     Refresh Stats
                 </Button>
             </div>
+
+            {/* Informational Banner */}
+            <Card className="border-violet-500/20 bg-gradient-to-r from-violet-500/10 to-emerald-500/10 p-5 backdrop-blur-md">
+                <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-5 w-5 text-violet-400" />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                        <h3 className="font-semibold text-white text-sm">What is Savings Realization?</h3>
+                        <p className="text-xs text-white/70 leading-relaxed">
+                            This dashboard tracks the <strong className="text-white">actual cost savings</strong> you've achieved by implementing Aurex's optimization recommendations.
+                            It shows the difference between your <strong className="text-emerald-400">previous wasteful spending</strong> and your <strong className="text-violet-400">current optimized costs</strong> after fixes are deployed.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 pt-3 border-t border-white/10">
+                            <div className="flex items-start gap-2">
+                                <span className="text-emerald-400 text-lg">✓</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Real Savings</p>
+                                    <p className="text-[10px] text-white/50">Actual $ saved after implementing fixes</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="text-violet-400 text-lg">📊</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">Timeline Tracking</p>
+                                    <p className="text-[10px] text-white/50">Monitor savings progress over time</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="text-blue-400 text-lg">🎯</span>
+                                <div>
+                                    <p className="text-[11px] font-medium text-white">ROI Validation</p>
+                                    <p className="text-[10px] text-white/50">Prove optimization impact to stakeholders</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             {/* Metrics cards */}
             <div className="grid gap-6 sm:grid-cols-2">
@@ -190,47 +229,47 @@ export function SavingsPanel({ companyName }: SavingsPanelProps) {
                             >
                                 <defs>
                                     <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                     </linearGradient>
                                     <linearGradient id="colorWaste" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis 
-                                    dataKey="date" 
-                                    stroke="rgba(255,255,255,0.3)" 
-                                    tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                                <XAxis
+                                    dataKey="date"
+                                    stroke="rgba(255,255,255,0.3)"
+                                    tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                 />
                                 <YAxis stroke="rgba(255,255,255,0.3)" />
-                                <Tooltip 
-                                    contentStyle={{ 
-                                        backgroundColor: "#0d0d12", 
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: "#0d0d12",
                                         borderColor: "rgba(255,255,255,0.1)",
                                         color: "#fff",
                                         borderRadius: "8px"
                                     }}
-                                    labelFormatter={(val) => new Date(val).toLocaleDateString(undefined, {dateStyle: 'medium'})}
+                                    labelFormatter={(val) => new Date(val).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                                     formatter={(value: any) => [`$${Number(value).toFixed(2)}`]}
                                 />
-                                <Area 
-                                    type="monotone" 
-                                    dataKey="realized_savings" 
+                                <Area
+                                    type="monotone"
+                                    dataKey="realized_savings"
                                     name="Realized Savings"
-                                    stroke="#10b981" 
-                                    fillOpacity={1} 
-                                    fill="url(#colorSavings)" 
+                                    stroke="#10b981"
+                                    fillOpacity={1}
+                                    fill="url(#colorSavings)"
                                     strokeWidth={2}
                                 />
-                                <Area 
-                                    type="monotone" 
-                                    dataKey="total_waste" 
+                                <Area
+                                    type="monotone"
+                                    dataKey="total_waste"
                                     name="Wasted Costs"
-                                    stroke="#ef4444" 
-                                    fillOpacity={1} 
-                                    fill="url(#colorWaste)" 
+                                    stroke="#ef4444"
+                                    fillOpacity={1}
+                                    fill="url(#colorWaste)"
                                     strokeWidth={2}
                                 />
                             </AreaChart>
@@ -260,16 +299,16 @@ export function SavingsPanel({ companyName }: SavingsPanelProps) {
                                 >
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                                     <XAxis type="number" stroke="rgba(255,255,255,0.3)" />
-                                    <YAxis 
-                                        type="category" 
-                                        dataKey="name" 
-                                        stroke="rgba(255,255,255,0.3)" 
+                                    <YAxis
+                                        type="category"
+                                        dataKey="name"
+                                        stroke="rgba(255,255,255,0.3)"
                                         width={100}
                                         tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 10 }}
                                     />
-                                    <Tooltip 
-                                        contentStyle={{ 
-                                            backgroundColor: "#0d0d12", 
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: "#0d0d12",
                                             borderColor: "rgba(255,255,255,0.1)",
                                             color: "#fff",
                                             borderRadius: "8px"

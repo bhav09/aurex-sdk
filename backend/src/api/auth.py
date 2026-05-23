@@ -5,6 +5,7 @@ import httpx
 import resend
 import jwt
 import json
+import hashlib
 import redis.asyncio as redis
 from datetime import datetime, timedelta
 from typing import Dict, Optional
@@ -12,9 +13,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from email_validator import validate_email, EmailNotValidError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from src.utils.logger import get_logger
 
 from app.config import settings
+from src.database import get_db
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -179,6 +183,157 @@ async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCrede
         return None
     try:
         token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        email: str = payload.get("sub")
+        return email
+    except Exception:
+        return None
+
+# ============================================================================
+# API Key Authentication (for SDK cloud sync)
+# ============================================================================
+
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> str:
+    """
+    Verify API key and return owner email.
+    Used by SDKs for cloud sync authentication.
+    
+    Args:
+        credentials: Bearer token containing the API key
+        db: Database session
+        
+    Returns:
+        str: Owner email associated with the API key
+        
+    Raises:
+        HTTPException: If API key is invalid, inactive, or malformed
+    """
+    api_key = credentials.credentials
+    
+    # Validate API key format (should be at least 32 characters)
+    if not api_key or len(api_key) < 32:
+        logger.warning("Invalid API key format", key_length=len(api_key) if api_key else 0)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API key format. Expected format: aurex_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        )
+    
+    # Extract prefix (first 8 characters after 'aurex_')
+    if api_key.startswith("aurex_"):
+        prefix = api_key[6:14]  # Characters 6-13 (8 chars after 'aurex_')
+        key_to_hash = api_key
+    else:
+        # Legacy format without prefix
+        prefix = api_key[:8]
+        key_to_hash = api_key
+    
+    # Hash the full API key
+    key_hash = hashlib.sha256(key_to_hash.encode()).hexdigest()
+    
+    # Query database for matching key
+    from src.models import ApiKey
+    
+    try:
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.prefix == prefix,
+                ApiKey.key_hash == key_hash,
+                ApiKey.is_active == True
+            )
+        )
+        api_key_obj = result.scalar_one_or_none()
+        
+        if not api_key_obj:
+            logger.warning("API key not found or inactive", prefix=prefix)
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or inactive API key"
+            )
+        
+        # Update last_used_at timestamp
+        api_key_obj.last_used_at = datetime.utcnow()
+        await db.commit()
+        
+        logger.info("API key verified successfully", 
+                   prefix=prefix, 
+                   owner_email=api_key_obj.owner_email,
+                   key_name=api_key_obj.name)
+        
+        return api_key_obj.owner_email
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error verifying API key", error=str(e), prefix=prefix)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal error during API key verification"
+        )
+
+
+async def get_current_user_or_api_key(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    db: AsyncSession = Depends(get_db)
+) -> str:
+    """
+    Hybrid authentication: Try JWT first, fall back to API key.
+    Supports both web dashboard users (JWT) and SDK users (API key).
+    
+    Args:
+        credentials: Optional bearer token (JWT or API key)
+        db: Database session
+        
+    Returns:
+        str: User email from either JWT or API key
+        
+    Raises:
+        HTTPException: If no valid authentication provided
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Provide either JWT token or API key."
+        )
+    
+    token = credentials.credentials
+    
+    # Try JWT authentication first (for web dashboard users)
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        email: str = payload.get("sub")
+        if email:
+            logger.debug("Authenticated via JWT", email=email)
+            return email
+    except jwt.ExpiredSignatureError:
+        # JWT expired, don't try API key - user needs to re-login
+        raise HTTPException(status_code=401, detail="JWT token has expired")
+    except jwt.PyJWTError:
+        # Not a valid JWT, try API key authentication
+        pass
+    
+    # Try API key authentication (for SDK users)
+    try:
+        email = await verify_api_key(credentials, db)
+        logger.debug("Authenticated via API key", email=email)
+        return email
+    except HTTPException as e:
+        # Re-raise with more context
+        if e.status_code == 401:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication. Provide a valid JWT token or API key."
+            )
+        raise
+    except Exception as e:
+        logger.error("Authentication error", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Internal authentication error"
+        )
+
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         email: str = payload.get("sub")
         return email

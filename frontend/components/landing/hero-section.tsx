@@ -49,10 +49,10 @@ function ElegantShape({
     >
       <motion.div
         animate={shouldAnimate ? {
-          y: [0, 15, 0],
+          y: [0, 10, 0],
         } : {}}
         transition={{
-          duration: 12,
+          duration: 15,
           repeat: Infinity,
           ease: "easeInOut",
         }}
@@ -186,9 +186,9 @@ export function HeroSection() {
               </Button>
             </a>
             <a href="/docs">
-              <Button 
+              <Button
                 id="hero-link-docs"
-                variant="outline" 
+                variant="outline"
                 className="rounded-full border border-white/20 hover:border-white/40 text-white bg-transparent hover:bg-white/5 px-6 sm:px-8 h-11 sm:h-12 text-sm sm:text-base font-medium transition-all"
               >
                 SDK Docs
