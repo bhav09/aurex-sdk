@@ -417,7 +417,7 @@ export class AurexAPI {
         return data;
     }
 
-    async loginWithSSO(email: string, userName: string, companyName: string, provider: 'google' | 'github'): Promise<{
+    async loginWithSSO(email: string, userName: string, companyName: string, provider: 'google'): Promise<{
         status: string;
         access_token: string;
         token_type: string;
