@@ -78,4 +78,4 @@ class DetectionConfig:
             'provider_savings_threshold': self.provider_savings_threshold,
         }
 
-# Made with Bob
+

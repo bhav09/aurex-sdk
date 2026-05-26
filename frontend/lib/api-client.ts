@@ -706,4 +706,4 @@ export class AurexAPI {
 
 export const aurixAPI = new AurexAPI();
 
-// Made with Bob
+

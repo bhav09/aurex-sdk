@@ -38,4 +38,4 @@ echo "To remove:"
 echo "  crontab -e"
 echo "  (delete the line containing 'update_pricing.py')"
 
-# Made with Bob
+

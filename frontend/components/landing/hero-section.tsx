@@ -141,7 +141,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6 sm:mb-8 md:mb-12"
           >
             <span className="w-6 sm:w-8 h-px bg-white/30" />
-            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">The FinOps Platform for the AI Era</span>
+            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">AI Cost Auditor for Engineering Teams</span>
             <span className="w-6 sm:w-8 h-px bg-white/30" />
           </motion.div>
 
@@ -150,16 +150,16 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
           >
-            <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-4 sm:mb-6 md:mb-8 tracking-tight leading-[0.9]">
+            <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mt-4 sm:mt-6 mb-8 sm:mb-10 md:mb-12 tracking-tight leading-[1.20] pb-1">
               <span className="block bg-clip-text text-transparent bg-gradient-to-b from-white to-white/80">
-                reduce inference
+                find where your
               </span>
               <span
                 className={cn(
                   "block bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300"
                 )}
               >
-                costs automatically.
+                AI budget leaks.
               </span>
             </h1>
           </motion.div>
@@ -170,7 +170,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.7 }}
           >
             <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/40 mb-8 sm:mb-10 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-2 sm:px-4">
-              real-time cost visibility, intelligent routing, and net-30 inference financing for ai companies.
+              upload your llm logs, get a credit score, and see exactly which models, workflows, and prompts are wasting your budget.
             </p>
           </motion.div>
 
@@ -226,4 +226,4 @@ export function HeroSection() {
   )
 }
 
-// Made with Bob
+
