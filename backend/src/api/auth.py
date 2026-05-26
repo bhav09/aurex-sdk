@@ -539,7 +539,7 @@ class SSOLoginRequest(BaseModel):
 @router.post("/sso-login")
 async def sso_login(data: SSOLoginRequest):
     """Legacy SSO login endpoint - kept for backward compatibility.
-    For new integrations, use /google-login or /github/callback instead."""
+    For new integrations, use /google-login instead."""
     email = data.email.lower()
     access_token = create_access_token(data={"sub": email})
     
@@ -615,6 +615,4 @@ async def google_login(data: GoogleLoginRequest):
             "company_name": ""
         }
     }
-
-
 
