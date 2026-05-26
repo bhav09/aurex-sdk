@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # External APIs
     resend_api_key: str = Field(default="")
 
+    # OAuth Configuration
+    google_oauth_client_id: str = Field(default="")
+    github_oauth_client_id: str = Field(default="")
+    github_oauth_client_secret: str = Field(default="")
+    frontend_url: str = Field(default="http://localhost:3000")
+
     # Google Cloud Configuration
     google_application_credentials: str = Field(default="/Users/bhavishya/VSC Projects/tbank/aurex-495417-8ed2dc84792c.json")
 

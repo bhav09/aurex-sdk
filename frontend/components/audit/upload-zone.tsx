@@ -222,36 +222,114 @@ export function UploadZone({
         }
     };
 
-    const handleSSOClick = async (provider: 'google' | 'github') => {
+    // Load Google Identity Services script
+    useEffect(() => {
+        const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+        if (!googleClientId) return;
+
+        // Check if already loaded
+        if (document.getElementById('google-gsi-script')) return;
+
+        const script = document.createElement('script');
+        script.id = 'google-gsi-script';
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+    }, []);
+
+    const handleGoogleClick = async () => {
+        const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+        if (!googleClientId) {
+            setError("Google OAuth is not configured. Please set NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID.");
+            return;
+        }
+
+        // Check if GSI script has loaded
+        if (typeof window === 'undefined' || !(window as any).google?.accounts?.id) {
+            setError("Google sign-in is still loading. Please try again in a moment.");
+            return;
+        }
+
+        setOtpLoading(true);
+        setError(null);
+
         try {
-            setOtpLoading(true);
-            setError(null);
+            const google = (window as any).google;
             
-            const emailVal = provider === 'google' ? 'google.sso@heyaurex.com' : 'github.sso@heyaurex.com';
-            const nameVal = provider === 'google' ? 'Google SSO User' : 'GitHub SSO User';
-            const companyVal = 'Aurex Partner';
-            
-            const data = await aurixAPI.loginWithSSO(emailVal, nameVal, companyVal, provider);
-            
-            aurixAPI.trackClick(`${provider}_sso_click`, emailVal);
-            
-            setUserName(nameVal);
-            setEmail(emailVal);
-            setCompanyName(companyVal);
-            
-            if (selectedFile) {
-                onFileSelect(selectedFile, {
-                    user_name: nameVal,
-                    email: emailVal,
-                    company_name: companyVal
+            await new Promise<void>((resolve, reject) => {
+                google.accounts.id.initialize({
+                    client_id: googleClientId,
+                    callback: async (response: { credential: string }) => {
+                        try {
+                            const data = await aurixAPI.loginWithGoogle(response.credential);
+                            
+                            const userInfo = data.user_info;
+                            setUserName(userInfo.user_name);
+                            setEmail(userInfo.email);
+                            setCompanyName(userInfo.company_name || '');
+                            
+                            aurixAPI.trackClick("google_oauth_click", userInfo.email);
+                            
+                            if (selectedFile) {
+                                onFileSelect(selectedFile, {
+                                    user_name: userInfo.user_name,
+                                    email: userInfo.email,
+                                    company_name: userInfo.company_name || ''
+                                });
+                                setSelectedFile(null);
+                            }
+                            resolve();
+                        } catch (err: any) {
+                            setError(err.message || "Failed to authenticate with Google");
+                            reject(err);
+                        } finally {
+                            setOtpLoading(false);
+                        }
+                    },
+                    auto_select: false,
                 });
-                setSelectedFile(null);
-            }
+                
+                google.accounts.id.prompt((notification: any) => {
+                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                        // Fallback: if One Tap is blocked (e.g., by browser), use the redirect flow
+                        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                            `client_id=${googleClientId}` +
+                            `&redirect_uri=${encodeURIComponent(window.location.origin + '/audit')}` +
+                            `&response_type=id_token` +
+                            `&scope=openid email profile` +
+                            `&nonce=${Math.random().toString(36).substring(2)}`;
+                        // We don't actually redirect for now; just show a notice
+                        setError("Google popup was blocked. Please allow popups for this site and try again.");
+                        setOtpLoading(false);
+                        reject(new Error("Google popup blocked"));
+                    }
+                });
+            });
         } catch (err: any) {
-            setError(err.message || `Failed to authenticate via ${provider}`);
-        } finally {
+            if (!error) { // Don't overwrite more specific error messages
+                setError(err.message || "Failed to sign in with Google");
+            }
             setOtpLoading(false);
         }
+    };
+
+    const handleGitHubClick = () => {
+        const githubClientId = process.env.NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID;
+        if (!githubClientId) {
+            setError("GitHub OAuth is not configured. Please set NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID.");
+            return;
+        }
+
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+        const redirectUri = `${backendUrl}/auth/github/callback`;
+        
+        const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
+            `client_id=${githubClientId}` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&scope=user:email`;
+        
+        window.location.href = githubAuthUrl;
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -364,7 +442,7 @@ export function UploadZone({
                                 type="button" 
                                 variant="outline" 
                                 className="flex items-center justify-center gap-2 border-white/10 text-white rounded-xl hover:bg-white/[0.04] py-5"
-                                onClick={() => handleSSOClick("google")}
+                                onClick={handleGoogleClick}
                                 disabled={otpLoading}
                             >
                                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -379,7 +457,7 @@ export function UploadZone({
                                 type="button" 
                                 variant="outline" 
                                 className="flex items-center justify-center gap-2 border-white/10 text-white rounded-xl hover:bg-white/[0.04] py-5"
-                                onClick={() => handleSSOClick("github")}
+                                onClick={handleGitHubClick}
                                 disabled={otpLoading}
                             >
                                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
