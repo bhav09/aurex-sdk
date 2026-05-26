@@ -44,7 +44,7 @@ def test_send_email(test_email: str = None):
             "from": "Aurex <onboarding@resend.dev>",
             "to": [test_email],
             "subject": "Test: Your Aurex verification code",
-            "text": "Your Aurex verification code is: 123456\n\nThis is a test email. This code expires in 10 minutes."
+            "text": "Your Aurex verification code is: 123456 This is a test email. This code expires in 10 minutes."
         }
         
         response = resend.Emails.send(params)
