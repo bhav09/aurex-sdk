@@ -538,6 +538,8 @@ class SSOLoginRequest(BaseModel):
 
 @router.post("/sso-login")
 async def sso_login(data: SSOLoginRequest):
+    """Legacy SSO login endpoint - kept for backward compatibility.
+    For new integrations, use /google-login or /github/callback instead."""
     email = data.email.lower()
     access_token = create_access_token(data={"sub": email})
     
@@ -554,3 +556,182 @@ async def sso_login(data: SSOLoginRequest):
             "company_name": data.company_name
         }
     }
+
+
+# ============================================================================
+# Real OAuth: Google Sign-In (ID Token Verification)
+# ============================================================================
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+@router.post("/google-login")
+async def google_login(data: GoogleLoginRequest):
+    """
+    Verify a Google ID token and issue a JWT.
+    The frontend obtains this token via Google Identity Services (GSI).
+    """
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+
+    client_id = settings.google_oauth_client_id
+    if not client_id:
+        logger.error("GOOGLE_OAUTH_CLIENT_ID not configured")
+        raise HTTPException(status_code=500, detail="Google OAuth is not configured on this server")
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            data.id_token,
+            google_requests.Request(),
+            client_id
+        )
+    except ValueError as e:
+        logger.warning("Google ID token verification failed", error=str(e))
+        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+
+    # Extract user info from verified token
+    google_email = idinfo.get("email", "").lower()
+    if not google_email:
+        raise HTTPException(status_code=400, detail="Google account has no email")
+    if not idinfo.get("email_verified", False):
+        raise HTTPException(status_code=400, detail="Google email is not verified")
+
+    google_name = idinfo.get("name", google_email.split("@")[0])
+
+    # Issue our JWT
+    access_token = create_access_token(data={"sub": google_email})
+
+    logger.info("Google OAuth login successful", email=google_email)
+    from src.utils.analytics import log_analytics_event
+    log_analytics_event(event_type="google_oauth_login", email=google_email)
+
+    return {
+        "status": "success",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_info": {
+            "user_name": google_name,
+            "email": google_email,
+            "company_name": ""
+        }
+    }
+
+
+# ============================================================================
+# Real OAuth: GitHub (Authorization Code Flow)
+# ============================================================================
+
+@router.get("/github/callback")
+async def github_callback(code: str = "", error: str = ""):
+    """
+    GitHub OAuth callback endpoint.
+    GitHub redirects here with an authorization code, which we exchange
+    for an access token, then fetch the user's profile and email.
+    """
+    from fastapi.responses import RedirectResponse
+
+    frontend_url = settings.frontend_url
+    github_client_id = settings.github_oauth_client_id
+    github_client_secret = settings.github_oauth_client_secret
+
+    if error:
+        logger.warning("GitHub OAuth error", error=error)
+        return RedirectResponse(url=f"{frontend_url}/audit?auth_error=github_denied")
+
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    if not github_client_id or not github_client_secret:
+        logger.error("GitHub OAuth not configured")
+        raise HTTPException(status_code=500, detail="GitHub OAuth is not configured on this server")
+
+    # Step 1: Exchange authorization code for access token
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://github.com/login/oauth/access_token",
+            json={
+                "client_id": github_client_id,
+                "client_secret": github_client_secret,
+                "code": code
+            },
+            headers={"Accept": "application/json"},
+            timeout=10.0
+        )
+
+    if token_response.status_code != 200:
+        logger.error("GitHub token exchange failed", status=token_response.status_code)
+        return RedirectResponse(url=f"{frontend_url}/audit?auth_error=github_token_failed")
+
+    token_data = token_response.json()
+    github_access_token = token_data.get("access_token")
+
+    if not github_access_token:
+        logger.error("GitHub token exchange returned no access_token", response=token_data)
+        return RedirectResponse(url=f"{frontend_url}/audit?auth_error=github_token_missing")
+
+    # Step 2: Fetch user profile
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {github_access_token}",
+                "Accept": "application/vnd.github+json"
+            },
+            timeout=10.0
+        )
+
+    if user_response.status_code != 200:
+        logger.error("GitHub user fetch failed", status=user_response.status_code)
+        return RedirectResponse(url=f"{frontend_url}/audit?auth_error=github_user_failed")
+
+    github_user = user_response.json()
+    github_email = (github_user.get("email") or "").lower()
+    github_name = github_user.get("name") or github_user.get("login") or "GitHub User"
+
+    # Step 3: If email is not public, fetch from /user/emails
+    if not github_email:
+        async with httpx.AsyncClient() as client:
+            emails_response = await client.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Authorization": f"Bearer {github_access_token}",
+                    "Accept": "application/vnd.github+json"
+                },
+                timeout=10.0
+            )
+        if emails_response.status_code == 200:
+            emails = emails_response.json()
+            # Prefer the primary verified email
+            for e in emails:
+                if e.get("primary") and e.get("verified"):
+                    github_email = e["email"].lower()
+                    break
+            # Fallback to any verified email
+            if not github_email:
+                for e in emails:
+                    if e.get("verified"):
+                        github_email = e["email"].lower()
+                        break
+
+    if not github_email:
+        logger.warning("GitHub user has no verified email", github_login=github_user.get("login"))
+        return RedirectResponse(url=f"{frontend_url}/audit?auth_error=github_no_email")
+
+    # Step 4: Issue our JWT
+    access_token = create_access_token(data={"sub": github_email})
+
+    logger.info("GitHub OAuth login successful", email=github_email)
+    from src.utils.analytics import log_analytics_event
+    log_analytics_event(event_type="github_oauth_login", email=github_email)
+
+    # Redirect back to the frontend with the token and user info as query params
+    import urllib.parse
+    params = urllib.parse.urlencode({
+        "token": access_token,
+        "user_name": github_name,
+        "email": github_email,
+        "company_name": "",
+        "provider": "github"
+    })
+    return RedirectResponse(url=f"{frontend_url}/audit?{params}")
+

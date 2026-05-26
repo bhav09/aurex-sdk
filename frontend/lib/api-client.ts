@@ -451,6 +451,35 @@ export class AurexAPI {
         return data;
     }
 
+    async loginWithGoogle(idToken: string): Promise<{
+        status: string;
+        access_token: string;
+        token_type: string;
+        user_info: { user_name: string; email: string; company_name: string };
+    }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/auth/google-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_token: idToken }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to sign in with Google');
+        }
+
+        const data = await response.json();
+
+        if (data.access_token) {
+            this.setToken(data.access_token);
+        }
+        if (data.user_info) {
+            this.setUserInfo(data.user_info);
+        }
+
+        return data;
+    }
+
     // ============================================================================
     // AUDIT SESSION METHODS
     // ============================================================================

@@ -113,6 +113,50 @@ export default function AuditPage() {
         }
     }, []);
 
+    // Handle OAuth callback params (GitHub redirects back with token in URL)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        const oauthEmail = params.get('email');
+        const oauthUserName = params.get('user_name');
+        const oauthCompanyName = params.get('company_name');
+        const authError = params.get('auth_error');
+        
+        // Handle OAuth errors
+        if (authError) {
+            const errorMessages: Record<string, string> = {
+                'github_denied': 'GitHub authorization was denied.',
+                'github_token_failed': 'Failed to exchange GitHub authorization code.',
+                'github_token_missing': 'GitHub did not return an access token.',
+                'github_user_failed': 'Failed to fetch GitHub user profile.',
+                'github_no_email': 'No verified email found on your GitHub account. Please make your email public or add a verified email to GitHub.',
+            };
+            setError(errorMessages[authError] || `Authentication error: ${authError}`);
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname);
+            return;
+        }
+        
+        // Handle successful OAuth callback
+        if (token && oauthEmail) {
+            aurixAPI.setToken(token);
+            const userInfoData = {
+                user_name: oauthUserName || oauthEmail.split('@')[0],
+                email: oauthEmail,
+                company_name: oauthCompanyName || ''
+            };
+            aurixAPI.setUserInfo(userInfoData);
+            
+            setUserEmail(oauthEmail);
+            setCompanyName(oauthCompanyName || '');
+            
+            // Clean URL params
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []);
+
     const handleRefreshAnalysis = async () => {
         const activeEmail = userEmail || aurixAPI.getUserInfo()?.email;
         if (!activeEmail) return;
