@@ -222,6 +222,98 @@ export function UploadZone({
         }
     };
 
+    // Load Google Identity Services script
+    useEffect(() => {
+        const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+        if (!googleClientId) return;
+
+        // Check if already loaded
+        if (document.getElementById('google-gsi-script')) return;
+
+        const script = document.createElement('script');
+        script.id = 'google-gsi-script';
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+    }, []);
+
+    const handleGoogleClick = async () => {
+        const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+        if (!googleClientId) {
+            setError("Google OAuth is not configured. Please set NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID.");
+            return;
+        }
+
+        // Check if GSI script has loaded
+        if (typeof window === 'undefined' || !(window as any).google?.accounts?.id) {
+            setError("Google sign-in is still loading. Please try again in a moment.");
+            return;
+        }
+
+        setOtpLoading(true);
+        setError(null);
+
+        try {
+            const google = (window as any).google;
+            
+            await new Promise<void>((resolve, reject) => {
+                google.accounts.id.initialize({
+                    client_id: googleClientId,
+                    callback: async (response: { credential: string }) => {
+                        try {
+                            const data = await aurixAPI.loginWithGoogle(response.credential);
+                            
+                            const userInfo = data.user_info;
+                            setUserName(userInfo.user_name);
+                            setEmail(userInfo.email);
+                            setCompanyName(userInfo.company_name || '');
+                            
+                            aurixAPI.trackClick("google_oauth_click", userInfo.email);
+                            
+                            if (selectedFile) {
+                                onFileSelect(selectedFile, {
+                                    user_name: userInfo.user_name,
+                                    email: userInfo.email,
+                                    company_name: userInfo.company_name || ''
+                                });
+                                setSelectedFile(null);
+                            }
+                            resolve();
+                        } catch (err: any) {
+                            setError(err.message || "Failed to authenticate with Google");
+                            reject(err);
+                        } finally {
+                            setOtpLoading(false);
+                        }
+                    },
+                    auto_select: false,
+                });
+                
+                google.accounts.id.prompt((notification: any) => {
+                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                        // Fallback: if One Tap is blocked (e.g., by browser), use the redirect flow
+                        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                            `client_id=${googleClientId}` +
+                            `&redirect_uri=${encodeURIComponent(window.location.origin + '/audit')}` +
+                            `&response_type=id_token` +
+                            `&scope=openid email profile` +
+                            `&nonce=${Math.random().toString(36).substring(2)}`;
+                        // We don't actually redirect for now; just show a notice
+                        setError("Google popup was blocked. Please allow popups for this site and try again.");
+                        setOtpLoading(false);
+                        reject(new Error("Google popup blocked"));
+                    }
+                });
+            });
+        } catch (err: any) {
+            if (!error) { // Don't overwrite more specific error messages
+                setError(err.message || "Failed to sign in with Google");
+            }
+            setOtpLoading(false);
+        }
+    };
+
     const formatFileSize = (bytes: number): string => {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -327,6 +419,30 @@ export function UploadZone({
                     </div>
                 ) : (
                     <div className="mt-4 space-y-4">
+                        <div className="mb-2">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                className="flex w-full items-center justify-center gap-2 border-white/10 text-white rounded-xl hover:bg-white/[0.04] py-5"
+                                onClick={handleGoogleClick}
+                                disabled={otpLoading}
+                            >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                                </svg>
+                                <span className="text-xs">Google SSO</span>
+                            </Button>
+                        </div>
+                        
+                        <div className="relative flex py-1 items-center">
+                            <div className="flex-grow border-t border-white/5"></div>
+                            <span className="flex-shrink mx-3 text-[10px] text-white/30 uppercase tracking-wider">Or credentials</span>
+                            <div className="flex-grow border-t border-white/5"></div>
+                        </div>
+
                         <div>
                             <Label htmlFor="user-name" className="text-sm font-medium">
                                 User Name <span className="text-red-500">*</span>
@@ -517,4 +633,4 @@ export function UploadZone({
     );
 }
 
-// Made with Bob
+

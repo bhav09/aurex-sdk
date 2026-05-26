@@ -81,8 +81,16 @@ function GridBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timeRef = useRef(0);
   const frameRef = useRef(0);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
 
   useEffect(() => {
+    // Only animate on desktop for performance
+    setShouldAnimate(window.innerWidth > 1024);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldAnimate) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -90,7 +98,7 @@ function GridBackground() {
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = 1; // Force 1x for better performance
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       ctx.scale(dpr, dpr);
@@ -98,12 +106,20 @@ function GridBackground() {
     resize();
     window.addEventListener("resize", resize);
 
-    const render = () => {
+    let lastTime = 0;
+    const render = (currentTime: number) => {
+      // Throttle to 30fps instead of 60fps
+      if (currentTime - lastTime < 33) {
+        frameRef.current = requestAnimationFrame(render);
+        return;
+      }
+      lastTime = currentTime;
+
       const rect = canvas.getBoundingClientRect();
       const width = rect.width;
       const height = rect.height;
       ctx.clearRect(0, 0, width, height);
-      const gridSize = 60;
+      const gridSize = 80; // Larger grid = fewer dots
       const time = timeRef.current;
       for (let x = 0; x < width; x += gridSize) {
         for (let y = 0; y < height; y += gridSize) {
@@ -115,23 +131,20 @@ function GridBackground() {
           ctx.fill();
         }
       }
-      const pulseY = (time * 30) % height;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, pulseY);
-      ctx.lineTo(width, pulseY);
-      ctx.stroke();
-      timeRef.current += 0.02;
+      timeRef.current += 0.015; // Slower animation
       frameRef.current = requestAnimationFrame(render);
     };
-    render();
+    render(0);
 
     return () => {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(frameRef.current);
     };
-  }, []);
+  }, [shouldAnimate]);
+
+  if (!shouldAnimate) {
+    return <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />;
+  }
 
   return (
     <canvas
@@ -367,4 +380,4 @@ export function MetricsSection() {
   );
 }
 
-// Made with Bob
+

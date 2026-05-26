@@ -1,14 +1,13 @@
 import pytest
 from httpx import AsyncClient
 from main import app
-import redis.asyncio as redis
 
 class TestRateLimiting:
     @pytest.mark.asyncio
     async def test_health_check_rate_limit(self, client: AsyncClient):
-        # Clear redis first to ensure a clean slate
-        r = redis.from_url("redis://localhost:6379/0")
-        await r.flushdb()
+        # Reset slowapi limiter storage to ensure a clean slate
+        if hasattr(app.state, "limiter") and hasattr(app.state.limiter, "_storage"):
+            app.state.limiter._storage.reset()
         
         # The limit is 100 per minute
         # We will make 100 successful requests
@@ -21,6 +20,8 @@ class TestRateLimiting:
         response = await client.get("/health")
         assert response.status_code == 429
         assert "Rate limit exceeded" in response.text or response.status_code == 429
-        
-        # Clean up
-        await r.flushdb()
+
+        # Reset rate limiter storage to avoid polluting other tests
+        if hasattr(app.state, "limiter") and hasattr(app.state.limiter, "_storage"):
+            app.state.limiter._storage.reset()
+

@@ -149,4 +149,3 @@ export default function BookPage() {
     );
 }
 
-// Made with Bob

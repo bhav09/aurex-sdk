@@ -130,7 +130,7 @@ function ParticleVisualization() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 pointer-events-auto"
+      className="absolute inset-0 pointer-events-none"
       style={{ width: "100%", height: "100%" }}
     />
   );
@@ -157,7 +157,7 @@ export function FeaturesSection() {
     <section
       id="features"
       ref={sectionRef}
-      className="relative py-24 lg:py-32 overflow-hidden"
+      className="relative py-16 sm:py-20 lg:py-28 overflow-hidden"
     >
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {
@@ -169,16 +169,16 @@ export function FeaturesSection() {
         }
       `}</style>
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header - Full width with diagonal layout */}
-        <div className="relative mb-24 lg:mb-32">
-          <div className="grid lg:grid-cols-12 gap-8 items-end">
+        {/* Header */}
+        <div className="relative mb-12 sm:mb-16 lg:mb-20">
+          <div className="grid lg:grid-cols-12 gap-6 sm:gap-8 items-end">
             <div className="lg:col-span-7">
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
+              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4 sm:mb-6">
                 <span className="w-12 h-px bg-foreground/30" />
                 Value Propositions
               </span>
               <h2
-                className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                   }`}
               >
                 Smart
@@ -187,7 +187,7 @@ export function FeaturesSection() {
               </h2>
             </div>
             <div className="lg:col-span-5 lg:pb-4">
-              <p className={`text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              <p className={`text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 }`}>
                 Analyze your AI token usage locally and discover where you're wasting money. Get actionable insights in seconds.
               </p>
@@ -198,27 +198,27 @@ export function FeaturesSection() {
         {/* Horizontal Scrollable Cards */}
         <div className="relative">
           {/* Scroll container */}
-          <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-6 px-6 lg:mx-0 lg:px-0">
             {features.map((feature, index) => (
               <div
                 key={feature.number}
-                className={`flex-none w-[85vw] lg:w-[calc(33.333%-16px)] relative bg-black border border-foreground/10 min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                className={`flex-none w-[85vw] sm:w-[75vw] lg:w-[calc(33.333%-16px)] relative bg-black border border-foreground/10 min-h-[380px] sm:min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                   }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <div className="relative h-full p-8 lg:p-10 bg-black">
+                <div className="relative h-full p-6 sm:p-8 lg:p-10 bg-black">
                   <ParticleVisualization />
                   <div className="relative z-10 flex flex-col h-full">
-                    <span className="font-mono text-sm text-muted-foreground">{feature.number}</span>
-                    <h3 className="text-3xl lg:text-4xl font-display mt-4 mb-6 group-hover:translate-x-2 transition-transform duration-500">
+                    <span className="font-mono text-xs sm:text-sm text-muted-foreground">{feature.number}</span>
+                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-display mt-3 sm:mt-4 mb-4 sm:mb-6 group-hover:translate-x-2 transition-transform duration-500">
                       {feature.title}
                     </h3>
-                    <p className="text-base text-muted-foreground leading-relaxed mb-8 flex-1">
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-6 sm:mb-8 flex-1">
                       {feature.description}
                     </p>
                     <div className="mt-auto">
-                      <span className="text-5xl lg:text-6xl font-display">{feature.stats.value}</span>
-                      <span className="block text-sm text-muted-foreground font-mono mt-2">{feature.stats.label}</span>
+                      <span className="text-4xl sm:text-5xl lg:text-6xl font-display">{feature.stats.value}</span>
+                      <span className="block text-xs sm:text-sm text-muted-foreground font-mono mt-2">{feature.stats.label}</span>
                     </div>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export function FeaturesSection() {
           </div>
 
           {/* Scroll indicators */}
-          <div className="flex justify-center gap-2 mt-6">
+          <div className="flex justify-center gap-2 mt-6 lg:hidden">
             {features.map((_, index) => (
               <button
                 key={index}

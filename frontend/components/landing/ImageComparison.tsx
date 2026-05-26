@@ -93,4 +93,4 @@ export function ImageComparison({ beforeImage, afterImage }: ImageComparisonProp
     );
 }
 
-// Made with Bob
+

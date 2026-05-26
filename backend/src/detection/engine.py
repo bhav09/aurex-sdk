@@ -1,6 +1,14 @@
 """
 Enhanced Detection Engine with Executive-Level Insights (Async)
 Implements production-grade detection with workflow-level analysis
+Now with 7 advanced improvements:
+1. Workflow Naming & Tagging
+2. False Positive Tuning (Configurable Thresholds)
+3. Model-Level Cost Comparison
+4. Prompt Efficiency Metrics
+5. Caching Opportunities
+6. Output Length Optimization
+7. Provider Cost Comparison
 """
 
 from typing import List, Dict, Any, Optional
@@ -11,6 +19,15 @@ from sqlalchemy import func, desc
 
 from src.models import LLMEvent
 from src.utils.logger import get_logger
+from src.detection.config import DetectionConfig
+from src.detection.analyzers import (
+    WorkflowNamingAnalyzer,
+    ModelEfficiencyAnalyzer,
+    PromptEfficiencyAnalyzer,
+    CachingOpportunityAnalyzer,
+    OutputLengthAnalyzer,
+    ProviderComparisonAnalyzer
+)
 
 logger = get_logger(__name__)
 
@@ -25,12 +42,18 @@ class ExecutiveSummary:
         optimized_spend: float,
         period_days: int = 7
     ):
-        self.current_weekly_spend = current_spend
-        self.wasted_amount = wasted_amount
-        self.waste_percentage = (wasted_amount / current_spend * 100) if current_spend > 0 else 0
+        self.current_period_spend = current_spend
         self.optimized_spend = optimized_spend
-        self.annual_savings_projection = wasted_amount * 52  # Weekly to annual
-        self.period_days = period_days
+        self.period_days = max(period_days, 1)  # Guard against zero
+        
+        self.current_weekly_spend = (current_spend / self.period_days) * 7
+        self.wasted_amount = (wasted_amount / self.period_days) * 7
+        self.waste_percentage = (wasted_amount / current_spend * 100) if current_spend > 0 else 0
+        
+        # Compute annual projection from ACTUAL date span
+        daily_waste = wasted_amount / self.period_days
+        self.annual_savings_projection = daily_waste * 365
+        self.credit_score = max(0, min(100, round(100.0 - self.waste_percentage)))
         
         # Determine severity
         if self.waste_percentage > 50:
@@ -44,13 +67,15 @@ class ExecutiveSummary:
     
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "current_period_spend": round(self.current_period_spend, 2),
             "current_weekly_spend": round(self.current_weekly_spend, 2),
             "wasted_amount": round(self.wasted_amount, 2),
             "waste_percentage": round(self.waste_percentage, 1),
             "optimized_spend": round(self.optimized_spend, 2),
             "annual_savings_projection": round(self.annual_savings_projection, 2),
             "period_days": self.period_days,
-            "severity": self.severity
+            "severity": self.severity,
+            "credit_score": self.credit_score
         }
 
 
@@ -135,15 +160,55 @@ class EnhancedIssue:
 class EnhancedDetectionEngine:
     """Production-grade detection engine with executive insights (Async)"""
     
-    def __init__(self, db, session_id: Optional[str] = None, email: Optional[str] = None):
+    def __init__(self, db, session_id: Optional[str] = None, email: Optional[str] = None, config: Optional[DetectionConfig] = None):
         self.db = db
         self.session_id = session_id
         self.email = email
+        self.config = config or DetectionConfig()
         self.issues: List[EnhancedIssue] = []
         self.workflow_analyses: Dict[str, WorkflowAnalysis] = {}
         self.events: Optional[List[LLMEvent]] = None
+        self.pricing_overrides: Dict[str, tuple[float, float]] = {}
+        
+        # Initialize analyzers
+        self.workflow_naming = WorkflowNamingAnalyzer()
+        self.model_efficiency = ModelEfficiencyAnalyzer(self.config)
+        self.prompt_efficiency = PromptEfficiencyAnalyzer(self.config)
+        self.caching_opportunity = CachingOpportunityAnalyzer(self.config)
+        self.output_length = OutputLengthAnalyzer(self.config)
+        self.provider_comparison = ProviderComparisonAnalyzer(self.config)
     
     async def load_events(self):
+        company_name = None
+        
+        # Load company_name if session_id is available
+        if self.session_id:
+            from src.models import AuditSession
+            session_query = select(AuditSession).where(AuditSession.id == self.session_id)
+            session_res = await self.db.execute(session_query)
+            session_obj = session_res.scalars().first()
+            if session_obj:
+                company_name = session_obj.company_name
+        elif self.email:
+            # Try to get the latest company name for the email
+            from src.models import AuditSession
+            session_query = select(AuditSession.company_name).where(
+                func.lower(AuditSession.email) == func.lower(self.email)
+            ).order_by(desc(AuditSession.created_at)).limit(1)
+            session_res = await self.db.execute(session_query)
+            company_name = session_res.scalar()
+            
+        if company_name:
+            from src.models import PricingOverride
+            override_query = select(PricingOverride).where(
+                func.lower(PricingOverride.company_name) == func.lower(company_name)
+            )
+            override_res = await self.db.execute(override_query)
+            for override in override_res.scalars().all():
+                from src.utils.pricing import normalize_model_name
+                norm_key = normalize_model_name(override.model_name)
+                self.pricing_overrides[norm_key] = (override.input_price_per_1m, override.output_price_per_1m)
+
         if self.session_id:
             query = select(LLMEvent).where(LLMEvent.upload_session_id == self.session_id)
         elif self.email:
@@ -157,14 +222,34 @@ class EnhancedDetectionEngine:
                 self.events = []
                 return
         else:
-            query = select(LLMEvent)
+            # Prevent tenant isolation bypass: do not load all events
+            self.events = []
+            return
             
         result = await self.db.execute(query)
         self.events = result.scalars().all()
+        
+        # Dynamically recalculate cost using overrides
+        if self.pricing_overrides and self.events:
+            from src.utils.pricing import calculate_cost
+            for e in self.events:
+                cache_read = 0
+                cache_create = 0
+                if e.extra_metadata:
+                    cache_read = e.extra_metadata.get("cache_read_tokens", 0)
+                    cache_create = e.extra_metadata.get("cache_creation_tokens", 0)
+                e.cost = calculate_cost(
+                    e.model,
+                    e.input_tokens,
+                    e.output_tokens,
+                    cache_read_tokens=cache_read,
+                    cache_creation_tokens=cache_create,
+                    pricing_overrides=self.pricing_overrides
+                )
     
     async def analyze_complete(self) -> Dict[str, Any]:
         """
-        Complete analysis with executive summary
+        Complete analysis with executive summary + 7 new advanced analyses
         """
         if self.events is None:
             await self.load_events()
@@ -189,11 +274,22 @@ class EnhancedDetectionEngine:
         
         total_cost = sum(e.cost for e in self.events)
         
-        # Run all detections
+        # Run all detections (with configurable thresholds)
+        self.detect_wasteful_prompts_from_metadata()  # NEW: Read wasteful_prompt field
         self.detect_system_prompt_waste()
         self.detect_agent_loops_enhanced()
         self.detect_expensive_model_misuse_enhanced()
         self.detect_context_explosion_enhanced()
+        self.detect_tool_bloat()
+        self.detect_retry_cascades()
+        self.detect_output_verbosity()
+        
+        # Run new advanced analyses
+        model_efficiency_analysis = self.model_efficiency.analyze_model_efficiency(self.events, self.pricing_overrides)
+        prompt_efficiency_analysis = self.prompt_efficiency.analyze_prompt_efficiency(self.events)
+        caching_analysis = self.caching_opportunity.detect_caching_opportunities(self.events, self.pricing_overrides)
+        output_length_analysis = self.output_length.detect_output_length_waste(self.events)
+        provider_comparison_analysis = self.provider_comparison.analyze_provider_efficiency(self.events, self.pricing_overrides)
         
         # Calculate wasted cost transparently (avoid double-counting by capping at event cost)
         event_waste_map = defaultdict(float)
@@ -214,12 +310,21 @@ class EnhancedDetectionEngine:
         # Analyze workflows
         self._analyze_workflows()
         
+        # Calculate actual period days dynamically
+        timestamps = [e.timestamp for e in self.events if e.timestamp]
+        if timestamps:
+            import math
+            time_delta = max(timestamps) - min(timestamps)
+            period_days = max(1, math.ceil(time_delta.total_seconds() / 86400.0))
+        else:
+            period_days = 7
+
         # Create executive summary
         exec_summary = ExecutiveSummary(
             current_spend=total_cost,
             wasted_amount=wasted_cost,
             optimized_spend=max(0.0, optimized_cost),
-            period_days=7
+            period_days=period_days
         )
         
         # Sort issues by cost impact
@@ -241,6 +346,7 @@ class EnhancedDetectionEngine:
         
         return {
             "executive_summary": exec_summary.to_dict(),
+            "credit_score": exec_summary.credit_score,
             "top_issues": [issue.to_dict() for issue in self.issues[:10]],  # Top 10
             "workflow_breakdown": [wa.to_dict() for wa in sorted(
                 self.workflow_analyses.values(),
@@ -248,18 +354,115 @@ class EnhancedDetectionEngine:
                 reverse=True
             )],
             "total_events": len(self.events),
-            "analysis_timestamp": datetime.utcnow().isoformat()
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            
+            # NEW: Advanced Analysis Sections
+            "advanced_analysis": {
+                "model_efficiency": model_efficiency_analysis,
+                "prompt_efficiency": prompt_efficiency_analysis,
+                "caching_opportunities": caching_analysis,
+                "output_length_optimization": output_length_analysis,
+                "provider_comparison": provider_comparison_analysis
+            },
+            "detection_config": self.config.to_dict()
         }
     
     def _analyze_workflows(self):
-        """Analyze cost per workflow"""
+        """Analyze cost per workflow with enhanced naming"""
         workflow_events = defaultdict(list)
         for event in self.events:
             wf_id = event.workflow_id or "unknown"
             workflow_events[wf_id].append(event)
         
         for wf_id, events_list in workflow_events.items():
-            self.workflow_analyses[wf_id] = WorkflowAnalysis(wf_id, events_list)
+            # Generate better workflow name using WorkflowNamingAnalyzer
+            improved_name, category, confidence = self.workflow_naming.generate_workflow_name(events_list, wf_id)
+            
+            # Create WorkflowAnalysis object with improved naming
+            workflow_analysis = WorkflowAnalysis(
+                workflow_id=improved_name,  # Use improved name
+                events=events_list
+            )
+            
+            # Add naming metadata
+            workflow_analysis.original_id = wf_id
+            workflow_analysis.naming_category = category
+            workflow_analysis.naming_confidence = confidence
+            
+            self.workflow_analyses[wf_id] = workflow_analysis
+    
+    def detect_wasteful_prompts_from_metadata(self):
+        """
+        PRIORITY: Read wasteful_prompt field from metadata
+        This detects pre-labeled wasteful requests and groups them by workflow/feature
+        """
+        # Group wasteful events by workflow
+        wasteful_by_workflow = defaultdict(list)
+        
+        for event in self.events:
+            # Check if wasteful_prompt field exists in metadata
+            is_wasteful = False
+            if event.extra_metadata:
+                # Check various possible field names
+                is_wasteful = event.extra_metadata.get("wasteful_prompt", False)
+                if not is_wasteful:
+                    is_wasteful = event.extra_metadata.get("wasteful", False)
+                if not is_wasteful:
+                    is_wasteful = event.extra_metadata.get("is_wasteful", False)
+            
+            if is_wasteful:
+                workflow = event.workflow_id or "unknown"
+                wasteful_by_workflow[workflow].append(event)
+        
+        # Create issues for each workflow with wasteful requests
+        for workflow_id, wasteful_events in wasteful_by_workflow.items():
+            if not wasteful_events:
+                continue
+                
+            total_wasteful_cost = sum(e.cost for e in wasteful_events)
+            total_workflow_events = sum(1 for e in self.events if (e.workflow_id or "unknown") == workflow_id)
+            wasteful_count = len(wasteful_events)
+            waste_rate = (wasteful_count / total_workflow_events * 100) if total_workflow_events > 0 else 0
+            
+            # Calculate period days for weekly projection
+            timestamps = [e.timestamp for e in self.events if e.timestamp]
+            if timestamps:
+                import math
+                time_delta = max(timestamps) - min(timestamps)
+                period_days = max(1, math.ceil(time_delta.total_seconds() / 86400.0))
+            else:
+                period_days = 7
+            
+            weekly_cost = (total_wasteful_cost / period_days) * 7
+            
+            # Determine severity based on waste rate
+            if waste_rate > 50:
+                severity = "HIGH"
+            elif waste_rate > 30:
+                severity = "MEDIUM"
+            else:
+                severity = "LOW"
+            
+            issue = EnhancedIssue(
+                rank=0,  # Will be assigned later
+                issue_type="wasteful_prompts",
+                title=f"{workflow_id} — {wasteful_count}/{total_workflow_events} calls wasteful",
+                severity=severity,
+                weekly_cost=weekly_cost,
+                one_line_summary=f"{wasteful_count} wasteful requests detected in {workflow_id} workflow",
+                fix_effort="Medium",
+                fix_confidence="High",
+                cta=f"Review and optimize {workflow_id} prompts to reduce waste",
+                affected_workflow=workflow_id,
+                affected_events=[e.id for e in wasteful_events],
+                metadata={
+                    "wasteful_count": wasteful_count,
+                    "total_count": total_workflow_events,
+                    "waste_rate": round(waste_rate, 1),
+                    "total_wasteful_cost": round(total_wasteful_cost, 2)
+                }
+            )
+            self.issues.append(issue)
     
     def detect_system_prompt_waste(self):
         """
@@ -322,11 +525,15 @@ class EnhancedDetectionEngine:
             workflows = set(e.workflow_id for e in events_list if e.workflow_id)
             affected_workflow = list(workflows)[0] if workflows else "unknown"
             
+            severity = "CRITICAL"
+            if any(getattr(e, "session_confidence", None) == "low" for e in events_list):
+                severity = "MEDIUM"
+                
             issue = EnhancedIssue(
                 rank=0,
                 issue_type="redundant_system_prompt",
                 title="System Prompt Waste",
-                severity="CRITICAL",
+                severity=severity,
                 weekly_cost=wasted_cost,
                 one_line_summary=f"Sending {prompt_tokens:,} tokens {repetitions:,} times",
                 fix_effort="5 minutes",
@@ -347,41 +554,79 @@ class EnhancedDetectionEngine:
     def _get_inferred_sessions(self) -> Dict[str, List[LLMEvent]]:
         """
         Groups events into sessions. Uses explicit workflow_id/session_id if available.
-        Otherwise, falls back to temporal clustering (5-min window).
+        Otherwise, falls back to multi-dimensional temporal clustering.
         """
+        import os
+        import uuid
+        gap_seconds = int(os.getenv("SESSION_GAP_SECONDS", "300"))
+        
         sessions = defaultdict(list)
-        unassigned_events = []
+        unassigned_with_user = []
+        unassigned_without_user = []
         
         for event in sorted(self.events, key=lambda e: e.timestamp or datetime.min):
             session_id = None
-            if event.extra_metadata:
+            if event.extra_metadata and isinstance(event.extra_metadata, dict):
                 session_id = event.extra_metadata.get("session_id")
-            if not session_id:
-                session_id = event.workflow_id
+            if not session_id and event.workflow_id:
+                if not str(event.workflow_id).startswith("inferred_"):
+                    session_id = event.workflow_id
             
             if session_id:
+                event.session_confidence = "high"
                 sessions[session_id].append(event)
             else:
-                unassigned_events.append(event)
+                user_id = None
+                if event.extra_metadata and isinstance(event.extra_metadata, dict):
+                    user_id = event.extra_metadata.get("user_id")
+                if user_id:
+                    unassigned_with_user.append((user_id, event))
+                else:
+                    unassigned_without_user.append(event)
+                    
+        # Group by (model, user_id)
+        if unassigned_with_user:
+            user_groups = defaultdict(list)
+            for user_id, e in unassigned_with_user:
+                user_groups[(e.model, user_id)].append(e)
                 
-        if unassigned_events:
-            # Group by model
-            model_groups = defaultdict(list)
-            for e in unassigned_events:
-                model_groups[e.model].append(e)
-                
-            for model, evs in model_groups.items():
+            for (model, user_id), evs in user_groups.items():
                 current_session_id = None
                 last_time = None
-                
                 for e in evs:
                     ts = e.timestamp or datetime.min
-                    
-                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > 300:
-                        import uuid
-                        current_session_id = f"inferred_session_{uuid.uuid4().hex[:8]}"
-                    
+                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > gap_seconds:
+                        current_session_id = f"inferred_user_{uuid.uuid4().hex[:8]}"
                     e.workflow_id = current_session_id
+                    e.session_confidence = "medium"
+                    sessions[current_session_id].append(e)
+                    last_time = ts
+                    
+        # Group by (model, token_bucket)
+        if unassigned_without_user:
+            def get_token_bucket(tokens):
+                if tokens < 500:
+                    return "0-500"
+                elif tokens < 2000:
+                    return "500-2000"
+                elif tokens < 10000:
+                    return "2000-10000"
+                return "10000+"
+                
+            bucket_groups = defaultdict(list)
+            for e in unassigned_without_user:
+                bucket = get_token_bucket(e.input_tokens)
+                bucket_groups[(e.model, bucket)].append(e)
+                
+            for (model, bucket), evs in bucket_groups.items():
+                current_session_id = None
+                last_time = None
+                for e in evs:
+                    ts = e.timestamp or datetime.min
+                    if not current_session_id or not last_time or (ts - last_time).total_seconds() > gap_seconds:
+                        current_session_id = f"inferred_bucket_{uuid.uuid4().hex[:8]}"
+                    e.workflow_id = current_session_id
+                    e.session_confidence = "low"
                     sessions[current_session_id].append(e)
                     last_time = ts
                     
@@ -404,7 +649,7 @@ class EnhancedDetectionEngine:
             
             doublings = 0
             for i in range(1, len(contexts)):
-                if contexts[i] >= contexts[i-1] * 1.8:
+                if contexts[i] >= contexts[i-1] * 2.5:
                     doublings += 1
             
             if doublings >= 2:
@@ -417,11 +662,15 @@ class EnhancedDetectionEngine:
                 else:
                     time_str = "unknown duration"
                 
+                severity = "CRITICAL"
+                if any(getattr(e, "session_confidence", None) == "low" for e in events_list):
+                    severity = "MEDIUM"
+                    
                 issue = EnhancedIssue(
                     rank=0,
                     issue_type="agent_loop",
                     title="Agent Runaway Loop",
-                    severity="CRITICAL",
+                    severity=severity,
                     weekly_cost=loop_cost,
                     one_line_summary=f"Context doubled {doublings}x in {time_str}",
                     fix_effort="10 minutes",
@@ -449,7 +698,7 @@ class EnhancedDetectionEngine:
         workflow_model_events = defaultdict(lambda: defaultdict(list))
         
         for event in self.events:
-            input_price, output_price = get_model_pricing(event.model)
+            input_price, output_price = get_model_pricing(event.model, pricing_overrides=self.pricing_overrides)
             
             # Dynamic expensive classification: If input price > $2.00 per 1M tokens
             is_expensive = input_price > 2.00
@@ -507,38 +756,240 @@ class EnhancedDetectionEngine:
                 self.issues.append(issue)
     
     def detect_context_explosion_enhanced(self):
-        """Enhanced context explosion detection with temporal fallback"""
+        """
+        Enhanced context explosion detection using per-turn delta analysis.
+        
+        The old approach flagged any session where max_context >= 2x min_context,
+        which falsely flags normal multi-turn chatbots (context naturally doubles
+        as conversation history accumulates).
+        
+        New approach: Check if any SINGLE turn causes a disproportionate context
+        jump (>= 1.8x the previous turn). Normal multi-turn conversations grow
+        linearly (~+500-2000 tokens per turn). Exponential growth signals an
+        agent loop or missing context management.
+        """
         sessions = self._get_inferred_sessions()
         
         for wf_id, events_list in sessions.items():
-            if len(events_list) < 2:
+            if len(events_list) < 2:  # Need at least 2 turns to detect explosion
                 continue
             
             contexts = [e.context_length if e.context_length is not None else e.input_tokens for e in events_list]
-            min_context = min(contexts)
-            max_context = max(contexts)
             
-            if min_context > 0 and max_context >= min_context * 2:
-                large_events = [e for e, c in zip(events_list, contexts) if c >= min_context * 1.5]
+            # Skip if any context is zero (missing data)
+            if any(c == 0 or c is None for c in contexts):
+                continue
+            
+            # Calculate per-turn deltas
+            explosive_turns = []  # Indices where context jumped >= 1.8x
+            for i in range(1, len(contexts)):
+                prev = contexts[i - 1]
+                curr = contexts[i]
+                if prev > 0 and curr >= prev * 1.8:
+                    explosive_turns.append(i)
+            
+            # Also check total growth, but only flag if individual jumps are explosive
+            total_growth = contexts[-1] / contexts[0] if contexts[0] > 0 else 0
+            
+            # Flag only if:
+            # 1. At least 2 explosive turns (not just one large message), OR
+            # 2. Total growth >= 5x (even if individual jumps are spread out)
+            if len(explosive_turns) >= 2 or (total_growth >= 5 and len(explosive_turns) >= 1):
+                # The "wasted" events are those after the first explosion
+                first_explosion_idx = explosive_turns[0]
+                large_events = events_list[first_explosion_idx:]
                 wasted_cost = sum(e.cost for e in large_events) * 0.5
                 
+                max_jump = max(
+                    contexts[i] / contexts[i - 1]
+                    for i in explosive_turns
+                ) if explosive_turns else 0
+                
+                severity = "HIGH"
+                if any(getattr(e, "session_confidence", None) == "low" for e in large_events):
+                    severity = "MEDIUM"
+                    
                 issue = EnhancedIssue(
                     rank=0,
                     issue_type="context_explosion",
                     title="Context Explosion",
-                    severity="HIGH",
+                    severity=severity,
                     weekly_cost=wasted_cost,
-                    one_line_summary=f"Context grew {max_context/min_context:.1f}x",
+                    one_line_summary=f"Context grew {total_growth:.1f}x total, {len(explosive_turns)} explosive turn(s)",
                     fix_effort="15 minutes",
                     fix_confidence="MEDIUM",
                     cta="Implement Sliding Window",
                     affected_workflow=wf_id,
                     affected_events=[e.id for e in large_events],
                     metadata={
-                        "min_context": min_context,
-                        "max_context": max_context,
-                        "growth_factor": round(max_context / min_context, 2),
-                        "fix_instructions": "Implement context summarization or sliding window"
+                        "min_context": contexts[0],
+                        "max_context": max(contexts),
+                        "total_growth_factor": round(total_growth, 2),
+                        "explosive_turns": len(explosive_turns),
+                        "max_single_turn_jump": round(max_jump, 2),
+                        "fix_instructions": "Implement context summarization or sliding window to cap context growth"
                     }
                 )
                 self.issues.append(issue)
+
+    def detect_tool_bloat(self):
+        """
+        Detect tool bloat: passing many tools but using few, wasting tokens
+        """
+        wasted_tokens = 0
+        affected_events = []
+        
+        for event in self.events:
+            avail_count = 0
+            tool_definitions_tokens = 0
+            
+            if event.extra_metadata:
+                avail_count = event.extra_metadata.get("tools_available_count", 0)
+                tool_definitions_tokens = event.extra_metadata.get("tool_definitions_tokens", 0)
+                
+            if avail_count > 10:
+                invocations = event.extra_metadata.get("tool_invocations") if event.extra_metadata else None
+                used_count = self._get_used_tools_count(invocations)
+                if used_count < 3:
+                    wasted = tool_definitions_tokens if tool_definitions_tokens > 0 else (avail_count * 50)
+                    wasted_tokens += wasted
+                    affected_events.append(event)
+                    
+        if wasted_tokens > 10000:
+            total_input_tokens = sum(e.input_tokens for e in affected_events)
+            total_cost = sum(e.cost for e in affected_events)
+            avg_price_per_token = (total_cost / total_input_tokens) if total_input_tokens > 0 else (0.0015 / 1000)
+            wasted_cost = wasted_tokens * avg_price_per_token
+            
+            workflows = set(e.workflow_id for e in affected_events if e.workflow_id)
+            affected_workflow = list(workflows)[0] if workflows else "unknown"
+            
+            issue = EnhancedIssue(
+                rank=0,
+                issue_type="tool_bloat",
+                title="Tool Bloat Waste",
+                severity="MEDIUM",
+                weekly_cost=wasted_cost,
+                one_line_summary=f"Passing many tools but using few. Approx {wasted_tokens:,} tokens wasted.",
+                fix_effort="10 minutes",
+                fix_confidence="HIGH",
+                cta="Reduce Tool Definitions",
+                affected_workflow=affected_workflow,
+                affected_events=[e.id for e in affected_events],
+                metadata={
+                    "wasted_tokens": wasted_tokens,
+                    "affected_events_count": len(affected_events),
+                    "fix_instructions": "Only pass relevant tool definitions based on the query classification or reduce descriptions."
+                }
+            )
+            self.issues.append(issue)
+
+    def _get_used_tools_count(self, invocations) -> int:
+        if not invocations:
+            return 0
+        if isinstance(invocations, str):
+            import json
+            try:
+                parsed = json.loads(invocations)
+                if isinstance(parsed, list):
+                    return len(parsed)
+                elif isinstance(parsed, dict):
+                    return len(parsed)
+                return 1
+            except:
+                return 1
+        if isinstance(invocations, list):
+            return len(invocations)
+        if isinstance(invocations, dict):
+            return len(invocations)
+        return 1
+
+    def detect_retry_cascades(self):
+        """
+        Detect rapid 5xx retry loops that burn input tokens on repetitive failures.
+        """
+        sorted_events = sorted(self.events, key=lambda e: e.timestamp or datetime.min)
+        cascade_count = 0
+        affected_events = []
+        
+        for i in range(1, len(sorted_events)):
+            prev = sorted_events[i - 1]
+            curr = sorted_events[i]
+            
+            if not prev.timestamp or not curr.timestamp:
+                continue
+                
+            time_delta = (curr.timestamp - prev.timestamp).total_seconds() * 1000
+            if time_delta < 5000 and curr.model == prev.model and curr.input_tokens == prev.input_tokens:
+                prev_status = None
+                if prev.extra_metadata:
+                    prev_status = prev.extra_metadata.get("http_status")
+                
+                if prev_status and prev_status >= 500:
+                    cascade_count += 1
+                    affected_events.extend([prev, curr])
+                    
+        if cascade_count > 5:
+            wasted_cost = sum(e.cost for e in set(affected_events))
+            
+            workflows = set(e.workflow_id for e in affected_events if e.workflow_id)
+            affected_workflow = list(workflows)[0] if workflows else "unknown"
+            
+            issue = EnhancedIssue(
+                rank=0,
+                issue_type="retry_cascades",
+                title="Retry Cascade Loops",
+                severity="HIGH",
+                weekly_cost=wasted_cost,
+                one_line_summary=f"Detected {cascade_count} likely retry cascades due to downstream 5xx errors.",
+                fix_effort="15 minutes",
+                fix_confidence="HIGH",
+                cta="Configure SDK Exponential Backoff",
+                affected_workflow=affected_workflow,
+                affected_events=[e.id for e in set(affected_events)],
+                metadata={
+                    "cascade_count": cascade_count,
+                    "fix_instructions": "Implement standard backoff, check downstream availability, or configure circuit breakers to stop retrying immediately on 5xx."
+                }
+            )
+            self.issues.append(issue)
+
+    def detect_output_verbosity(self):
+        """
+        Detect conversational filler/verbosity in model outputs (conversations with output > 50 tokens and filler text).
+        """
+        chatty_count = 0
+        affected_events = []
+        
+        for event in self.events:
+            if event.response and event.output_tokens > 50:
+                text = event.response.lower()
+                if "certainly! here's" in text or "let me know if you need anything else" in text:
+                    chatty_count += 1
+                    affected_events.append(event)
+                    
+        if chatty_count > 20:
+            wasted_cost = sum(event.cost * 0.20 for event in affected_events)
+            
+            workflows = set(e.workflow_id for e in affected_events if e.workflow_id)
+            affected_workflow = list(workflows)[0] if workflows else "unknown"
+            
+            issue = EnhancedIssue(
+                rank=0,
+                issue_type="output_verbosity",
+                title="Conversational Filler Waste",
+                severity="LOW",
+                weekly_cost=wasted_cost,
+                one_line_summary=f"Detected conversational filler in {chatty_count} responses.",
+                fix_effort="5 minutes",
+                fix_confidence="HIGH",
+                cta="Optimize System Prompt",
+                affected_workflow=affected_workflow,
+                affected_events=[e.id for e in affected_events],
+                metadata={
+                    "chatty_responses_count": chatty_count,
+                    "suggested_fix": "Add 'Do not output conversational filler. Output only the requested data.' to your system prompt.",
+                    "fix_instructions": "Inject constraints to prevent introductory and concluding politeness phrases which cost extra output tokens."
+                }
+            )
+            self.issues.append(issue)

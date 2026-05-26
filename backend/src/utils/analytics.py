@@ -17,6 +17,11 @@ BACKUP_FILE = os.path.join(BACKUP_DIR, "analytics_events.jsonl")
 
 def init_bigquery():
     global bq_client, bq_table_id
+    import sys
+    if "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST"):
+        logger.info("Test environment detected. Skipping BigQuery initialization.")
+        return False
+        
     credentials_path = getattr(settings, "google_application_credentials", "/Users/bhavishya/VSC Projects/tbank/aurex-495417-8ed2dc84792c.json")
     
     if not os.path.exists(credentials_path):

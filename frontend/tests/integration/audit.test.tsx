@@ -12,7 +12,7 @@ vi.mock('../../lib/api-client', () => ({
     }),
     completeAudit: vi.fn().mockResolvedValue({
       session: { credit_score: 85 },
-      summary: { executive_summary: { current_weekly_spend: 100 } }
+      summary: { executive_summary: { current_period_spend: 100 } }
     }),
     requestOTP: vi.fn().mockResolvedValue({ status: 'success' }),
     verifyOTP: vi.fn().mockResolvedValue({ status: 'success' }),
@@ -22,6 +22,19 @@ vi.mock('../../lib/api-client', () => ({
     clearSession: vi.fn(),
     trackClick: vi.fn().mockResolvedValue({ status: 'success' })
   }
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: () => '/audit',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 describe('Audit Integration Flow', () => {

@@ -54,6 +54,24 @@ class LLMEvent(Base):
     # Additional metadata (renamed from 'metadata' to avoid SQLAlchemy conflict)
     extra_metadata = Column(JSON, nullable=True)
     
+    @property
+    def cache_read_tokens(self) -> int:
+        if self.extra_metadata and "cache_read_tokens" in self.extra_metadata:
+            try:
+                return int(self.extra_metadata["cache_read_tokens"])
+            except (ValueError, TypeError):
+                pass
+        return 0
+
+    @property
+    def cache_creation_tokens(self) -> int:
+        if self.extra_metadata and "cache_creation_tokens" in self.extra_metadata:
+            try:
+                return int(self.extra_metadata["cache_creation_tokens"])
+            except (ValueError, TypeError):
+                pass
+        return 0
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

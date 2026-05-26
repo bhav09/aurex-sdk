@@ -1,13 +1,109 @@
 """
 LLM Model Pricing Information
 Prices per 1M tokens
+
+Loads pricing from the auto-synced LiteLLM catalog (backend/data/model_pricing.json).
+Falls back to a small built-in table if the synced file is missing.
+Run `python scripts/sync_pricing.py` to refresh the catalog.
 """
 
+import json
 import re
-from typing import Dict, Tuple
+import os
+from typing import Dict, Tuple, Optional
+from pathlib import Path
 
-# Aligned 2026 Model Pricing data (per 1M tokens)
-MODEL_PRICING: Dict[str, Dict[str, float]] = {
+# Path to the auto-synced pricing catalog
+_SYNCED_PRICING_PATH = Path(__file__).parent.parent.parent / "data" / "model_pricing.json"
+
+# Loaded catalog cache (populated on first call)
+_synced_catalog: Dict[str, Dict] = {}
+_catalog_loaded: bool = False
+
+
+# Semantic field mapping for pricing data
+# Maps various possible field names to our standard format
+PRICING_FIELD_MAPPINGS = {
+    "input": [
+        "input_price_per_1m",
+        "input_cost_per_token",
+        "input_price_per_million",
+        "input_cost_per_1m_tokens",
+        "prompt_price_per_1m",
+        "prompt_cost_per_token",
+        "input_token_price",
+        "input",
+    ],
+    "output": [
+        "output_price_per_1m",
+        "output_cost_per_token",
+        "output_price_per_million",
+        "output_cost_per_1m_tokens",
+        "completion_price_per_1m",
+        "completion_cost_per_token",
+        "output_token_price",
+        "output",
+    ],
+}
+
+
+def _extract_pricing_from_entry(entry: Dict) -> Optional[Tuple[float, float]]:
+    """
+    Extract input and output pricing from a catalog entry using semantic field mapping.
+    Handles various field name formats and converts to per-1M token pricing.
+    
+    Returns:
+        Tuple of (input_price_per_1m, output_price_per_1m) or None if not found
+    """
+    input_price = None
+    output_price = None
+    
+    # Try to find input price using semantic mapping
+    for field_name in PRICING_FIELD_MAPPINGS["input"]:
+        if field_name in entry:
+            value = entry[field_name]
+            # If it's per-token pricing (very small numbers), convert to per-1M
+            if "per_token" in field_name or (isinstance(value, (int, float)) and value < 0.01):
+                input_price = value * 1_000_000
+            else:
+                input_price = value
+            break
+    
+    # Try to find output price using semantic mapping
+    for field_name in PRICING_FIELD_MAPPINGS["output"]:
+        if field_name in entry:
+            value = entry[field_name]
+            # If it's per-token pricing (very small numbers), convert to per-1M
+            if "per_token" in field_name or (isinstance(value, (int, float)) and value < 0.01):
+                output_price = value * 1_000_000
+            else:
+                output_price = value
+            break
+    
+    if input_price is not None and output_price is not None:
+        return (input_price, output_price)
+    
+    return None
+
+
+def _load_synced_catalog():
+    """Load the auto-synced LiteLLM pricing JSON if available."""
+    global _synced_catalog, _catalog_loaded
+    _catalog_loaded = True
+
+    if not _SYNCED_PRICING_PATH.exists():
+        return
+
+    try:
+        with open(_SYNCED_PRICING_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        _synced_catalog = data.get("models", {})
+    except Exception:
+        _synced_catalog = {}
+
+
+# Built-in fallback pricing (used when synced catalog is unavailable)
+BUILTIN_PRICING: Dict[str, Dict[str, float]] = {
     # OpenAI
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
@@ -50,6 +146,10 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "mistral:7b": {"input": 0.0, "output": 0.0},
 }
 
+# Median fallback pricing for unknown models (instead of max-tier $15/$60)
+# Based on median of major providers: approximately Sonnet-tier pricing
+_MEDIAN_FALLBACK = (1.50, 6.00)
+
 
 def normalize_model_name(m: str) -> str:
     """
@@ -63,43 +163,123 @@ def normalize_model_name(m: str) -> str:
     return m
 
 
-def get_model_pricing(model: str) -> Tuple[float, float]:
+def get_model_pricing(model: str, pricing_overrides: Optional[Dict[str, Tuple[float, float]]] = None) -> Tuple[float, float]:
     """
-    Get pricing for a model
-    Returns (input_price, output_price) per 1M tokens
+    Get pricing for a model.
+    Returns (input_price, output_price) per 1M tokens.
+
+    Resolution order:
+    1. Custom pricing overrides (company-level)
+    2. Synced LiteLLM catalog (1,900+ models)
+    3. Built-in fallback table
+    4. Median-tier fallback ($1.50/$6.00) instead of max-tier
     """
     if not model:
-        return 3.00, 12.00
+        return _MEDIAN_FALLBACK
 
     query_norm = normalize_model_name(model)
-    
-    # 1. Try exact match first
-    pricing = MODEL_PRICING.get(query_norm)
+
+    # 1. Custom pricing overrides
+    if pricing_overrides:
+        if query_norm in pricing_overrides:
+            return pricing_overrides[query_norm]
+        for key, val in pricing_overrides.items():
+            if key in query_norm or query_norm in key:
+                return val
+
+    # Lazy-load the synced catalog on first call
+    global _catalog_loaded
+    if not _catalog_loaded:
+        _load_synced_catalog()
+
+    # 2. Try synced catalog (exact match)
+    if query_norm in _synced_catalog:
+        entry = _synced_catalog[query_norm]
+        pricing = _extract_pricing_from_entry(entry)
+        if pricing:
+            return pricing
+
+    # 3. Try synced catalog (substring match, longest key first)
+    if _synced_catalog:
+        sorted_keys = sorted(_synced_catalog.keys(), key=len, reverse=True)
+        for key in sorted_keys:
+            if key in query_norm or query_norm in key:
+                entry = _synced_catalog[key]
+                pricing = _extract_pricing_from_entry(entry)
+                if pricing:
+                    return pricing
+
+    # 4. Try built-in table (exact match)
+    pricing = BUILTIN_PRICING.get(query_norm)
     if pricing:
         return pricing["input"], pricing["output"]
-    
-    # 2. Match based on substring matching with descending key length
-    # This prevents shorter models matching first (e.g. gpt-4o-mini matching gpt-4o)
-    sorted_keys = sorted(MODEL_PRICING.keys(), key=len, reverse=True)
-    
-    for key in sorted_keys:
+
+    # 5. Try built-in table (substring match)
+    sorted_builtin = sorted(BUILTIN_PRICING.keys(), key=len, reverse=True)
+    for key in sorted_builtin:
         if key in query_norm:
-            return MODEL_PRICING[key]["input"], MODEL_PRICING[key]["output"]
-            
-    # Default fallback for unknown models (assume expensive model pricing, matches python tests)
-    return 15.00, 60.00
+            return BUILTIN_PRICING[key]["input"], BUILTIN_PRICING[key]["output"]
+
+    # 6. Median fallback for truly unknown models (not max-tier)
+    return _MEDIAN_FALLBACK
 
 
-def calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+def get_cached_input_pricing(model: str) -> float:
     """
-    Calculate cost for a given model and token usage
+    Get the cached input token price per 1M tokens for a model.
+    Returns 0.0 if no cache pricing is available.
     """
-    input_price, output_price = get_model_pricing(model)
+    if not model:
+        return 0.0
+
+    global _catalog_loaded
+    if not _catalog_loaded:
+        _load_synced_catalog()
+
+    query_norm = normalize_model_name(model)
+
+    if query_norm in _synced_catalog:
+        return _synced_catalog[query_norm].get("cached_input_price_per_1m") or 0.0
+
+    return 0.0
+
+
+def calculate_cost(
+    model: str, 
+    input_tokens: int, 
+    output_tokens: int,
+    cache_read_tokens: int = 0,
+    cache_creation_tokens: int = 0,
+    pricing_overrides: Optional[Dict[str, Tuple[float, float]]] = None
+) -> float:
+    """
+    Calculate cost for a given model and token usage, accounting for prompt caching
+    """
+    input_price, output_price = get_model_pricing(model, pricing_overrides=pricing_overrides)
+    provider = extract_provider_from_model(model)
     
+    standard_input = max(0, input_tokens - cache_read_tokens - cache_creation_tokens)
+    
+    # Cache pricing multipliers
+    cache_read_mult = 1.0
+    cache_create_mult = 1.0
+    
+    if provider == "anthropic":
+        cache_read_mult = 0.10
+        cache_create_mult = 1.25
+    elif provider == "openai":
+        cache_read_mult = 0.50
+        cache_create_mult = 1.0
+    elif provider == "google":
+        cache_read_mult = 0.25
+        cache_create_mult = 1.0
+        
     cost = (
-        (input_tokens / 1_000_000 * input_price) +
-        (output_tokens / 1_000_000 * output_price)
-    )
+        (standard_input * input_price) +
+        (cache_read_tokens * input_price * cache_read_mult) +
+        (cache_creation_tokens * input_price * cache_create_mult) +
+        (output_tokens * output_price)
+    ) / 1_000_000
     
     return cost
 
@@ -109,7 +289,7 @@ def extract_provider_from_model(model: str) -> str:
     Extract provider from model name
     """
     model_lower = model.lower()
-    
+
     if "claude" in model_lower:
         return "anthropic"
     elif "gpt" in model_lower or model_lower.startswith("o1") or model_lower.startswith("o3"):
@@ -118,5 +298,14 @@ def extract_provider_from_model(model: str) -> str:
         return "google"
     elif any(x in model_lower for x in ["llama", "mistral", "qwen"]):
         return "ollama"
-    
+
+    # Try synced catalog for provider info
+    global _catalog_loaded
+    if not _catalog_loaded:
+        _load_synced_catalog()
+
+    query_norm = normalize_model_name(model)
+    if query_norm in _synced_catalog:
+        return _synced_catalog[query_norm].get("provider", "unknown")
+
     return "unknown"

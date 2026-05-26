@@ -3,7 +3,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://aurex-backend-8
 
 export interface ExecutiveSummary {
     executive_summary: {
-        current_weekly_spend: number;
+        current_period_spend: number;
         wasted_amount: number;
         waste_percentage: number;
         optimized_spend: number;
@@ -257,6 +257,87 @@ export class AurexAPI {
         return response.json();
     }
 
+    // Get savings realization analytics
+    async getSavingsRealization(companyName: string): Promise<{
+        total_realized_savings: number;
+        annualized_savings_run_rate: number;
+        timeline: Array<{ date: string; realized_savings: number; total_waste: number }>;
+        category_breakdown: Record<string, number>;
+    }> {
+        const url = `${this.baseUrl}/analytics/savings-realization?company_name=${encodeURIComponent(companyName)}`;
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
+        if (!response.ok) {
+            throw new Error('Failed to fetch savings realization');
+        }
+        return response.json();
+    }
+
+    // List API keys
+    async listApiKeys(): Promise<Array<{
+        id: string;
+        prefix: string;
+        name: string;
+        company_name: string;
+        is_active: boolean;
+        created_at: string;
+        last_used_at: string | null;
+    }>> {
+        const url = `${this.baseUrl}/auth/api-keys`;
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
+        if (!response.ok) {
+            throw new Error('Failed to fetch API keys');
+        }
+        return response.json();
+    }
+
+    // Generate API key
+    async generateApiKey(name: string, companyName: string): Promise<{
+        id: string;
+        key: string;
+        prefix: string;
+        name: string;
+        company_name: string;
+        is_active: boolean;
+        created_at: string;
+    }> {
+        const url = `${this.baseUrl}/auth/api-keys`;
+        const response = await this.fetchWithRetry(url, {
+            method: 'POST',
+            headers: {
+                ...this.getHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, company_name: companyName })
+        });
+        if (!response.ok) {
+            throw new Error('Failed to generate API key');
+        }
+        return response.json();
+    }
+
+    // Revoke API key
+    async revokeApiKey(keyId: string): Promise<{ status: string; message: string }> {
+        const url = `${this.baseUrl}/auth/api-keys/${keyId}`;
+        const response = await this.fetchWithRetry(url, {
+            method: 'DELETE',
+            headers: this.getHeaders()
+        });
+        if (!response.ok) {
+            throw new Error('Failed to revoke API key');
+        }
+        return response.json();
+    }
+
+    // Download executive PDF report
+    async downloadExecutiveReport(sessionId: string): Promise<Blob> {
+        const url = `${this.baseUrl}/audit/sessions/${sessionId}/report`;
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
+        if (!response.ok) {
+            throw new Error('Failed to download executive report PDF');
+        }
+        return response.blob();
+    }
+
     // Get individual events with optional filtering
     async getEvents(params?: {
         skip?: number;
@@ -333,6 +414,69 @@ export class AurexAPI {
             this.setToken(data.access_token);
         }
         
+        return data;
+    }
+
+    async loginWithSSO(email: string, userName: string, companyName: string, provider: 'google'): Promise<{
+        status: string;
+        access_token: string;
+        token_type: string;
+        user_info: { user_name: string; email: string; company_name: string };
+    }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/auth/sso-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email,
+                user_name: userName,
+                company_name: companyName,
+                provider
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || `Failed to sign in with ${provider}`);
+        }
+
+        const data = await response.json();
+
+        if (data.access_token) {
+            this.setToken(data.access_token);
+        }
+        if (data.user_info) {
+            this.setUserInfo(data.user_info);
+        }
+
+        return data;
+    }
+
+    async loginWithGoogle(idToken: string): Promise<{
+        status: string;
+        access_token: string;
+        token_type: string;
+        user_info: { user_name: string; email: string; company_name: string };
+    }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/auth/google-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_token: idToken }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to sign in with Google');
+        }
+
+        const data = await response.json();
+
+        if (data.access_token) {
+            this.setToken(data.access_token);
+        }
+        if (data.user_info) {
+            this.setUserInfo(data.user_info);
+        }
+
         return data;
     }
 
@@ -480,7 +624,7 @@ export class AurexAPI {
         // Update session with results
         const updatedSession = await this.updateAuditSession(session.id, {
             credit_score: creditScore,
-            total_cost: summary.executive_summary.current_weekly_spend,
+            total_cost: summary.executive_summary.current_period_spend,
             wasted_cost: summary.executive_summary.wasted_amount,
             waste_percentage: summary.executive_summary.waste_percentage,
             total_events: summary.total_events,
@@ -494,8 +638,72 @@ export class AurexAPI {
             summary,
         };
     }
+
+    // Generate optimizations using backend optimization generator
+    async generateOptimization(data: {
+        issue_type: string;
+        issue_title: string;
+        weekly_cost: number;
+        one_line_summary: string;
+        message: string;
+        chat_history?: { role: "assistant" | "user"; text: string }[];
+    }): Promise<{ response: string }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/optimization/generate`, {
+            method: 'POST',
+            headers: this.getHeaders({
+                'Content-Type': 'application/json',
+            }),
+            body: JSON.stringify({
+                issue_type: data.issue_type,
+                issue_title: data.issue_title,
+                weekly_cost: data.weekly_cost,
+                one_line_summary: data.one_line_summary,
+                message: data.message,
+                chat_history: data.chat_history?.map(msg => ({ role: msg.role, text: msg.text })) || []
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate optimization');
+        }
+
+        return response.json();
+    }
+
+    async getPricingOverrides(companyName: string): Promise<any[]> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/pricing/overrides?company_name=${encodeURIComponent(companyName)}`, {
+            method: 'GET',
+            headers: this.getHeaders(),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to fetch pricing overrides');
+        }
+
+        return response.json();
+    }
+
+    async uploadPricingOverrides(file: File, companyName: string): Promise<any> {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await this.fetchWithRetry(`${this.baseUrl}/pricing/overrides?company_name=${encodeURIComponent(companyName)}`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to upload pricing overrides');
+        }
+
+        return response.json();
+    }
 }
 
 export const aurixAPI = new AurexAPI();
 
-// Made with Bob
+
