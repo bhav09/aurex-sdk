@@ -18,10 +18,17 @@ export interface AurexConfig {
   ledgerPath?: string;
   cloudSync?: boolean;
   cloudEndpoint?: string;
+  baseUrl?: string;
   flushIntervalMs?: number;
   maxBatchSize?: number;
   localOnly?: boolean;
   budgetGuard?: BudgetGuardConfig;
+}
+
+function resolveCloudEndpoint(config?: AurexConfig): string {
+  if (config?.cloudEndpoint) return config.cloudEndpoint;
+  const base = (config?.baseUrl || process.env.AUREX_BASE_URL || "http://localhost:8000/api/v1").replace(/\/$/, "");
+  return `${base}/ledger/events`;
 }
 
 export interface AurexEvent {
@@ -184,9 +191,10 @@ export class AurexAuditor {
       project: config?.project || "default",
       ledgerPath: config?.ledgerPath || defaultLedger,
       cloudSync: config?.cloudSync ?? false,
-      cloudEndpoint: config?.cloudEndpoint || "http://localhost:8000/api/v1/upload/csv",
-      flushIntervalMs: config?.flushIntervalMs || 1000,
-      maxBatchSize: config?.maxBatchSize || 50,
+      cloudEndpoint: resolveCloudEndpoint(config),
+      baseUrl: config?.baseUrl || process.env.AUREX_BASE_URL || "",
+      flushIntervalMs: config?.flushIntervalMs || 30000,
+      maxBatchSize: config?.maxBatchSize || 100,
       localOnly: config?.localOnly ?? true,
       budgetGuard: config?.budgetGuard || {},
     };
@@ -435,11 +443,11 @@ export class AurexAuditor {
 
   private async syncToCloud(batch: AurexEvent[]): Promise<void> {
     try {
-      const payload = {
-        project: this.config.project,
-        data: batch,
-      };
-      
+      const isLedgerEndpoint = /\/ledger\/events\/?$/.test(this.config.cloudEndpoint);
+      const payload = isLedgerEndpoint
+        ? { events: batch.map(e => ({ ...e, cost_usd: e.cost })) }
+        : { project: this.config.project, data: batch };
+
       const response = await fetch(this.config.cloudEndpoint, {
         method: "POST",
         headers: {
@@ -478,5 +486,95 @@ export class AurexAuditor {
   /** Tear down the auditor instance and clean up queue loops */
   public shutdown() {
     this.persistPendingAndShutdown();
+  }
+
+  // ==========================================================================
+  // Auto-instrumentation
+  // ==========================================================================
+
+  /** Best-effort LiteLLM patcher (covers most users via the SDK shim). */
+  public patchLiteLLM(): void {
+    let lite: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      lite = require("litellm");
+    } catch {
+      return;
+    }
+    if (!lite || typeof lite.completion !== "function" || lite.completion.__aurex_patched__) return;
+
+    const original = lite.completion.bind(lite);
+    const self = this;
+    const patched: any = async function (...args: any[]) {
+      const resp = await original(...args);
+      try {
+        const params = args[0] || {};
+        const usage = resp?.usage || {};
+        self.logEvent({
+          model: params.model || "unknown",
+          inputTokens: usage.prompt_tokens || usage.input_tokens || 0,
+          outputTokens: usage.completion_tokens || usage.output_tokens || 0,
+          cachedTokens: usage.cache_read_input_tokens || 0,
+          cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+          extraMetadata: params.metadata,
+        });
+      } catch (e) {
+        // never break the app
+      }
+      return resp;
+    };
+    patched.__aurex_patched__ = true;
+    lite.completion = patched;
+  }
+
+  /** Best-effort Anthropic SDK patcher. */
+  public patchAnthropic(): void {
+    let anthropicMod: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      anthropicMod = require("@anthropic-ai/sdk");
+    } catch {
+      return;
+    }
+    const Cls = anthropicMod?.default || anthropicMod?.Anthropic;
+    if (!Cls || Cls.__aurex_patched__) return;
+
+    const self = this;
+    const Wrapped: any = function (...ctorArgs: any[]) {
+      // @ts-ignore
+      const inst = new Cls(...ctorArgs);
+      const messages = inst.messages;
+      if (messages && typeof messages.create === "function" && !messages.create.__aurex_patched__) {
+        const origCreate = messages.create.bind(messages);
+        const patched: any = async function (...args: any[]) {
+          const resp = await origCreate(...args);
+          try {
+            const params = args[0] || {};
+            const usage = resp?.usage || {};
+            self.logEvent({
+              model: params.model || "unknown",
+              inputTokens: usage.input_tokens || 0,
+              outputTokens: usage.output_tokens || 0,
+              cachedTokens: usage.cache_read_input_tokens || 0,
+              cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+            });
+          } catch {}
+          return resp;
+        };
+        patched.__aurex_patched__ = true;
+        messages.create = patched;
+      }
+      return inst;
+    };
+    Wrapped.prototype = Cls.prototype;
+    Wrapped.__aurex_patched__ = true;
+
+    if (anthropicMod.default) anthropicMod.default = Wrapped;
+    if (anthropicMod.Anthropic) anthropicMod.Anthropic = Wrapped;
+  }
+
+  public patchAll(): void {
+    this.patchLiteLLM();
+    this.patchAnthropic();
   }
 }

@@ -60,7 +60,7 @@ class TestAurexPatchersAndMemory(unittest.TestCase):
         AurexAuditor._instance = None
 
     def test_memory_storage_mode(self):
-        config = AurexConfig(storage_mode="memory", local_only=True)
+        config = AurexConfig(storage_mode="memory", local_only=True, flush_interval_seconds=0.1)
         auditor = AurexAuditor(config)
         
         # Verify it initializes empty
@@ -111,9 +111,9 @@ class TestAurexPatchersAndMemory(unittest.TestCase):
         # Mock the raw Messages.create call FIRST
         original_create = MagicMock(return_value=mock_resp)
         anthropic.resources.messages.Messages.create = original_create
-        
+
         # Patch AFTER the target function has been mocked
-        config = AurexConfig(storage_mode="memory", local_only=True)
+        config = AurexConfig(storage_mode="memory", local_only=True, flush_interval_seconds=0.1)
         auditor = AurexAuditor(config)
         auditor.clear_local_events()
         auditor.patch_anthropic()
@@ -156,7 +156,7 @@ class TestAurexPatchersAndMemory(unittest.TestCase):
         genai.GenerativeModel.generate_content = original_generate
         
         # Patch AFTER target function mock
-        config = AurexConfig(storage_mode="memory", local_only=True)
+        config = AurexConfig(storage_mode="memory", local_only=True, flush_interval_seconds=0.1)
         auditor = AurexAuditor(config)
         auditor.clear_local_events()
         auditor.patch_google()

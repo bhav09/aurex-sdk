@@ -54,52 +54,65 @@ npm run dev
 
 ### 3. Integrated SDK Usage
 
-Instrument your application to log LLM transactions and enforce real-time budgets:
+#### Zero-code auto-hook (recommended)
 
-#### Node.js SDK
+No code changes needed — install the hook once, set two env vars, run your app.
+
+```bash
+# Python
+pip install aurex-sdk
+aurex install-hook
+
+export AUREX_ENABLED=1
+export AUREX_API_KEY=aux_dev_...   # from /app/api-keys
+python your_app.py                 # all LLM calls tracked automatically
+
+# Node
+npm install aurex-sdk
+npx aurex install-hook
+
+AUREX_ENABLED=1 AUREX_API_KEY=aux_dev_... node your_app.js
+```
+
+#### Manual instrumentation
+
+```python
+# Python — manual log_event or patch specific providers
+from aurex_sdk import AurexAuditor, AurexConfig
+
+auditor = AurexAuditor(AurexConfig(
+    api_key="aux_dev_...",
+    project="my-project",
+    flush_interval_seconds=30,
+    max_batch_size=100,
+))
+
+# Patch all supported providers at once (LiteLLM → Anthropic → OpenAI → Google)
+auditor.patch_all()
+
+# Or manually log events
+auditor.log_event(
+    model="gpt-4o",
+    input_tokens=120,
+    output_tokens=45,
+    workflow_id="my-workflow"
+)
+```
+
 ```typescript
-import { AurexAuditor } from "@aurex/sdk-node";
+// Node — manual logEvent or patchAll
+import { AurexAuditor } from "aurex-sdk";
 
 const auditor = AurexAuditor.getInstance({
-  apiKey: "your-aurex-api-key",
-  cloudSync: true,
+  apiKey: "aux_dev_...",
+  project: "my-project",
   budgetGuard: {
-    maxCostPerMinute: 5.0, // Limit spend to $5.00/min
-    onBudgetExceeded: "warn" // Configurable: 'throw' | 'warn' | 'webhook'
+    maxCostPerMinute: 5.0,
+    onBudgetExceeded: "warn"  // 'throw' | 'warn' | 'webhook'
   }
 });
 
-// Non-blocking log event
-auditor.logEvent({
-  model: "gpt-4o",
-  prompt: "...",
-  response: "...",
-  inputTokens: 120,
-  outputTokens: 45
-});
-```
-
-#### Python SDK
-```python
-from aurex_sdk import AurexAuditor
-
-auditor = AurexAuditor.get_instance(
-    api_key="your-aurex-api-key",
-    cloud_sync=True,
-    budget_guard={
-        "max_cost_per_minute": 5.0,
-        "on_budget_exceeded": "warn"
-    }
-)
-
-# Non-blocking log event
-auditor.log_event(
-    model="gpt-4o",
-    prompt="...",
-    response="...",
-    input_tokens=120,
-    output_tokens=45
-)
+auditor.patchAll(); // covers LiteLLM, Anthropic, OpenAI
 ```
 
 ---

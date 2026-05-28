@@ -81,6 +81,32 @@ export interface AuditSession {
     updated_at: string;
 }
 
+export interface ApiKeyMetadata {
+    id: string;
+    prefix: string;
+    last4: string | null;
+    name: string;
+    is_active: boolean;
+    created_at: string;
+    last_used_at: string | null;
+    project_id: string | null;
+    environment: string | null;
+    scopes: string[] | null;
+    revoked_at: string | null;
+}
+
+export interface ApiKeyGenerated {
+    id: string;
+    key: string;
+    prefix: string;
+    name: string;
+    is_active: boolean;
+    created_at: string;
+    project_id: string | null;
+    environment: string | null;
+    scopes: string[] | null;
+}
+
 export interface CreateAuditSessionRequest {
     user_name: string;
     email: string;
@@ -315,7 +341,7 @@ export class AurexAPI {
         return response.json();
     }
 
-    // Revoke API key
+    // Revoke API key (legacy /auth/api-keys path)
     async revokeApiKey(keyId: string): Promise<{ status: string; message: string }> {
         const url = `${this.baseUrl}/auth/api-keys/${keyId}`;
         const response = await this.fetchWithRetry(url, {
@@ -324,6 +350,63 @@ export class AurexAPI {
         });
         if (!response.ok) {
             throw new Error('Failed to revoke API key');
+        }
+        return response.json();
+    }
+
+    // ============================================================================
+    // PROJECT-SCOPED API KEYS (v1)
+    // ============================================================================
+
+    async listProjects(): Promise<Array<{ id: string; org_id: string; name: string; environment: string }>> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/projects`, { headers: this.getHeaders() });
+        if (!response.ok) throw new Error('Failed to fetch projects');
+        return response.json();
+    }
+
+    async listKeysV1(projectId?: string): Promise<Array<ApiKeyMetadata>> {
+        const url = projectId
+            ? `${this.baseUrl}/keys?project_id=${encodeURIComponent(projectId)}`
+            : `${this.baseUrl}/keys`;
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
+        if (!response.ok) throw new Error('Failed to fetch API keys');
+        return response.json();
+    }
+
+    async createKeyV1(body: {
+        name: string;
+        project_id: string;
+        environment: 'dev' | 'staging' | 'prod';
+        scopes?: string[];
+    }): Promise<ApiKeyGenerated> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/keys`, {
+            method: 'POST',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to create API key');
+        }
+        return response.json();
+    }
+
+    async revokeKeyV1(keyId: string): Promise<void> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/keys/${keyId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(),
+        });
+        if (!response.ok) throw new Error('Failed to revoke API key');
+    }
+
+    async rotateKeyV1(keyId: string): Promise<ApiKeyGenerated> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/keys/${keyId}/rotate`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to rotate API key');
         }
         return response.json();
     }
@@ -345,6 +428,7 @@ export class AurexAPI {
         workflow_id?: string;
         provider?: string;
         model?: string;
+        project_id?: string;
     }): Promise<LLMEvent[]> {
         const queryParams = new URLSearchParams();
         if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
@@ -352,6 +436,7 @@ export class AurexAPI {
         if (params?.workflow_id) queryParams.append('workflow_id', params.workflow_id);
         if (params?.provider) queryParams.append('provider', params.provider);
         if (params?.model) queryParams.append('model', params.model);
+        if (params?.project_id) queryParams.append('project_id', params.project_id);
 
         const url = `${this.baseUrl}/events${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
         const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
@@ -360,6 +445,41 @@ export class AurexAPI {
             throw new Error('Failed to fetch events');
         }
 
+        return response.json();
+    }
+
+    async getProjectStats(projectId?: string): Promise<{
+        total_events: number;
+        total_cost: number;
+        spend_7d: number;
+        spend_24h: number;
+        total_tokens: number;
+        unique_workflows: number;
+        unique_models: number;
+        top_models: Array<{ model: string; cost: number; calls: number }>;
+        date_range: { first_event: string | null; last_event: string | null };
+    }> {
+        const url = projectId
+            ? `${this.baseUrl}/stats?project_id=${encodeURIComponent(projectId)}`
+            : `${this.baseUrl}/stats`;
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
+        if (!response.ok) throw new Error('Failed to fetch stats');
+        return response.json();
+    }
+
+    async getProjectWorkflows(projectId?: string): Promise<Array<{
+        workflow_id: string;
+        event_count: number;
+        total_cost: number;
+        total_tokens: number;
+        start_time: string | null;
+        end_time: string | null;
+    }>> {
+        const url = projectId
+            ? `${this.baseUrl}/workflows?project_id=${encodeURIComponent(projectId)}`
+            : `${this.baseUrl}/workflows`;
+        const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
+        if (!response.ok) throw new Error('Failed to fetch workflows');
         return response.json();
     }
 

@@ -71,13 +71,31 @@ export default function DocsPage() {
   const sections = [
     { id: "overview", label: "Overview & Philosophy" },
     { id: "quickstart", label: "Quick Start" },
+    { id: "autohook", label: "Zero-Code Hook" },
     { id: "integration", label: "SDK Integration" },
     { id: "heuristics", label: "Offline Heuristics" },
     { id: "cicd", label: "CI/CD Build Breaker" }
   ];
 
   const pythonInstallCode = `pip install aurex-sdk`;
-  const nodeInstallCode = `npm install @aurex/sdk`;
+  const nodeInstallCode = `npm install aurex-sdk`;
+
+  const pythonAutoHookCode = `# Install the zero-code import hook (writes to site-packages)
+aurex install-hook
+
+# Set env vars — that's it. No code changes needed.
+export AUREX_ENABLED=1
+export AUREX_API_KEY=aux_dev_...      # from /app/api-keys
+export AUREX_BASE_URL=https://your-backend.run.app/api/v1   # optional
+
+# Run your app — every LLM call is tracked automatically
+python your_app.py`;
+
+  const nodeAutoHookCode = `# Install the zero-code require hook
+npx aurex install-hook
+
+# Set env vars
+AUREX_ENABLED=1 AUREX_API_KEY=aux_dev_... node your_app.js`;
 
   const pythonUsageCode = `from aurex_sdk import AurexAuditor, AurexConfig
 
@@ -99,14 +117,21 @@ auditor.log_event(
     workflow_id="session_user_8492"
 )`;
 
-  const pythonOpenAICode = `from aurex_sdk import AurexAuditor
-import openai
+  const pythonPatchAllCode = `from aurex_sdk import AurexAuditor
+import openai, anthropic, litellm
 
 auditor = AurexAuditor()
-# Auto-patches completions in the 'openai' library
-auditor.patch_openai()
 
-# Standard OpenAI completions are now monitored automatically!
+# Patch all supported providers at once (litellm → anthropic → openai → google)
+auditor.patch_all()
+
+# Or patch individually:
+# auditor.patch_litellm()     # LiteLLM (covers most providers via one hook)
+# auditor.patch_openai()      # OpenAI / Azure OpenAI
+# auditor.patch_anthropic()   # Anthropic Claude
+# auditor.patch_google()      # Google Gemini
+
+# All subsequent LLM calls are monitored automatically
 response = openai.chat.completions.create(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Analyze my project"}]
@@ -114,12 +139,12 @@ response = openai.chat.completions.create(
 
   const pythonContextManagerCode = `with AurexAuditor() as auditor:
     auditor.log_event(
-        model="gemini-2.0-flash", 
-        input_tokens=250, 
+        model="gemini-2.0-flash",
+        input_tokens=250,
         output_tokens=100
     )`;
 
-  const nodeUsageCode = `import { AurexAuditor } from "@aurex/sdk";
+  const nodeUsageCode = `import { AurexAuditor } from "aurex-sdk";
 
 // Initialize the singleton instance
 const auditor = AurexAuditor.getInstance({
@@ -353,9 +378,11 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
                   <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 space-y-3">
                     <h4 className="text-sm font-semibold text-white">Environment Variables:</h4>
                     <ul className="space-y-2 text-sm text-white/45 font-mono">
-                      <li><strong className="text-white/70">AUREX_API_KEY</strong> - Authorizes cloud sync.</li>
+                      <li><strong className="text-white/70">AUREX_ENABLED</strong> - Set to <code className="text-indigo-400">1</code> to activate the auto-hook.</li>
+                      <li><strong className="text-white/70">AUREX_API_KEY</strong> - API key for cloud sync. Format: <code className="text-indigo-400">aux_dev_...</code> (from <a href="/app/api-keys" className="text-emerald-400 hover:underline">/app/api-keys</a>).</li>
+                      <li><strong className="text-white/70">AUREX_BASE_URL</strong> - Backend URL (defaults to <code className="text-indigo-400">http://localhost:8000/api/v1</code>).</li>
                       <li><strong className="text-white/70">AUREX_PROJECT</strong> - Labels logged workloads.</li>
-                      <li><strong className="text-white/70">AUREX_LEDGER_PATH</strong> - Specifies JSONL target path (defaults to <code className="text-indigo-400">.aurex/ledger.jsonl</code>).</li>
+                      <li><strong className="text-white/70">AUREX_LEDGER_PATH</strong> - JSONL target path (defaults to <code className="text-indigo-400">.aurex/ledger.jsonl</code>).</li>
                     </ul>
                   </div>
                 </div>
@@ -373,19 +400,64 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
                     Configuration parameters:
                   </p>
                   <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 space-y-3">
-                    <h4 className="text-sm font-semibold text-white">AurexConfig Interface:</h4>
+                    <h4 className="text-sm font-semibold text-white">AurexConfig options:</h4>
                     <ul className="space-y-2 text-sm text-white/45 font-mono">
-                      <li><strong className="text-white/70">apiKey?: string</strong> - Secret key verification.</li>
-                      <li><strong className="text-white/70">project?: string</strong> - Project grouping.</li>
-                      <li><strong className="text-white/70">ledgerPath?: string</strong> - Path to write logs (Default: <code className="text-indigo-400">.aurex/ledger.jsonl</code>).</li>
-                      <li><strong className="text-white/70">localOnly?: boolean</strong> - Restrict transmission (Default: <code className="text-indigo-400">true</code>).</li>
+                      <li><strong className="text-white/70">apiKey?: string</strong> - API key. Format: <code className="text-indigo-400">aux_dev_...</code></li>
+                      <li><strong className="text-white/70">project?: string</strong> - Project label.</li>
+                      <li><strong className="text-white/70">baseUrl?: string</strong> - Backend base URL (defaults to localhost).</li>
+                      <li><strong className="text-white/70">ledgerPath?: string</strong> - JSONL log path (Default: <code className="text-indigo-400">.aurex/ledger.jsonl</code>).</li>
+                      <li><strong className="text-white/70">localOnly?: boolean</strong> - Disable cloud sync (Default: <code className="text-indigo-400">true</code>).</li>
+                      <li><strong className="text-white/70">flushIntervalMs?: number</strong> - Flush interval in ms (Default: <code className="text-indigo-400">30000</code>).</li>
+                      <li><strong className="text-white/70">maxBatchSize?: number</strong> - Events per batch (Default: <code className="text-indigo-400">100</code>).</li>
                     </ul>
                   </div>
                 </div>
               )}
             </section>
 
-            {/* Section 3: SDK Integration */}
+            {/* Section 3: Zero-Code Hook */}
+            <section id="autohook" className="scroll-mt-32 space-y-6">
+              <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <Terminal className="w-5 h-5" />
+                </span>
+                Zero-Code Hook
+              </h2>
+              <p className="text-base text-white/60 leading-relaxed">
+                The fastest way to start tracking. Install once, set two env vars, run your app — no code changes needed.
+                All LiteLLM, OpenAI, Anthropic, and Gemini calls are intercepted automatically.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { step: "1", title: "Install hook", desc: "Writes a .pth file to site-packages that auto-imports on every Python start." },
+                  { step: "2", title: "Set env vars", desc: "AUREX_ENABLED=1 activates the hook. AUREX_API_KEY links events to your project." },
+                  { step: "3", title: "Run your app", desc: "Events appear in /app dashboard within 30 seconds. No SDK import needed." }
+                ].map((item) => (
+                  <div key={item.step} className="p-4 rounded-xl border border-white/[0.05] bg-white/[0.01] space-y-2">
+                    <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Step {item.step}</span>
+                    <h4 className="text-sm font-semibold text-white">{item.title}</h4>
+                    <p className="text-xs text-white/40 leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              {activeTab === "python" ? (
+                <CodeBlock id="copy-python-autohook" code={pythonAutoHookCode} language="bash" />
+              ) : (
+                <CodeBlock id="copy-node-autohook" code={nodeAutoHookCode} language="bash" />
+              )}
+
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex gap-3">
+                <span className="text-amber-400 text-lg mt-0.5">⚡</span>
+                <p className="text-sm text-white/60 leading-relaxed">
+                  To uninstall: run <code className="text-indigo-400">aurex uninstall-hook</code>. The hook only activates
+                  when <code className="text-indigo-400">AUREX_ENABLED=1</code> is set, so it is safe to leave installed in dev environments.
+                </p>
+              </div>
+            </section>
+
+            {/* Section 4: SDK Integration */}
             <section id="integration" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -429,15 +501,16 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
                   <div className="space-y-3 pt-4 border-t border-white/[0.05]">
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                      Method C: Auto-Patching OpenAI
+                      Method C: Auto-Patching (all providers)
                     </h3>
                     <p className="text-base text-white/60">
-                      Zero-code instrumentation for standard OpenAI clients. Import and patch.
+                      Monkey-patches the provider SDK at the call site. Supports LiteLLM, OpenAI, Anthropic, and Google Gemini.
+                      Use <code className="text-indigo-400">patch_all()</code> to cover all at once.
                     </p>
-                    <CodeBlock 
-                      id="copy-python-patch" 
-                      code={pythonOpenAICode} 
-                      language="python" 
+                    <CodeBlock
+                      id="copy-python-patch"
+                      code={pythonPatchAllCode}
+                      language="python"
                     />
                   </div>
                 </div>
@@ -446,22 +519,38 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      Standard Node.js Integration
+                      Manual Event Logging
                     </h3>
                     <p className="text-base text-white/60">
-                      Call <code className="text-indigo-400">logEvent()</code> to record events. Buffered and batched to disk automatically.
+                      Call <code className="text-indigo-400">logEvent()</code> to record events. Buffered and batched automatically.
+                      Package name: <code className="text-indigo-400">aurex-sdk</code>.
                     </p>
-                    <CodeBlock 
-                      id="copy-node-manual" 
-                      code={nodeUsageCode} 
-                      language="typescript" 
+                    <CodeBlock
+                      id="copy-node-manual"
+                      code={nodeUsageCode}
+                      language="typescript"
+                    />
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-white/[0.05]">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                      Auto-Patching
+                    </h3>
+                    <p className="text-base text-white/60">
+                      Use <code className="text-indigo-400">patchAll()</code> to monkey-patch LiteLLM, Anthropic, and OpenAI in one call.
+                    </p>
+                    <CodeBlock
+                      id="copy-node-patch"
+                      code={`import { AurexAuditor } from "aurex-sdk";\n\nconst auditor = AurexAuditor.getInstance({ apiKey: "aux_dev_..." });\n\n// Covers LiteLLM → Anthropic → OpenAI\nauditor.patchAll();\n\n// Or individually:\n// auditor.patchLiteLLM();\n// auditor.patchAnthropic();\n// auditor.patchOpenAI();`}
+                      language="typescript"
                     />
                   </div>
                 </div>
               )}
             </section>
 
-            {/* Section 4: Heuristics */}
+            {/* Section 5: Heuristics */}
             <section id="heuristics" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -536,7 +625,7 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
               </div>
             </section>
 
-            {/* Section 5: CI/CD Build Breaker */}
+            {/* Section 6: CI/CD Build Breaker */}
             <section id="cicd" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
