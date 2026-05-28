@@ -420,10 +420,10 @@ export function UploadZone({
                 ) : (
                     <div className="mt-4 space-y-4">
                         <div className="mb-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full flex items-center justify-center gap-2 border-white/10 text-white rounded-xl hover:bg-white/[0.04] py-5"
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                className="flex w-full items-center justify-center gap-2 border-white/10 text-white rounded-xl hover:bg-white/[0.04] py-5"
                                 onClick={handleGoogleClick}
                                 disabled={otpLoading}
                             >
