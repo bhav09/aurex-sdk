@@ -717,5 +717,3 @@ async def google_login(data: GoogleLoginRequest):
         "default_project_id": default_project_id,
     }
 
-
-
