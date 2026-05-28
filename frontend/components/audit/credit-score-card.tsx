@@ -166,7 +166,7 @@ export function CreditScoreCard({ score, previousScore, className }: CreditScore
                         <p className="text-center text-sm leading-relaxed text-white/55 md:text-left">
                             {score >= 80 && "Your token usage is highly optimized. Keep shipping the great patterns you already have."}
                             {score >= 60 && score < 80 && "Solid baseline with clear upside. Dive into the agent plan below for the fastest wins."}
-                            {score >= 40 && score < 60 && "Meaningful waste detected. Prioritize the top-ranked issues—they compound weekly."}
+                            {score >= 40 && score < 60 && "Meaningful waste detected. Prioritize the top-ranked issues, they compound weekly."}
                             {score < 40 && "Large optimization headroom. Fixing the critical issues first moves your burn curve the most."}
                         </p>
                     </div>

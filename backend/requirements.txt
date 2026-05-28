@@ -34,6 +34,7 @@ python-dateutil==2.8.2
 
 # Hashing
 hashlib-additional==1.0.0
+argon2-cffi==23.1.0
 asyncpg
 aiosqlite
 redis

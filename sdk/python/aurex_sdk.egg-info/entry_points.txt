@@ -1,0 +1,2 @@
+[console_scripts]
+aurex = aurex_sdk.cli:run_cli

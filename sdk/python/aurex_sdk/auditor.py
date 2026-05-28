@@ -142,9 +142,10 @@ class AurexConfig:
         project: str = "default",
         ledger_path: str = ".aurex/ledger.jsonl",
         cloud_sync: bool = False,
-        cloud_endpoint: str = "http://localhost:8000/api/v1/upload/csv",
-        flush_interval_seconds: float = 1.0,
-        max_batch_size: int = 50,
+        cloud_endpoint: Optional[str] = None,
+        base_url: Optional[str] = None,
+        flush_interval_seconds: float = 30.0,
+        max_batch_size: int = 100,
         local_only: bool = True,
         storage_mode: str = "file", # "file" or "memory"
         budget_guard: Optional[Dict[str, Any]] = None
@@ -153,7 +154,17 @@ class AurexConfig:
         self.project = project
         self.ledger_path = ledger_path
         self.cloud_sync = cloud_sync
-        self.cloud_endpoint = cloud_endpoint
+        # Cloud target: explicit cloud_endpoint wins, else derive from base_url
+        # (env: AUREX_BASE_URL), else fall back to localhost dev default.
+        if cloud_endpoint:
+            self.cloud_endpoint = cloud_endpoint
+        else:
+            resolved_base = (
+                base_url
+                or os.getenv("AUREX_BASE_URL")
+                or "http://localhost:8000/api/v1"
+            ).rstrip("/")
+            self.cloud_endpoint = f"{resolved_base}/ledger/events"
         self.flush_interval_seconds = flush_interval_seconds
         self.max_batch_size = max_batch_size
         self.local_only = local_only
@@ -481,30 +492,41 @@ class AurexAuditor:
             self._sync_to_cloud(batch)
 
     def _sync_to_cloud(self, batch: List[Dict[str, Any]]):
-        """Transmit hashed metadata to the cloud backend asynchronously"""
+        """Transmit hashed metadata to the cloud backend asynchronously.
+
+        Wire format depends on the configured endpoint:
+        - `/ledger/events` (Phase 1): `{events: [...]}` with cost as `cost_usd`.
+        - Anything else: legacy `{project, data: [...]}` payload.
+        """
         try:
-            # Prepare payload
-            payload = {
-                "project": self.config.project,
-                "data": batch
-            }
+            endpoint = self.config.cloud_endpoint
+            if endpoint.rstrip("/").endswith("/ledger/events"):
+                payload = {
+                    "events": [
+                        {**evt, "cost_usd": evt.get("cost", 0.0)}
+                        for evt in batch
+                    ]
+                }
+            else:
+                payload = {
+                    "project": self.config.project,
+                    "data": batch,
+                }
             req_data = json.dumps(payload).encode("utf-8")
-            
-            # Non-blocking simple HTTP request
+
             req = urllib.request.Request(
-                self.config.cloud_endpoint,
+                endpoint,
                 data=req_data,
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.config.api_key}"
+                    "Authorization": f"Bearer {self.config.api_key}",
                 },
-                method="POST"
+                method="POST",
             )
-            # Timeout quickly to avoid hanging background thread
             with urllib.request.urlopen(req, timeout=3.0) as response:
                 response.read()
-        except Exception as e:
-            # Fail silently to not impact production application
+        except Exception:
+            # Fail silently to never impact production app behavior.
             pass
 
     def persist_pending_and_shutdown(self):
@@ -775,7 +797,7 @@ class AurexAuditor:
 
     def _log_google_response(self, model_self: Any, args: tuple, kwargs: Dict[str, Any], resp: Any):
         """Parses Google Gemini response metadata, hashes prompts locally, and logs them"""
-        model = getattr(model_self, "model_name", "gemini-1.5-flash")
+        model = normalize_model_name(getattr(model_self, "model_name", "gemini-1.5-flash"))
         
         input_tokens = 0
         output_tokens = 0
@@ -823,8 +845,99 @@ class AurexAuditor:
             extra_metadata=kwargs.get("metadata")
         )
 
+    def patch_litellm(self):
+        """Patch LiteLLM's `completion` (and async variant) to auto-log events.
+
+        LiteLLM normalizes responses across providers, so a single hook here
+        covers most users (and runs *before* the provider-specific patchers
+        when used together).
+        """
+        try:
+            import litellm  # type: ignore
+        except ImportError:
+            return
+
+        original = getattr(litellm, "completion", None)
+        if original is not None and not getattr(original, "__aurex_patched__", False):
+            def patched_completion(*args, **kwargs):
+                resp = original(*args, **kwargs)
+                try:
+                    self._log_litellm_response(kwargs, resp)
+                except Exception as e:
+                    print(f"[Aurex SDK Patch Error] LiteLLM patch failed: {e}", file=sys.stderr)
+                return resp
+            patched_completion.__aurex_patched__ = True  # type: ignore[attr-defined]
+            litellm.completion = patched_completion
+
+        original_a = getattr(litellm, "acompletion", None)
+        if original_a is not None and not getattr(original_a, "__aurex_patched__", False):
+            async def patched_acompletion(*args, **kwargs):
+                resp = await original_a(*args, **kwargs)
+                try:
+                    self._log_litellm_response(kwargs, resp)
+                except Exception as e:
+                    print(f"[Aurex SDK Patch Error] LiteLLM async patch failed: {e}", file=sys.stderr)
+                return resp
+            patched_acompletion.__aurex_patched__ = True  # type: ignore[attr-defined]
+            litellm.acompletion = patched_acompletion
+
+    def _log_litellm_response(self, kwargs: Dict[str, Any], resp: Any):
+        """Extract usage from a LiteLLM completion result and log a single event."""
+        model = kwargs.get("model", "unknown")
+
+        input_tokens = 0
+        output_tokens = 0
+        cached_tokens = 0
+        cache_write_tokens = 0
+        usage = getattr(resp, "usage", None)
+        if usage is None and isinstance(resp, dict):
+            usage = resp.get("usage")
+        if usage is not None:
+            def _read(u, key):
+                if isinstance(u, dict):
+                    return u.get(key, 0) or 0
+                return getattr(u, key, 0) or 0
+            input_tokens = int(_read(usage, "prompt_tokens") or _read(usage, "input_tokens") or 0)
+            output_tokens = int(_read(usage, "completion_tokens") or _read(usage, "output_tokens") or 0)
+            cached_tokens = int(
+                _read(usage, "cache_read_input_tokens")
+                or _read(usage, "cached_tokens")
+                or 0
+            )
+            cache_write_tokens = int(_read(usage, "cache_creation_input_tokens") or 0)
+
+        messages = kwargs.get("messages") or []
+        user_prompt = None
+        system_prompt = None
+        for m in messages:
+            role = m.get("role") if isinstance(m, dict) else getattr(m, "role", None)
+            content = m.get("content") if isinstance(m, dict) else getattr(m, "content", None)
+            if role == "system" and isinstance(content, str):
+                system_prompt = content
+            if role == "user" and isinstance(content, str):
+                user_prompt = content
+
+        workflow_id = kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None
+
+        self.log_event(
+            model=model,
+            prompt=user_prompt,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            cache_write_tokens=cache_write_tokens,
+            workflow_id=workflow_id,
+            system_prompt=system_prompt,
+            extra_metadata=kwargs.get("metadata") if isinstance(kwargs.get("metadata"), dict) else None,
+        )
+
     def patch_all(self):
-        """Auto-patch all supported provider libraries (OpenAI, Anthropic, Google Gemini)"""
-        self.patch_openai()
+        """Auto-patch all supported provider libraries.
+
+        Order: LiteLLM first (it wraps everything else), then Anthropic,
+        OpenAI, Google. The patchers each guard against missing imports.
+        """
+        self.patch_litellm()
         self.patch_anthropic()
+        self.patch_openai()
         self.patch_google()

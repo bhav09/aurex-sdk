@@ -193,85 +193,156 @@ async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCrede
 # API Key Authentication (for SDK cloud sync)
 # ============================================================================
 
+def _extract_prefix(api_key: str) -> str:
+    """Return the lookup prefix for an API key.
+
+    New format: ``aux_<env>_<32-urlsafe>`` -> first 8 chars (e.g. ``aux_live``).
+    Legacy ``aurex_...`` -> 8 chars after ``aurex_``.
+    Anything else -> first 8 chars.
+    """
+    if api_key.startswith("aux_"):
+        return api_key[:8]
+    if api_key.startswith("aurex_"):
+        return api_key[6:14]
+    return api_key[:8]
+
+
+async def _resolve_api_key(api_key: str, db: AsyncSession):
+    """Look up an ApiKey row matching `api_key`. Returns the row or None.
+
+    Tries Argon2id (new format) first, then SHA-256 (legacy).
+    """
+    from src.models import ApiKey
+
+    if not api_key or len(api_key) < 16:
+        return None
+
+    prefix = _extract_prefix(api_key)
+
+    # Candidate keys with this prefix that are still considered active.
+    result = await db.execute(
+        select(ApiKey).where(
+            ApiKey.prefix == prefix,
+            ApiKey.is_active == True,  # noqa: E712
+        )
+    )
+    candidates = list(result.scalars().all())
+
+    if not candidates:
+        return None
+
+    # Argon2 path
+    try:
+        from argon2 import PasswordHasher
+        from argon2.exceptions import VerifyMismatchError, InvalidHashError
+        ph = PasswordHasher()
+        for cand in candidates:
+            if cand.argon2_hash and cand.salt:
+                try:
+                    ph.verify(cand.argon2_hash, api_key + cand.salt)
+                    return cand
+                except (VerifyMismatchError, InvalidHashError):
+                    continue
+                except Exception:
+                    continue
+    except ImportError:
+        logger.warning("argon2-cffi not installed; skipping Argon2 verify")
+
+    # Legacy SHA-256 path
+    legacy_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    for cand in candidates:
+        if cand.key_hash and cand.key_hash == legacy_hash:
+            return cand
+
+    return None
+
+
 async def verify_api_key(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> str:
-    """
-    Verify API key and return owner email.
-    Used by SDKs for cloud sync authentication.
-    
-    Args:
-        credentials: Bearer token containing the API key
-        db: Database session
-        
-    Returns:
-        str: Owner email associated with the API key
-        
-    Raises:
-        HTTPException: If API key is invalid, inactive, or malformed
-    """
+    """Verify API key and return owner email. Used by SDKs for cloud sync."""
+    obj = await _verify_api_key_obj(credentials, db)
+    return obj.owner_email
+
+
+async def _verify_api_key_obj(
+    credentials: HTTPAuthorizationCredentials,
+    db: AsyncSession,
+):
+    """Internal: return the resolved ApiKey row (used by scope-aware endpoints)."""
     api_key = credentials.credentials
-    
-    # Validate API key format (should be at least 32 characters)
-    if not api_key or len(api_key) < 32:
+
+    if not api_key or len(api_key) < 16:
         logger.warning("Invalid API key format", key_length=len(api_key) if api_key else 0)
         raise HTTPException(
             status_code=401,
-            detail="Invalid API key format. Expected format: aurex_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            detail="Invalid API key format. Expected: aux_<env>_<random> or aurex_<random>",
         )
-    
-    # Extract prefix (first 8 characters after 'aurex_')
-    if api_key.startswith("aurex_"):
-        prefix = api_key[6:14]  # Characters 6-13 (8 chars after 'aurex_')
-        key_to_hash = api_key
-    else:
-        # Legacy format without prefix
-        prefix = api_key[:8]
-        key_to_hash = api_key
-    
-    # Hash the full API key
-    key_hash = hashlib.sha256(key_to_hash.encode()).hexdigest()
-    
-    # Query database for matching key
-    from src.models import ApiKey
-    
+
+    prefix = _extract_prefix(api_key)
+    last4 = api_key[-4:]
+
+    # Negative cache: revoked keys for fast rejection across workers.
     try:
-        result = await db.execute(
-            select(ApiKey).where(
-                ApiKey.prefix == prefix,
-                ApiKey.key_hash == key_hash,
-                ApiKey.is_active == True
-            )
-        )
-        api_key_obj = result.scalar_one_or_none()
-        
-        if not api_key_obj:
-            logger.warning("API key not found or inactive", prefix=prefix)
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid or inactive API key"
-            )
-        
-        # Update last_used_at timestamp
-        api_key_obj.last_used_at = datetime.utcnow()
-        await db.commit()
-        
-        logger.info("API key verified successfully", 
-                   prefix=prefix, 
-                   owner_email=api_key_obj.owner_email,
-                   key_name=api_key_obj.name)
-        
-        return api_key_obj.owner_email
-        
+        cached = await redis_client.get(f"revoked:{prefix}{last4}")
+        if cached:
+            logger.warning("API key rejected via revocation cache", prefix=prefix)
+            raise HTTPException(status_code=401, detail="API key has been revoked")
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error("Error verifying API key", error=str(e), prefix=prefix)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal error during API key verification"
-        )
+    except Exception:
+        pass  # Redis unavailable -> fall back to DB check.
+
+    api_key_obj = await _resolve_api_key(api_key, db)
+
+    if not api_key_obj:
+        logger.warning("API key not found or inactive", prefix=prefix)
+        raise HTTPException(status_code=401, detail="Invalid or inactive API key")
+
+    # Revoked check (after grace window if rotation in flight).
+    if api_key_obj.revoked_at is not None:
+        grace = api_key_obj.rotation_grace_until
+        if grace is None or grace < datetime.utcnow():
+            raise HTTPException(status_code=401, detail="API key has been revoked")
+
+    # Update last_used_at (best-effort; don't block auth on commit failure).
+    try:
+        api_key_obj.last_used_at = datetime.utcnow()
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    logger.info(
+        "API key verified successfully",
+        prefix=prefix,
+        owner_email=api_key_obj.owner_email,
+        key_name=api_key_obj.name,
+    )
+    return api_key_obj
+
+
+def require_api_key_scope(scope: str):
+    """FastAPI dependency factory: verify API key AND require it to carry `scope`."""
+
+    async def _dep(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: AsyncSession = Depends(get_db),
+    ):
+        obj = await _verify_api_key_obj(credentials, db)
+        scopes = obj.scopes or []
+        if scope not in scopes and "*" not in scopes:
+            # Legacy keys without `scopes` populated retain implicit access
+            # to maintain backward compatibility with existing SDK installs.
+            if obj.scopes is None:
+                return obj
+            raise HTTPException(
+                status_code=403,
+                detail=f"API key missing required scope: {scope}",
+            )
+        return obj
+
+    return _dep
 
 
 async def get_current_user_or_api_key(
@@ -519,15 +590,30 @@ async def verify_otp(data: OTPVerify):
     
     # Generate JWT token
     access_token = create_access_token(data={"sub": email})
-    
+
+    # Bootstrap tenancy on first login (idempotent).
+    org_id = None
+    default_project_id = None
+    try:
+        from src.services.onboarding import ensure_user_and_default_org
+        from src.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            user, org, project = await ensure_user_and_default_org(db, email)
+            org_id = org.id
+            default_project_id = project.id
+    except Exception as e:
+        logger.warning("Onboarding bootstrap failed (non-fatal)", email=email, error=str(e))
+
     logger.info("OTP verified successfully", email=email)
     from src.utils.analytics import log_analytics_event
     log_analytics_event(event_type="otp_verify", email=email)
     return {
-        "status": "success", 
+        "status": "success",
         "message": "Email verified successfully",
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "org_id": org_id,
+        "default_project_id": default_project_id,
     }
 
 class SSOLoginRequest(BaseModel):
@@ -539,7 +625,7 @@ class SSOLoginRequest(BaseModel):
 @router.post("/sso-login")
 async def sso_login(data: SSOLoginRequest):
     """Legacy SSO login endpoint - kept for backward compatibility.
-    For new integrations, use /google-login or /github/callback instead."""
+    For new integrations, use /google-login instead."""
     email = data.email.lower()
     access_token = create_access_token(data={"sub": email})
     
@@ -601,6 +687,19 @@ async def google_login(data: GoogleLoginRequest):
     # Issue our JWT
     access_token = create_access_token(data={"sub": google_email})
 
+    # Bootstrap tenancy on first login (idempotent).
+    org_id = None
+    default_project_id = None
+    try:
+        from src.services.onboarding import ensure_user_and_default_org
+        from src.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            user, org, project = await ensure_user_and_default_org(db, google_email, name=google_name)
+            org_id = org.id
+            default_project_id = project.id
+    except Exception as e:
+        logger.warning("Onboarding bootstrap failed (non-fatal)", email=google_email, error=str(e))
+
     logger.info("Google OAuth login successful", email=google_email)
     from src.utils.analytics import log_analytics_event
     log_analytics_event(event_type="google_oauth_login", email=google_email)
@@ -613,7 +712,9 @@ async def google_login(data: GoogleLoginRequest):
             "user_name": google_name,
             "email": google_email,
             "company_name": ""
-        }
+        },
+        "org_id": org_id,
+        "default_project_id": default_project_id,
     }
 
 

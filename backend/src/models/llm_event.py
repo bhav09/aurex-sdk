@@ -3,7 +3,7 @@ Unified LLM Event Schema
 This is the core data model for all LLM usage events
 """
 
-from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Text
+from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -34,6 +34,9 @@ class LLMEvent(Base):
     
     # Upload session tracking (to handle multiple uploads)
     upload_session_id = Column(String, nullable=True, index=True)
+
+    # Project scoping (Phase 1 — populated by SDK ingest via /api/v1/ledger/events).
+    project_id = Column(String, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     
     # Token usage
     input_tokens = Column(Integer, nullable=False, default=0)

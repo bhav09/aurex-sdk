@@ -133,7 +133,7 @@ export function HeroSection() {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-12">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-5xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -150,16 +150,16 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
           >
-            <h1 className="text-[2.5rem] sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mt-4 sm:mt-6 mb-8 sm:mb-10 md:mb-12 tracking-tight leading-[1.20] pb-1">
+            <h1 className="text-[2rem] sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mt-4 sm:mt-6 mb-8 sm:mb-10 md:mb-12 tracking-tight leading-[1.1] text-balance pb-1">
               <span className="block bg-clip-text text-transparent bg-gradient-to-b from-white to-white/80">
-                find where your
+                measure, control, and verify
               </span>
               <span
                 className={cn(
                   "block bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300"
                 )}
               >
-                AI budget leaks.
+                every dollar your AI spends.
               </span>
             </h1>
           </motion.div>
@@ -170,7 +170,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.7 }}
           >
             <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/40 mb-8 sm:mb-10 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-2 sm:px-4">
-              upload your llm logs, get a credit score, and see exactly which models, workflows, and prompts are wasting your budget.
+              detect waste in your LLM logs, score your spend, and ship budget guards into your SDK, one platform, one credit score.
             </p>
           </motion.div>
 

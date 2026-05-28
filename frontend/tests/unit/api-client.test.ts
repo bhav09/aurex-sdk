@@ -308,5 +308,97 @@ describe('AurexAPI', () => {
             expect(result).toEqual(mockResponse);
         });
     });
+
+    describe('getProjectStats', () => {
+        it('calls /stats without query param when no projectId given', async () => {
+            const mockStats = {
+                total_events: 0, total_cost: 0, spend_7d: 0, spend_24h: 0,
+                total_tokens: 0, unique_workflows: 0, unique_models: 0,
+                top_models: [], date_range: { first_event: null, last_event: null }
+            };
+            (global.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => mockStats });
+
+            const result = await api.getProjectStats();
+
+            expect(global.fetch).toHaveBeenCalledWith(`${mockBaseUrl}/stats`, expect.anything());
+            expect(result).toEqual(mockStats);
+        });
+
+        it('calls /stats?project_id=... when projectId given', async () => {
+            const mockStats = {
+                total_events: 5, total_cost: 0.42, spend_7d: 0.30, spend_24h: 0.10,
+                total_tokens: 750, unique_workflows: 2, unique_models: 1,
+                top_models: [{ model: 'gpt-4o', cost: 0.42, calls: 5 }],
+                date_range: { first_event: '2026-05-01T00:00:00', last_event: '2026-05-28T00:00:00' }
+            };
+            (global.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => mockStats });
+
+            const result = await api.getProjectStats('proj-abc123');
+
+            expect(global.fetch).toHaveBeenCalledWith(
+                `${mockBaseUrl}/stats?project_id=proj-abc123`,
+                expect.anything()
+            );
+            expect(result.total_events).toBe(5);
+            expect(result.top_models[0].model).toBe('gpt-4o');
+        });
+
+        it('throws on non-ok response', async () => {
+            (global.fetch as any).mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+            await expect(api.getProjectStats('proj-x')).rejects.toThrow('Failed to fetch stats');
+        });
+    });
+
+    describe('getProjectWorkflows', () => {
+        it('calls /workflows without query param when no projectId given', async () => {
+            (global.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+            await api.getProjectWorkflows();
+
+            expect(global.fetch).toHaveBeenCalledWith(`${mockBaseUrl}/workflows`, expect.anything());
+        });
+
+        it('calls /workflows?project_id=... when projectId given', async () => {
+            const mockWf = [
+                { workflow_id: 'wf-alpha', event_count: 3, total_cost: 0.15, total_tokens: 450, start_time: null, end_time: null }
+            ];
+            (global.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => mockWf });
+
+            const result = await api.getProjectWorkflows('proj-xyz');
+
+            expect(global.fetch).toHaveBeenCalledWith(
+                `${mockBaseUrl}/workflows?project_id=proj-xyz`,
+                expect.anything()
+            );
+            expect(result).toHaveLength(1);
+            expect(result[0].workflow_id).toBe('wf-alpha');
+        });
+
+        it('throws on non-ok response', async () => {
+            (global.fetch as any).mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+            await expect(api.getProjectWorkflows('proj-x')).rejects.toThrow('Failed to fetch workflows');
+        });
+    });
+
+    describe('getEvents with project_id', () => {
+        it('includes project_id in query string when provided', async () => {
+            (global.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+            await api.getEvents({ project_id: 'proj-123', limit: 50 });
+
+            const calledUrl = (global.fetch as any).mock.calls[0][0] as string;
+            expect(calledUrl).toContain('project_id=proj-123');
+            expect(calledUrl).toContain('limit=50');
+        });
+
+        it('omits project_id when not provided', async () => {
+            (global.fetch as any).mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+            await api.getEvents({ limit: 10 });
+
+            const calledUrl = (global.fetch as any).mock.calls[0][0] as string;
+            expect(calledUrl).not.toContain('project_id');
+        });
+    });
 });
 

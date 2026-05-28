@@ -25,7 +25,10 @@ from src.models import (
     AlertRuleResponse,
     ApiKeyCreate,
     ApiKeyGeneratedResponse,
-    ApiKeyResponse
+    ApiKeyResponse,
+    User,
+    Membership,
+    Project,
 )
 from src.utils.logger import get_logger
 from src.ingestion.field_mapper import field_mapper
@@ -36,6 +39,21 @@ from .auth import get_current_user, get_current_user_optional, get_current_user_
 router = APIRouter()
 logger = get_logger(__name__)
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
+
+
+async def _require_project_access(db: AsyncSession, email: str, project_id: str) -> "Project":
+    user = (await db.execute(select(User).where(User.email == email.lower()))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=403, detail="User not found")
+    project = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    membership = (await db.execute(
+        select(Membership).where(Membership.user_id == user.id, Membership.org_id == project.org_id)
+    )).scalar_one_or_none()
+    if not membership:
+        raise HTTPException(status_code=403, detail="Not a member of this project's org")
+    return project
 
 
 @router.get("/")
@@ -55,56 +73,62 @@ async def get_events(
     workflow_id: Optional[str] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    project_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
     """
-    Get LLM events with optional filtering
+    Get LLM events with optional filtering.
+    When project_id is provided, scopes to SDK-ingested events for that project.
     """
     from src.models import AuditSession
-    
-    # Enforce tenant isolation
-    sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
-    result = await db.execute(sessions_query)
-    session_ids = [row[0] for row in result.all()]
-    
-    if not session_ids:
-        return []
-    
-    query = select(LLMEvent).where(LLMEvent.upload_session_id.in_(session_ids))
-    
+
+    if project_id:
+        await _require_project_access(db, current_user, project_id)
+        query = select(LLMEvent).where(LLMEvent.project_id == project_id)
+    else:
+        sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
+        result = await db.execute(sessions_query)
+        session_ids = [row[0] for row in result.all()]
+        if not session_ids:
+            return []
+        query = select(LLMEvent).where(LLMEvent.upload_session_id.in_(session_ids))
+
     if workflow_id:
         query = query.where(LLMEvent.workflow_id == workflow_id)
     if provider:
         query = query.where(LLMEvent.provider == provider)
     if model:
         query = query.where(LLMEvent.model == model)
-    
+
     query = query.order_by(desc(LLMEvent.timestamp)).offset(skip).limit(limit)
-    
     events_result = await db.execute(query)
     return events_result.scalars().all()
 
 
 @router.get("/workflows")
 async def get_workflows(
+    project_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
     """
-    Get list of all workflows with summary statistics
+    Get list of all workflows with summary statistics.
+    When project_id is provided, scopes to SDK-ingested events for that project.
     """
     from src.models import AuditSession
-    
-    # Enforce tenant isolation
-    sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
-    result = await db.execute(sessions_query)
-    session_ids = [row[0] for row in result.all()]
-    
-    if not session_ids:
-        return []
-        
-    # Group by workflow_id and get aggregates
+
+    if project_id:
+        await _require_project_access(db, current_user, project_id)
+        base_filter = (LLMEvent.workflow_id.isnot(None), LLMEvent.project_id == project_id)
+    else:
+        sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
+        result = await db.execute(sessions_query)
+        session_ids = [row[0] for row in result.all()]
+        if not session_ids:
+            return []
+        base_filter = (LLMEvent.workflow_id.isnot(None), LLMEvent.upload_session_id.in_(session_ids))
+
     workflows_query = select(
         LLMEvent.workflow_id,
         func.count(LLMEvent.id).label('event_count'),
@@ -112,18 +136,11 @@ async def get_workflows(
         func.sum(LLMEvent.total_tokens).label('total_tokens'),
         func.min(LLMEvent.timestamp).label('start_time'),
         func.max(LLMEvent.timestamp).label('end_time')
-    ).where(
-        LLMEvent.workflow_id.isnot(None),
-        LLMEvent.upload_session_id.in_(session_ids)
-    ).group_by(
-        LLMEvent.workflow_id
-    )
-    
+    ).where(*base_filter).group_by(LLMEvent.workflow_id).order_by(desc('total_cost')).limit(20)
+
     workflows_result = await db.execute(workflows_query)
-    workflows = workflows_result.all()
-    
     result = []
-    for wf in workflows:
+    for wf in workflows_result.all():
         result.append({
             "workflow_id": wf.workflow_id,
             "event_count": wf.event_count,
@@ -132,7 +149,6 @@ async def get_workflows(
             "start_time": wf.start_time.isoformat() if wf.start_time else None,
             "end_time": wf.end_time.isoformat() if wf.end_time else None
         })
-    
     return result
 
 
@@ -229,7 +245,7 @@ async def get_workflow_insights(
     return {"insights": []}
 
 
-@router.delete("/clear-data")
+@router.delete("/clear-data", status_code=403, response_class=None, response_model=None)
 async def clear_data(
     confirm: bool = Query(False, description="Must be true to confirm deletion"),
     db: AsyncSession = Depends(get_db)
@@ -246,59 +262,75 @@ async def clear_data(
 
 @router.get("/stats")
 async def get_stats(
+    project_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
     """
-    Get overall statistics
+    Get overall statistics.
+    When project_id is provided, scopes to SDK-ingested events for that project.
     """
     from src.models import AuditSession
-    
-    sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
-    result = await db.execute(sessions_query)
-    session_ids = [row[0] for row in result.all()]
-    
-    if not session_ids:
-        return {
-            "total_events": 0,
-            "total_cost": 0,
-            "total_tokens": 0,
-            "unique_workflows": 0,
-            "unique_models": 0,
-            "date_range": {
-                "first_event": None,
-                "last_event": None
-            }
-        }
-        
-    total_events_query = select(func.count(LLMEvent.id)).where(LLMEvent.upload_session_id.in_(session_ids))
-    total_events = (await db.execute(total_events_query)).scalar()
-    
-    total_cost_query = select(func.sum(LLMEvent.cost)).where(LLMEvent.upload_session_id.in_(session_ids))
-    total_cost = (await db.execute(total_cost_query)).scalar() or 0
-    
-    total_tokens_query = select(func.sum(LLMEvent.total_tokens)).where(LLMEvent.upload_session_id.in_(session_ids))
-    total_tokens = (await db.execute(total_tokens_query)).scalar() or 0
-    
-    unique_workflows_query = select(func.count(func.distinct(LLMEvent.workflow_id))).where(LLMEvent.upload_session_id.in_(session_ids))
-    unique_workflows = (await db.execute(unique_workflows_query)).scalar()
-    
-    unique_models_query = select(func.count(func.distinct(LLMEvent.model))).where(LLMEvent.upload_session_id.in_(session_ids))
-    unique_models = (await db.execute(unique_models_query)).scalar()
-    
-    # Date range
-    first_event_query = select(func.min(LLMEvent.timestamp)).where(LLMEvent.upload_session_id.in_(session_ids))
-    first_event = (await db.execute(first_event_query)).scalar()
-    
-    last_event_query = select(func.max(LLMEvent.timestamp)).where(LLMEvent.upload_session_id.in_(session_ids))
-    last_event = (await db.execute(last_event_query)).scalar()
-    
+    from datetime import timedelta
+
+    empty = {
+        "total_events": 0, "total_cost": 0, "spend_7d": 0, "spend_24h": 0,
+        "total_tokens": 0, "unique_workflows": 0, "unique_models": 0,
+        "top_models": [],
+        "date_range": {"first_event": None, "last_event": None}
+    }
+
+    if project_id:
+        await _require_project_access(db, current_user, project_id)
+        base_where = LLMEvent.project_id == project_id
+    else:
+        sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
+        result = await db.execute(sessions_query)
+        session_ids = [row[0] for row in result.all()]
+        if not session_ids:
+            return empty
+        base_where = LLMEvent.upload_session_id.in_(session_ids)
+
+    total_events = (await db.execute(select(func.count(LLMEvent.id)).where(base_where))).scalar() or 0
+    if total_events == 0:
+        return empty
+
+    total_cost = (await db.execute(select(func.sum(LLMEvent.cost)).where(base_where))).scalar() or 0
+    total_tokens = (await db.execute(select(func.sum(LLMEvent.total_tokens)).where(base_where))).scalar() or 0
+    unique_workflows = (await db.execute(select(func.count(func.distinct(LLMEvent.workflow_id))).where(base_where))).scalar() or 0
+    unique_models = (await db.execute(select(func.count(func.distinct(LLMEvent.model))).where(base_where))).scalar() or 0
+    first_event = (await db.execute(select(func.min(LLMEvent.timestamp)).where(base_where))).scalar()
+    last_event = (await db.execute(select(func.max(LLMEvent.timestamp)).where(base_where))).scalar()
+
+    now = datetime.utcnow()
+    cutoff_7d = now - timedelta(days=7)
+    cutoff_24h = now - timedelta(hours=24)
+
+    spend_7d = (await db.execute(
+        select(func.sum(LLMEvent.cost)).where(base_where, LLMEvent.timestamp >= cutoff_7d)
+    )).scalar() or 0
+    spend_24h = (await db.execute(
+        select(func.sum(LLMEvent.cost)).where(base_where, LLMEvent.timestamp >= cutoff_24h)
+    )).scalar() or 0
+
+    top_models_rows = (await db.execute(
+        select(LLMEvent.model, func.sum(LLMEvent.cost).label("cost"), func.count(LLMEvent.id).label("calls"))
+        .where(base_where)
+        .group_by(LLMEvent.model)
+        .order_by(desc("cost"))
+        .limit(5)
+    )).all()
+    top_models = [{"model": r.model, "cost": round(r.cost or 0, 4), "calls": r.calls} for r in top_models_rows]
+
     return {
         "total_events": total_events,
         "total_cost": round(total_cost, 4),
+        "spend_7d": round(spend_7d, 4),
+        "spend_24h": round(spend_24h, 4),
         "total_tokens": total_tokens,
         "unique_workflows": unique_workflows,
         "unique_models": unique_models,
+        "top_models": top_models,
         "date_range": {
             "first_event": first_event.isoformat() if first_event else None,
             "last_event": last_event.isoformat() if last_event else None
@@ -1548,7 +1580,7 @@ async def get_alert_rules(
     return rules
 
 
-@router.delete("/audit/sessions/{session_id}")
+@router.delete("/audit/sessions/{session_id}", status_code=403, response_class=None, response_model=None)
 async def delete_audit_session(
     session_id: str,
     db: AsyncSession = Depends(get_db)
@@ -1802,7 +1834,7 @@ async def list_api_keys(
     return keys
 
 
-@router.delete("/auth/api-keys/{key_id}")
+@router.delete("/auth/api-keys/{key_id}", status_code=200, response_class=None, response_model=None)
 async def revoke_api_key(
     key_id: str,
     db: AsyncSession = Depends(get_db),

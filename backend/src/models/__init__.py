@@ -24,7 +24,21 @@ from .api_key import (
     ApiKey,
     ApiKeyCreate,
     ApiKeyGeneratedResponse,
-    ApiKeyResponse
+    ApiKeyResponse,
+    KeyAuditLog,
+)
+from .tenancy import (
+    Environment,
+    Role,
+    User,
+    Organization,
+    Project,
+    Membership,
+    UserResponse,
+    OrganizationResponse,
+    ProjectResponse,
+    MembershipResponse,
+    OnboardingResponse,
 )
 
 __all__ = [
@@ -47,5 +61,17 @@ __all__ = [
     "ApiKey",
     "ApiKeyCreate",
     "ApiKeyGeneratedResponse",
-    "ApiKeyResponse"
+    "ApiKeyResponse",
+    "KeyAuditLog",
+    "Environment",
+    "Role",
+    "User",
+    "Organization",
+    "Project",
+    "Membership",
+    "UserResponse",
+    "OrganizationResponse",
+    "ProjectResponse",
+    "MembershipResponse",
+    "OnboardingResponse",
 ]
