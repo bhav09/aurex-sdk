@@ -141,7 +141,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6 sm:mb-8 md:mb-12"
           >
             <span className="w-6 sm:w-8 h-px bg-white/30" />
-            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">AI Cost Auditor for Engineering Teams</span>
+            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">AI Runtime Cost Control Plane</span>
             <span className="w-6 sm:w-8 h-px bg-white/30" />
           </motion.div>
 
@@ -170,7 +170,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.7 }}
           >
             <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/40 mb-8 sm:mb-10 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-2 sm:px-4">
-              detect waste in your LLM logs, score your spend, and ship budget guards into your SDK, one platform, one credit score.
+              Intercept and prevent LLM cost runaways in real-time, enforce budget policies at the SDK level, and optimize system prompt redundancy.
             </p>
           </motion.div>
 

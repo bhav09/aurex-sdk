@@ -148,12 +148,14 @@ class AurexConfig:
         max_batch_size: int = 100,
         local_only: bool = True,
         storage_mode: str = "file", # "file" or "memory"
-        budget_guard: Optional[Dict[str, Any]] = None
+        budget_guard: Optional[Dict[str, Any]] = None,
+        sync_prompt_hashes: bool = False
     ):
         self.api_key = api_key or os.getenv("AUREX_API_KEY")
         self.project = project
         self.ledger_path = ledger_path
         self.cloud_sync = cloud_sync
+        self.sync_prompt_hashes = sync_prompt_hashes or (os.getenv("AUREX_SYNC_PROMPT_HASHES", "0") in ("1", "true", "True"))
         # Cloud target: explicit cloud_endpoint wins, else derive from base_url
         # (env: AUREX_BASE_URL), else fall back to localhost dev default.
         if cloud_endpoint:
@@ -192,6 +194,7 @@ class AurexAuditor:
         self._lock = threading.Lock()
         self._memory_events = []
         self._last_minute_events = []
+        self._recent_requests = []
         self._session_costs = {}
         self._budget_config = self.config.budget_guard or {}
         
@@ -269,7 +272,10 @@ class AurexAuditor:
         is_batch: bool = False,
         workflow_id: Optional[str] = None,
         system_prompt: Optional[str] = None,
-        extra_metadata: Optional[Dict[str, Any]] = None
+        extra_metadata: Optional[Dict[str, Any]] = None,
+        retry_count: int = 0,
+        outcome: Optional[str] = None,
+        cost_type: Optional[str] = None
     ):
         """
         Record an LLM call to the ledger completely asynchronously.
@@ -321,7 +327,10 @@ class AurexAuditor:
             "system_prompt_hash": system_prompt_hash,
             "prompt_hash": prompt_hash,
             "response_hash": response_hash,
-            "extra_metadata": extra_metadata or {}
+            "extra_metadata": extra_metadata or {},
+            "retry_count": retry_count,
+            "outcome": outcome,
+            "cost_type": cost_type
         }
         
         # Track metrics for sliding window and session tracking under lock
@@ -358,6 +367,122 @@ class AurexAuditor:
     def configureCircuitBreaker(self, config: Dict[str, Any]):
         """Alias for configure_circuit_breaker"""
         self.configure_circuit_breaker(config)
+
+    def _estimate_tokens(self, prompt: Optional[str] = None, messages: Optional[List[Dict[str, Any]]] = None) -> int:
+        if messages:
+            total_chars = 0
+            for m in messages:
+                content = m.get("content")
+                if isinstance(content, str):
+                    total_chars += len(content)
+            return max(1, total_chars // 4)
+        if prompt:
+            return max(1, len(prompt) // 4)
+        return 1
+
+    def pre_call_check(
+        self,
+        model: str,
+        prompt: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        workflow_id: Optional[str] = None,
+        messages: Optional[List[Dict[str, Any]]] = None
+    ):
+        """
+        Perform real-time pre-call checks on the outgoing LLM request.
+        Checks for:
+        1. System Prompt Waste
+        2. Agent Runaway Loop
+        3. Over-provisioned Model Misuse
+        4. Context Explosion
+        
+        If any issue is detected, prints a warning (default) or throws an exception (if configured to block).
+        """
+        now = time.time()
+        workflow_id = workflow_id or os.environ.get("AUREX_WORKFLOW_ID") or "default_workflow"
+        
+        # Estimate input size
+        est_tokens = self._estimate_tokens(prompt, messages)
+        prompt_hash = None
+        if prompt:
+            prompt_hash = hashlib.sha256(prompt.encode('utf-8')).hexdigest()
+        sys_prompt_hash = None
+        if system_prompt:
+            sys_prompt_hash = hashlib.sha256(system_prompt.encode('utf-8')).hexdigest()
+
+        # Build current request metadata
+        req_meta = {
+            "timestamp": now,
+            "model": model,
+            "workflow_id": workflow_id,
+            "system_prompt_hash": sys_prompt_hash,
+            "prompt_hash": prompt_hash,
+            "estimated_tokens": est_tokens
+        }
+
+        # Keep thread-safe recent requests capped at 200
+        with self._lock:
+            self._recent_requests = [r for r in self._recent_requests if now - r["timestamp"] < 300]
+            self._recent_requests.append(req_meta)
+            if len(self._recent_requests) > 200:
+                self._recent_requests.pop(0)
+            workflow_requests = [r for r in self._recent_requests if r["workflow_id"] == workflow_id]
+
+        warnings = []
+
+        # 1. System Prompt Waste Detector
+        if sys_prompt_hash and len(workflow_requests) >= 2:
+            # Check if this exact system prompt hash was already sent in the same workflow recently
+            previous_sends = [r for r in workflow_requests[:-1] if r["system_prompt_hash"] == sys_prompt_hash]
+            if previous_sends:
+                warnings.append(
+                    f"System Prompt Waste: Redundant system prompt sent again in workflow '{workflow_id}'. "
+                    f"Enable Prompt Caching to optimize token spend."
+                )
+
+        # 2. Agent Runaway Loop Detector (exponential context size doubling)
+        if len(workflow_requests) >= 3:
+            recent_workflow_reqs = workflow_requests[-3:]
+            sizes = [r["estimated_tokens"] for r in recent_workflow_reqs]
+            if sizes[1] >= sizes[0] * 2.2 and sizes[2] >= sizes[1] * 2.2 and sizes[0] > 20:
+                warnings.append(
+                    f"Agent Runaway Loop: Prompt context size grew exponentially in workflow '{workflow_id}' "
+                    f"({sizes[0]} -> {sizes[1]} -> {sizes[2]} estimated tokens). Add pruning or stopping conditions."
+                )
+
+        # 3. Over-Provisioned Model Misuse Detector
+        input_price, _ = get_model_pricing(model)
+        is_expensive = input_price > 2.00 # > $2.00 per 1M tokens
+        is_simple = est_tokens < 150
+        if is_expensive and is_simple:
+            recommended = "gpt-4o-mini" if "gpt" in model.lower() or "o1" in model.lower() else "claude-3-5-haiku"
+            warnings.append(
+                f"Over-Provisioned Model: Using expensive model '{model}' for simple task "
+                f"(avg ~{est_tokens} tokens). Recommend switching to '{recommended}'."
+            )
+
+        # 4. Context Explosion Detector
+        if len(workflow_requests) >= 2:
+            initial_size = workflow_requests[0]["estimated_tokens"]
+            current_size = est_tokens
+            if initial_size > 0 and current_size >= initial_size * 3.5:
+                warnings.append(
+                    f"Context Explosion: Context grew {current_size / initial_size:.1f}x in workflow '{workflow_id}' "
+                    f"({initial_size} -> {current_size} estimated tokens). Recommend sliding window windowing."
+                )
+
+        # Handle violations
+        if warnings:
+            mode = self._budget_config.get("on_budget_exceeded", "warn")
+            if os.getenv("AUREX_BLOCK_ON_WASTE") == "1":
+                mode = "throw"
+                
+            for msg in warnings:
+                full_msg = f"[Aurex SDK Real-Time Guard] {msg}"
+                if mode == "throw":
+                    raise Exception(full_msg)
+                else:
+                    print(full_msg, file=sys.stderr)
 
     def _check_budget(self, new_event_cost: float, input_tokens: int, workflow_id: Optional[str] = None):
         with self._lock:
@@ -499,18 +624,28 @@ class AurexAuditor:
         - Anything else: legacy `{project, data: [...]}` payload.
         """
         try:
+            # Metadata-only sync: strip out hashes if sync_prompt_hashes is False
+            cleaned_batch = []
+            for evt in batch:
+                c = evt.copy()
+                if not self.config.sync_prompt_hashes:
+                    c.pop("prompt_hash", None)
+                    c.pop("system_prompt_hash", None)
+                    c.pop("response_hash", None)
+                cleaned_batch.append(c)
+
             endpoint = self.config.cloud_endpoint
             if endpoint.rstrip("/").endswith("/ledger/events"):
                 payload = {
                     "events": [
                         {**evt, "cost_usd": evt.get("cost", 0.0)}
-                        for evt in batch
+                        for evt in cleaned_batch
                     ]
                 }
             else:
                 payload = {
                     "project": self.config.project,
-                    "data": batch,
+                    "data": cleaned_batch,
                 }
             req_data = json.dumps(payload).encode("utf-8")
 
@@ -578,6 +713,27 @@ class AurexAuditor:
             original_create = openai.resources.chat.completions.Completions.create
             
             def patched_create(cls_self, *args, **kwargs):
+                try:
+                    messages = kwargs.get("messages", [])
+                    system_prompt = None
+                    user_prompt = None
+                    for m in messages:
+                        if m.get("role") == "system":
+                            system_prompt = m.get("content")
+                        elif m.get("role") == "user":
+                            user_prompt = m.get("content")
+                    self.pre_call_check(
+                        model=kwargs.get("model", "unknown"),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        messages=messages
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = original_create(cls_self, *args, **kwargs)
                 try:
                     self._log_openai_response(kwargs, resp)
@@ -592,6 +748,27 @@ class AurexAuditor:
             original_acreate = openai.resources.chat.completions.AsyncCompletions.create
             
             async def patched_acreate(cls_self, *args, **kwargs):
+                try:
+                    messages = kwargs.get("messages", [])
+                    system_prompt = None
+                    user_prompt = None
+                    for m in messages:
+                        if m.get("role") == "system":
+                            system_prompt = m.get("content")
+                        elif m.get("role") == "user":
+                            user_prompt = m.get("content")
+                    self.pre_call_check(
+                        model=kwargs.get("model", "unknown"),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        messages=messages
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = await original_acreate(cls_self, *args, **kwargs)
                 try:
                     self._log_openai_response(kwargs, resp)
@@ -671,6 +848,38 @@ class AurexAuditor:
             original_create = anthropic.resources.messages.Messages.create
             
             def patched_create(cls_self, *args, **kwargs):
+                try:
+                    system_prompt = kwargs.get("system")
+                    if isinstance(system_prompt, list):
+                        system_prompt = "".join(
+                            getattr(b, "text", str(b)) if not isinstance(b, str) else b
+                            for b in system_prompt
+                        )
+                    messages = kwargs.get("messages", [])
+                    user_prompt = None
+                    for m in reversed(messages):
+                        if m.get("role") == "user":
+                            content = m.get("content")
+                            if isinstance(content, str):
+                                user_prompt = content
+                            elif isinstance(content, list):
+                                user_prompt = "".join(
+                                    item.get("text", "") if isinstance(item, dict) else getattr(item, "text", str(item))
+                                    for item in content
+                                )
+                            break
+                    self.pre_call_check(
+                        model=kwargs.get("model", "unknown"),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("metadata", {}).get("workflow_id") or kwargs.get("user"),
+                        messages=messages
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = original_create(cls_self, *args, **kwargs)
                 try:
                     self._log_anthropic_response(kwargs, resp)
@@ -685,6 +894,38 @@ class AurexAuditor:
             original_acreate = anthropic.resources.messages.AsyncMessages.create
             
             async def patched_acreate(cls_self, *args, **kwargs):
+                try:
+                    system_prompt = kwargs.get("system")
+                    if isinstance(system_prompt, list):
+                        system_prompt = "".join(
+                            getattr(b, "text", str(b)) if not isinstance(b, str) else b
+                            for b in system_prompt
+                        )
+                    messages = kwargs.get("messages", [])
+                    user_prompt = None
+                    for m in reversed(messages):
+                        if m.get("role") == "user":
+                            content = m.get("content")
+                            if isinstance(content, str):
+                                user_prompt = content
+                            elif isinstance(content, list):
+                                user_prompt = "".join(
+                                    item.get("text", "") if isinstance(item, dict) else getattr(item, "text", str(item))
+                                    for item in content
+                                )
+                            break
+                    self.pre_call_check(
+                        model=kwargs.get("model", "unknown"),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("metadata", {}).get("workflow_id") or kwargs.get("user"),
+                        messages=messages
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = await original_acreate(cls_self, *args, **kwargs)
                 try:
                     self._log_anthropic_response(kwargs, resp)
@@ -769,6 +1010,36 @@ class AurexAuditor:
             original_generate = genai.GenerativeModel.generate_content
             
             def patched_generate(model_self, *args, **kwargs):
+                try:
+                    contents = kwargs.get("contents")
+                    if not contents and len(args) > 0:
+                        contents = args[0]
+                    user_prompt = None
+                    if isinstance(contents, str):
+                        user_prompt = contents
+                    elif isinstance(contents, list):
+                        user_prompt = " ".join(str(c) for c in contents)
+                    elif contents:
+                        user_prompt = str(contents)
+                    system_prompt = None
+                    config = getattr(model_self, "_system_instruction", None) or getattr(model_self, "system_instruction", None)
+                    if config:
+                        if hasattr(config, "parts") and config.parts:
+                            system_prompt = " ".join(getattr(p, "text", str(p)) for p in config.parts)
+                        else:
+                            system_prompt = str(config)
+                    self.pre_call_check(
+                        model=normalize_model_name(getattr(model_self, "model_name", "gemini-1.5-flash")),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("metadata", {}).get("workflow_id"),
+                        messages=None
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = original_generate(model_self, *args, **kwargs)
                 try:
                     self._log_google_response(model_self, args, kwargs, resp)
@@ -783,6 +1054,36 @@ class AurexAuditor:
             original_generate_async = genai.GenerativeModel.generate_content_async
             
             async def patched_generate_async(model_self, *args, **kwargs):
+                try:
+                    contents = kwargs.get("contents")
+                    if not contents and len(args) > 0:
+                        contents = args[0]
+                    user_prompt = None
+                    if isinstance(contents, str):
+                        user_prompt = contents
+                    elif isinstance(contents, list):
+                        user_prompt = " ".join(str(c) for c in contents)
+                    elif contents:
+                        user_prompt = str(contents)
+                    system_prompt = None
+                    config = getattr(model_self, "_system_instruction", None) or getattr(model_self, "system_instruction", None)
+                    if config:
+                        if hasattr(config, "parts") and config.parts:
+                            system_prompt = " ".join(getattr(p, "text", str(p)) for p in config.parts)
+                        else:
+                            system_prompt = str(config)
+                    self.pre_call_check(
+                        model=normalize_model_name(getattr(model_self, "model_name", "gemini-1.5-flash")),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("metadata", {}).get("workflow_id"),
+                        messages=None
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = await original_generate_async(model_self, *args, **kwargs)
                 try:
                     self._log_google_response(model_self, args, kwargs, resp)
@@ -860,6 +1161,27 @@ class AurexAuditor:
         original = getattr(litellm, "completion", None)
         if original is not None and not getattr(original, "__aurex_patched__", False):
             def patched_completion(*args, **kwargs):
+                try:
+                    messages = kwargs.get("messages", [])
+                    system_prompt = None
+                    user_prompt = None
+                    for m in messages:
+                        if m.get("role") == "system":
+                            system_prompt = m.get("content")
+                        elif m.get("role") == "user":
+                            user_prompt = m.get("content")
+                    self.pre_call_check(
+                        model=kwargs.get("model", "unknown"),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        messages=messages
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = original(*args, **kwargs)
                 try:
                     self._log_litellm_response(kwargs, resp)
@@ -872,6 +1194,27 @@ class AurexAuditor:
         original_a = getattr(litellm, "acompletion", None)
         if original_a is not None and not getattr(original_a, "__aurex_patched__", False):
             async def patched_acompletion(*args, **kwargs):
+                try:
+                    messages = kwargs.get("messages", [])
+                    system_prompt = None
+                    user_prompt = None
+                    for m in messages:
+                        if m.get("role") == "system":
+                            system_prompt = m.get("content")
+                        elif m.get("role") == "user":
+                            user_prompt = m.get("content")
+                    self.pre_call_check(
+                        model=kwargs.get("model", "unknown"),
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        messages=messages
+                    )
+                except Exception as e:
+                    if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
+                        raise e
+                    print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
+
                 resp = await original_a(*args, **kwargs)
                 try:
                     self._log_litellm_response(kwargs, resp)

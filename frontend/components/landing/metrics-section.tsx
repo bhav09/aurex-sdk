@@ -7,8 +7,8 @@ const metrics = [
     value: 100,
     suffix: "%",
     prefix: "",
-    label: "Local Processing",
-    sublabel: "your data never leaves your device",
+    label: "Local SDK Ledger",
+    sublabel: "Sync is strictly opt-in and project-scoped",
   },
   {
     value: 5,
@@ -270,10 +270,10 @@ export function MetricsSection() {
 
             <h2 className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.95] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}>
-              Built for <span className="text-muted-foreground">privacy.</span>
+              Built for <span className="text-muted-foreground">control.</span>
             </h2>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl">
-              Your sensitive LLM usage data stays on your device. No cloud uploads, no data sharing, no compromises.
+              Enforce prompt caching, intercept infinite runaway loops, and govern your model usage in real-time. Privacy is a default: cloud sync is strictly opt-in.
             </p>
           </div>
         </div>

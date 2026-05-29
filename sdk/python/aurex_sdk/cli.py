@@ -171,12 +171,20 @@ def cmd_audit(args: argparse.Namespace) -> int:
         fail_reasons.append(f"Total spend (${total_cost:.4f}) exceeds the maximum budget of ${args.max_spend_usd:.4f}.")
 
     if failed:
-        print("\n\033[91m🚨 BUILD BREAKER TRIPPED! CI/CD Audit Failed:\033[0m")
-        for reason in fail_reasons:
-            print(f"  ❌ {reason}")
-        print("\nPlease optimize your LLM orchestration (e.g. enable caching, prune context) before deploying.")
-        print("=" * 55 + "\n")
-        return 1
+        if getattr(args, "mode", "warn") == "block":
+            print("\n\033[91m🚨 BUILD BREAKER TRIPPED! CI/CD Audit Failed:\033[0m")
+            for reason in fail_reasons:
+                print(f"  ❌ {reason}")
+            print("\nPlease optimize your LLM orchestration (e.g. enable caching, prune context) before deploying.")
+            print("=" * 55 + "\n")
+            return 1
+        else:
+            print("\n\033[93m⚠️ CI/CD POLICY WARNING: Cost & efficiency thresholds exceeded:\033[0m")
+            for reason in fail_reasons:
+                print(f"  ⚠️ {reason}")
+            print("\nBuild continued. Set --mode=block to hard-fail in CI/CD.")
+            print("=" * 55 + "\n")
+            return 0
     print("\n\033[92m✅ CI/CD BUILD PASSED. Cost & efficiency policies are fully satisfied.\033[0m\n")
     return 0
 
@@ -198,6 +206,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_audit.add_argument("--fail-under", type=int, default=0)
     p_audit.add_argument("--max-waste-usd", type=float, default=float("inf"))
     p_audit.add_argument("--max-spend-usd", type=float, default=float("inf"))
+    p_audit.add_argument("--mode", choices=["warn", "block"], default="warn", help="CI/CD block/fail mode (default: warn)")
 
     p_install = sub.add_parser(
         "install-hook",
@@ -216,6 +225,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fail-under", type=int, default=argparse.SUPPRESS)
     parser.add_argument("--max-waste-usd", type=float, default=argparse.SUPPRESS)
     parser.add_argument("--max-spend-usd", type=float, default=argparse.SUPPRESS)
+    parser.add_argument("--mode", default=argparse.SUPPRESS)
 
     return parser
 
@@ -235,6 +245,7 @@ def run_cli() -> None:
         fail_under=getattr(args, "fail_under", 0),
         max_waste_usd=getattr(args, "max_waste_usd", float("inf")),
         max_spend_usd=getattr(args, "max_spend_usd", float("inf")),
+        mode=getattr(args, "mode", "warn"),
     )
     sys.exit(cmd_audit(audit_args))
 

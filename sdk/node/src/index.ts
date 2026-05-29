@@ -23,6 +23,7 @@ export interface AurexConfig {
   maxBatchSize?: number;
   localOnly?: boolean;
   budgetGuard?: BudgetGuardConfig;
+  syncPromptHashes?: boolean;
 }
 
 function resolveCloudEndpoint(config?: AurexConfig): string {
@@ -48,6 +49,9 @@ export interface AurexEvent {
   prompt_hash?: string;
   response_hash?: string;
   extra_metadata?: Record<string, any>;
+  retry_count?: number;
+  outcome?: string;
+  cost_type?: string;
 }
 
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -183,6 +187,7 @@ export class AurexAuditor {
   private lastMinuteEvents: { timestamp: number; cost: number }[] = [];
   private sessionCosts: Record<string, number> = {};
   private budgetConfig: BudgetGuardConfig | null = null;
+  private recentRequests: { timestamp: number; model: string; workflowId: string; systemPromptHash?: string; promptHash?: string; estimatedTokens: number }[] = [];
 
   private constructor(config?: AurexConfig) {
     const defaultLedger = ".aurex/ledger.jsonl";
@@ -197,6 +202,7 @@ export class AurexAuditor {
       maxBatchSize: config?.maxBatchSize || 100,
       localOnly: config?.localOnly ?? true,
       budgetGuard: config?.budgetGuard || {},
+      syncPromptHashes: config?.syncPromptHashes ?? (process.env.AUREX_SYNC_PROMPT_HASHES === "1" || process.env.AUREX_SYNC_PROMPT_HASHES === "true"),
     };
 
     if (config?.budgetGuard) {
@@ -296,6 +302,9 @@ export class AurexAuditor {
     workflowId?: string;
     systemPrompt?: string;
     extraMetadata?: Record<string, any>;
+    retryCount?: number;
+    outcome?: string;
+    costType?: string;
   }) {
     const inputT = params.inputTokens || 0;
     const outputT = params.outputTokens || 0;
@@ -323,6 +332,9 @@ export class AurexAuditor {
       prompt_hash: this.hashText(params.prompt),
       response_hash: this.hashText(params.response),
       extra_metadata: params.extraMetadata || {},
+      retry_count: params.retryCount,
+      outcome: params.outcome,
+      cost_type: params.costType,
     };
 
     // Track metrics for the sliding window
@@ -343,6 +355,107 @@ export class AurexAuditor {
 
   public configureCircuitBreaker(config: BudgetGuardConfig): void {
     this.budgetConfig = config;
+  }
+
+  private estimateTokens(prompt?: string, messages?: any[]): number {
+    if (messages) {
+      let chars = 0;
+      for (const m of messages) {
+        if (typeof m.content === "string") {
+          chars += m.content.length;
+        }
+      }
+      return Math.max(1, Math.floor(chars / 4));
+    }
+    if (prompt) {
+      return Math.max(1, Math.floor(prompt.length / 4));
+    }
+    return 1;
+  }
+
+  public preCallCheck(params: {
+    model: string;
+    prompt?: string;
+    systemPrompt?: string;
+    workflowId?: string;
+    messages?: any[];
+  }): void {
+    const now = Date.now();
+    const workflowId = params.workflowId || process.env.AUREX_WORKFLOW_ID || "default_workflow";
+    const estTokens = this.estimateTokens(params.prompt, params.messages);
+
+    const promptHash = this.hashText(params.prompt);
+    const sysPromptHash = this.hashText(params.systemPrompt);
+
+    const reqMeta = {
+      timestamp: now,
+      model: params.model,
+      workflowId,
+      systemPromptHash: sysPromptHash,
+      promptHash,
+      estimatedTokens: estTokens
+    };
+
+    // Filter recent requests to last 5 minutes
+    this.recentRequests = this.recentRequests.filter(r => now - r.timestamp < 300000);
+    this.recentRequests.push(reqMeta);
+    if (this.recentRequests.length > 200) {
+      this.recentRequests.shift();
+    }
+
+    const workflowRequests = this.recentRequests.filter(r => r.workflowId === workflowId);
+    const warnings: string[] = [];
+
+    // 1. System Prompt Waste Detector
+    if (sysPromptHash && workflowRequests.length >= 2) {
+      const duplicates = workflowRequests.slice(0, -1).filter(r => r.systemPromptHash === sysPromptHash);
+      if (duplicates.length > 0) {
+        warnings.push(`System Prompt Waste: Redundant system prompt sent again in workflow '${workflowId}'. Enable Prompt Caching to optimize token spend.`);
+      }
+    }
+
+    // 2. Agent Runaway Loop Detector (exponential context growth)
+    if (workflowRequests.length >= 3) {
+      const recent = workflowRequests.slice(-3);
+      const sizes = recent.map(r => r.estimatedTokens);
+      if (sizes[1] >= sizes[0] * 2.2 && sizes[2] >= sizes[1] * 2.2 && sizes[0] > 20) {
+        warnings.push(`Agent Runaway Loop: Prompt context size grew exponentially in workflow '${workflowId}' (${sizes[0]} -> ${sizes[1]} -> ${sizes[2]} estimated tokens). Add context pruning.`);
+      }
+    }
+
+    // 3. Expensive Model Misuse Detector
+    const [inputPrice] = getModelPricing(params.model);
+    const isExpensive = inputPrice > 2.00;
+    const isSimple = estTokens < 150;
+    if (isExpensive && isSimple) {
+      const recommended = params.model.includes("gpt") || params.model.startsWith("o1") ? "gpt-4o-mini" : "claude-3-5-haiku";
+      warnings.push(`Over-Provisioned Model: Using expensive model '${params.model}' for simple task (~${estTokens} tokens). Switch to '${recommended}'.`);
+    }
+
+    // 4. Context Explosion Detector
+    if (workflowRequests.length >= 2) {
+      const initial = workflowRequests[0].estimatedTokens;
+      const current = estTokens;
+      if (initial > 0 && current >= initial * 3.5) {
+        warnings.push(`Context Explosion: Context grew ${(current / initial).toFixed(1)}x in workflow '${workflowId}' (${initial} -> ${current} estimated tokens). Recommend sliding window.`);
+      }
+    }
+
+    if (warnings.length > 0) {
+      let mode = this.budgetConfig?.onBudgetExceeded || "warn";
+      if (process.env.AUREX_BLOCK_ON_WASTE === "1") {
+        mode = "throw";
+      }
+
+      for (const msg of warnings) {
+        const fullMsg = `[Aurex SDK Real-Time Guard] ${msg}`;
+        if (mode === "throw") {
+          throw new Error(fullMsg);
+        } else {
+          console.warn(fullMsg);
+        }
+      }
+    }
   }
 
   private checkBudget(newEventCost: number, inputTokens: number, workflowId?: string): void {
@@ -443,10 +556,20 @@ export class AurexAuditor {
 
   private async syncToCloud(batch: AurexEvent[]): Promise<void> {
     try {
+      const cleaned = batch.map(e => {
+        const copy = { ...e };
+        if (!this.config.syncPromptHashes) {
+          delete copy.prompt_hash;
+          delete copy.system_prompt_hash;
+          delete copy.response_hash;
+        }
+        return copy;
+      });
+
       const isLedgerEndpoint = /\/ledger\/events\/?$/.test(this.config.cloudEndpoint);
       const payload = isLedgerEndpoint
-        ? { events: batch.map(e => ({ ...e, cost_usd: e.cost })) }
-        : { project: this.config.project, data: batch };
+        ? { events: cleaned.map(e => ({ ...e, cost_usd: e.cost })) }
+        : { project: this.config.project, data: cleaned };
 
       const response = await fetch(this.config.cloudEndpoint, {
         method: "POST",
@@ -506,9 +629,31 @@ export class AurexAuditor {
     const original = lite.completion.bind(lite);
     const self = this;
     const patched: any = async function (...args: any[]) {
+      const params = args[0] || {};
+      try {
+        const messages = params.messages || [];
+        let systemPrompt = "";
+        let userPrompt = "";
+        for (const m of messages) {
+          if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
+          else if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
+        }
+        self.preCallCheck({
+          model: params.model || "unknown",
+          prompt: userPrompt,
+          systemPrompt,
+          workflowId: params.user || params.metadata?.workflow_id,
+          messages,
+        });
+      } catch (err: any) {
+        if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+          throw err;
+        }
+        console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+      }
+
       const resp = await original(...args);
       try {
-        const params = args[0] || {};
         const usage = resp?.usage || {};
         self.logEvent({
           model: params.model || "unknown",
@@ -547,9 +692,42 @@ export class AurexAuditor {
       if (messages && typeof messages.create === "function" && !messages.create.__aurex_patched__) {
         const origCreate = messages.create.bind(messages);
         const patched: any = async function (...args: any[]) {
+          const params = args[0] || {};
+          try {
+            let systemPrompt = "";
+            if (typeof params.system === "string") systemPrompt = params.system;
+            else if (Array.isArray(params.system)) {
+              systemPrompt = params.system.map((b: any) => typeof b === "string" ? b : (b.text || "")).join("");
+            }
+            const messages = params.messages || [];
+            let userPrompt = "";
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const m = messages[i];
+              if (m.role === "user") {
+                if (typeof m.content === "string") {
+                  userPrompt = m.content;
+                } else if (Array.isArray(m.content)) {
+                  userPrompt = m.content.map((item: any) => typeof item === "string" ? item : (item.text || "")).join("");
+                }
+                break;
+              }
+            }
+            self.preCallCheck({
+              model: params.model || "unknown",
+              prompt: userPrompt,
+              systemPrompt,
+              workflowId: params.metadata?.workflow_id || params.user,
+              messages,
+            });
+          } catch (err: any) {
+            if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+              throw err;
+            }
+            console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+          }
+
           const resp = await origCreate(...args);
           try {
-            const params = args[0] || {};
             const usage = resp?.usage || {};
             self.logEvent({
               model: params.model || "unknown",
@@ -573,8 +751,85 @@ export class AurexAuditor {
     if (anthropicMod.Anthropic) anthropicMod.Anthropic = Wrapped;
   }
 
+  /** Best-effort OpenAI SDK patcher. */
+  public patchOpenAI(): void {
+    let openaiMod: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      openaiMod = require("openai");
+    } catch {
+      return;
+    }
+    const Cls = openaiMod?.default || openaiMod?.OpenAI;
+    if (!Cls || Cls.__aurex_patched__) return;
+
+    const self = this;
+    const Wrapped: any = function (...ctorArgs: any[]) {
+      // @ts-ignore
+      const inst = new Cls(...ctorArgs);
+      const chat = inst.chat;
+      if (chat && chat.completions && typeof chat.completions.create === "function" && !chat.completions.create.__aurex_patched__) {
+        const origCreate = chat.completions.create.bind(chat.completions);
+        const patched: any = async function (...args: any[]) {
+          const params = args[0] || {};
+          let systemPrompt = "";
+          let userPrompt = "";
+          try {
+            const messages = params.messages || [];
+            for (const m of messages) {
+              if (m.role === "system" && typeof m.content === "string") {
+                systemPrompt = m.content;
+              } else if (m.role === "user" && typeof m.content === "string") {
+                userPrompt = m.content;
+              }
+            }
+            self.preCallCheck({
+              model: params.model || "unknown",
+              prompt: userPrompt,
+              systemPrompt,
+              workflowId: params.user || params.metadata?.workflow_id,
+              messages,
+            });
+          } catch (err: any) {
+            if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+              throw err;
+            }
+            console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+          }
+
+          const resp = await origCreate(...args);
+          try {
+            const usage = resp?.usage || {};
+            self.logEvent({
+              model: params.model || "unknown",
+              prompt: userPrompt,
+              response: resp?.choices?.[0]?.message?.content,
+              inputTokens: usage.prompt_tokens || 0,
+              outputTokens: usage.completion_tokens || 0,
+              cachedTokens: usage.prompt_tokens_details?.cached_tokens || 0,
+              reasoningTokens: usage.completion_tokens_details?.reasoning_tokens || 0,
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId: params.user || params.metadata?.workflow_id,
+            });
+          } catch {}
+          return resp;
+        };
+        patched.__aurex_patched__ = true;
+        chat.completions.create = patched;
+      }
+      return inst;
+    };
+    Wrapped.prototype = Cls.prototype;
+    Wrapped.__aurex_patched__ = true;
+
+    if (openaiMod.default) openaiMod.default = Wrapped;
+    if (openaiMod.OpenAI) openaiMod.OpenAI = Wrapped;
+  }
+
   public patchAll(): void {
     this.patchLiteLLM();
     this.patchAnthropic();
+    this.patchOpenAI();
   }
 }

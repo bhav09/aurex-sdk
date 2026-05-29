@@ -13,7 +13,6 @@ export default function PrivacyPolicy() {
                         <li><strong>We do NOT train models</strong> on your data.</li>
                         <li><strong>Free Audit:</strong> Runs 100% locally in your browser. We see nothing.</li>
                         <li><strong>SaaS Proxy:</strong> We temporarily process prompts to route them, and we permanently store only <strong>metadata</strong> (token counts, timestamps, costs).</li>
-                        <li><strong>Capital Partners:</strong> Only see anonymized financial health metrics (Token Credit Score). They never see your proprietary usage patterns.</li>
                     </ul>
                 </div>
 
@@ -21,7 +20,7 @@ export default function PrivacyPolicy() {
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">1. What We Do (The Process)</h2>
                         <p className="mb-4">
-                            Aurex operates across three distinct tiers. Here is exactly how we handle your data in each:
+                            Aurex operates across two distinct tiers. Here is exactly how we handle your data in each:
                         </p>
                         <ul className="space-y-4">
                             <li>
@@ -29,9 +28,6 @@ export default function PrivacyPolicy() {
                             </li>
                             <li>
                                 <strong className="text-foreground">SaaS Proxy:</strong> We sit between your application and your chosen LLM provider (e.g., OpenAI). We temporarily process your prompts in transit to route them efficiently and apply caching. We record the metadata of these transactions to populate your observability dashboard.
-                            </li>
-                            <li>
-                                <strong className="text-foreground">Inference Financing:</strong> We use your historical usage efficiency (Token Credit Score) to underwrite a Net-30 credit line. We aggregate your metadata into financial health indicators.
                             </li>
                         </ul>
                     </section>
@@ -67,9 +63,6 @@ export default function PrivacyPolicy() {
                                 <strong className="text-foreground">LLM Providers (e.g., OpenAI, Anthropic):</strong> When using our proxy, they receive your raw prompts to generate responses. You remain subject to their specific data privacy terms and retention policies.
                             </li>
                             <li>
-                                <strong className="text-foreground">Capital Partners & Insurers:</strong> To facilitate Inference Financing, we share <strong>only</strong> anonymized financial health metrics (your Token Credit Score and aggregate token burn rate). They never see your prompt data, metadata, or proprietary usage patterns.
-                            </li>
-                            <li>
                                 <strong className="text-foreground">Infrastructure Providers:</strong> We use Google Cloud Platform (GCP) to securely host the Aurex proxy and process analytics, and Stripe for secure payment processing.
                             </li>
                         </ul>
@@ -80,14 +73,14 @@ export default function PrivacyPolicy() {
                         <ul className="list-disc pl-6 space-y-2">
                             <li>Access the telemetry metadata we have collected about your organization.</li>
                             <li>Request full deletion of your account and historical observability metadata.</li>
-                            <li>Withdraw consent for data processing (Note: this terminates your ability to use the SaaS Proxy and Financing features).</li>
+                            <li>Withdraw consent for data processing (Note: this terminates your ability to use the SaaS Proxy features).</li>
                         </ul>
                     </section>
 
                     <section>
                         <h2 className="text-2xl font-display text-foreground mb-4">5. Contact Us</h2>
                         <p>
-                            If you have questions about this Privacy Policy, our data practices, or how your Token Credit Score is calculated, please contact us at:
+                            If you have questions about this Privacy Policy, our data practices, or how your observability metrics are calculated, please contact us at:
                         </p>
                         <p className="mt-4 font-mono text-sm">
                             Email: contact@heyaurex.com<br />

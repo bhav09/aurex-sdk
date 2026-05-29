@@ -1,6 +1,11 @@
+import dynamic from "next/dynamic";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
-import { CsvInsights } from "@/components/insights/csv-insights";
+
+const CsvInsights = dynamic(
+  () => import("@/components/insights/csv-insights").then((mod) => mod.CsvInsights),
+  { ssr: false }
+);
 
 export default function InsightsPage() {
   return (
