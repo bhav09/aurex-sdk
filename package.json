@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "aurex-sdk": "file:sdk/node"
+  }
+}

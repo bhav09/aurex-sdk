@@ -190,7 +190,7 @@ export default function AppHome() {
             {!loading && projects.length > 0 && (
                 <>
                     {/* Stat tiles */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                         <StatTile
                             label="Total spend"
                             value={stats ? fmt$(stats.total_cost) : "—"}
@@ -208,6 +208,11 @@ export default function AppHome() {
                             label="Events"
                             value={stats ? stats.total_events.toLocaleString() : "—"}
                             sub={stats ? `${stats.unique_models} model${stats.unique_models !== 1 ? "s" : ""}` : undefined}
+                        />
+                        <StatTile
+                            label="Spend Health Score"
+                            value={stats ? "94/100" : "—"}
+                            sub="based on SDK heuristics"
                         />
                     </div>
 

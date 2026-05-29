@@ -11,8 +11,7 @@ export default function TermsAndConditions() {
                     <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
                         <li><strong>Aurex is a pass-through proxy.</strong> We are not responsible for the content you generate.</li>
                         <li><strong>You must follow LLM provider rules.</strong> You are bound by the Acceptable Use Policies (AUP) of OpenAI, Anthropic, etc.</li>
-                        <li><strong>Financing is tied to efficiency.</strong> If you use Inference Financing, your rate (3-5%) depends on your Token Credit Score.</li>
-                        <li><strong>Pay on time.</strong> Failing to pay your Net-30 balance will result in proxy suspension and reporting to our capital partners.</li>
+                        <li><strong>Paid tier billing.</strong> Failing to pay your subscription invoice will result in proxy service suspension.</li>
                     </ul>
                 </div>
 
@@ -21,29 +20,12 @@ export default function TermsAndConditions() {
                         <h2 className="text-2xl font-display text-foreground mb-4">1. Clear Stakeholder Responsibilities</h2>
                         <ul className="space-y-4">
                             <li>
-                                <strong className="text-foreground">Aurex's Responsibility:</strong> We are responsible for maintaining proxy uptime, calculating your Token Credit Score fairly based on telemetry, and securing your metadata and API keys in transit.
+                                <strong className="text-foreground">Aurex's Responsibility:</strong> We are responsible for maintaining control plane proxy uptime, calculating optimization metrics based on telemetry, and securing your metadata and API keys in transit.
                             </li>
                             <li>
                                 <strong className="text-foreground">Your Responsibility (The User):</strong> You are solely responsible for complying with the underlying LLM provider's Acceptable Use Policy (AUP). Aurex is a pass-through; if you generate illegal content, violate copyright, or abuse rate limits, the liability rests entirely with you.
                             </li>
-                            <li>
-                                <strong className="text-foreground">Capital Partners' Responsibility:</strong> Our financial partners are responsible for providing the Net-30 credit facility based on the underwriting signals (Token Credit Score) we provide.
-                            </li>
                         </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-2xl font-display text-foreground mb-4">2. Inference Financing Mechanics</h2>
-                        <p className="mb-4">
-                            If you opt into Inference Financing, here is exactly how the lifecycle works:
-                        </p>
-                        <ol className="list-decimal pl-6 space-y-3">
-                            <li><strong>Routing:</strong> You route your LLM traffic through the Aurex Gateway.</li>
-                            <li><strong>Scoring:</strong> We analyze your metadata (not your prompts) to calculate your efficiency, generating your <strong>Token Credit Score</strong>.</li>
-                            <li><strong>Approval & Rate:</strong> Based on that score, you are approved for a Net-30 credit line. Your liquidity fee will be dynamically set between <strong>3% and 5%</strong>. The more efficient you are, the lower your rate.</li>
-                            <li><strong>Repayment:</strong> You must repay the principal inference cost plus the liquidity fee on a strict Net-30 schedule.</li>
-                            <li><strong>Consequences of Default:</strong> Failure to repay on time will result in immediate suspension of your proxy services. We reserve the right to report defaults to credit bureaus and our capital partners.</li>
-                        </ol>
                     </section>
 
                     <section>
