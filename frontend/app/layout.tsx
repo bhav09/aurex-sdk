@@ -20,8 +20,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Aurex - AI Token Usage Auditor',
-  description: 'Find and eliminate wasted AI tokens instantly. Analyze your GPT, Claude, and Gemini usage locally. No data leaves your system.',
+  title: 'Aurex - LLM Cost Intelligence & Control',
+  description: 'Real-time cost control and audit insights. Local SDK ledger by default. Cloud sync is opt-in and project-scoped.',
   generator: 'v0.app',
 }
 

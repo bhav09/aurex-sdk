@@ -17,9 +17,9 @@ const features = [
   },
   {
     number: "03",
-    title: "Privacy",
-    description: "Runs locally. Your data never leaves your environment. All analysis happens on your machine with zero data transmission to external servers.",
-    stats: { value: "0", label: "data shared" },
+    title: "Control",
+    description: "Local SDK ledger by default. Cloud sync is opt-in and project-scoped. You decide what leaves your environment.",
+    stats: { value: "100%", label: "control" },
   },
 ];
 

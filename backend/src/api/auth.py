@@ -587,22 +587,30 @@ async def verify_otp(data: OTPVerify):
     # Mark as verified
     otp_data["verified"] = True
     await redis_client.setex(f"otp:{email}", 600, json.dumps(otp_data))
-    
-    # Generate JWT token
-    access_token = create_access_token(data={"sub": email})
 
     # Bootstrap tenancy on first login (idempotent).
     org_id = None
     default_project_id = None
+    role = "owner"
     try:
         from src.services.onboarding import ensure_user_and_default_org
         from src.database import AsyncSessionLocal
+        from src.models import Role
         async with AsyncSessionLocal() as db:
             user, org, project = await ensure_user_and_default_org(db, email)
             org_id = org.id
             default_project_id = project.id
+            role = Role.OWNER.value
     except Exception as e:
         logger.warning("Onboarding bootstrap failed (non-fatal)", email=email, error=str(e))
+
+    # Generate JWT token with tenancy info
+    access_token = create_access_token(data={
+        "sub": email,
+        "org_id": org_id,
+        "project_id": default_project_id,
+        "role": role,
+    })
 
     logger.info("OTP verified successfully", email=email)
     from src.utils.analytics import log_analytics_event

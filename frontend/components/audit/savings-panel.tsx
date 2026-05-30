@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { aurixAPI } from "@/lib/api-client";
+import { aurexAPI } from "@/lib/api-client";
 import {
     AreaChart,
     Area,
@@ -54,7 +54,7 @@ export function SavingsPanel({ companyName }: SavingsPanelProps) {
         setLoading(true);
         setError(null);
         try {
-            const res = await aurixAPI.getSavingsRealization(companyName);
+            const res = await aurexAPI.getSavingsRealization(companyName);
             setData(res);
         } catch (err: any) {
             console.error("Error fetching savings data:", err);

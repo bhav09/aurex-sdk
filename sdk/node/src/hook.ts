@@ -21,7 +21,7 @@ import { AurexAuditor } from "./index";
   try {
     const auditor = AurexAuditor.getInstance({
       apiKey: process.env.AUREX_API_KEY,
-      project: process.env.AUREX_WORKFLOW_ID || process.env.AUREX_PROJECT || "default",
+      project: process.env.AUREX_WORKFLOW_ID || "default",
       cloudSync: true,
       localOnly: false,
       baseUrl: process.env.AUREX_BASE_URL,

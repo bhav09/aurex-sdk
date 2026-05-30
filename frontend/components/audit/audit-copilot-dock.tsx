@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { aurixAPI, type Issue } from "@/lib/api-client";
+import { aurexAPI, type Issue } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Bot, X, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -56,7 +56,7 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
         setLoading(true);
 
         try {
-            const result = await aurixAPI.generateOptimization({
+            const result = await aurexAPI.generateOptimization({
                 issue_type: issue.affected_workflow || "general",
                 issue_title: issue.title,
                 weekly_cost: issue.weekly_cost,

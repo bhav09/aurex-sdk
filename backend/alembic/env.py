@@ -30,7 +30,7 @@ if config.config_file_name is not None:
 
 
 def _resolve_database_url() -> str:
-    raw = os.getenv("DATABASE_URL", "sqlite:///./aurix.db")
+    raw = os.getenv("DATABASE_URL", "sqlite:///./aurex.db")
     # Alembic uses sync drivers; strip async dialect suffixes.
     if raw.startswith("postgresql+asyncpg://"):
         return raw.replace("postgresql+asyncpg://", "postgresql+psycopg2://")

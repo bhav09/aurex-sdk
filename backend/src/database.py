@@ -16,7 +16,7 @@ load_dotenv()
 
 # Get database URL from environment or use SQLite default
 # Convert standard dialect to async dialect
-RAW_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./aurix.db")
+RAW_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./aurex.db")
 if RAW_URL.startswith("postgresql://"):
     DATABASE_URL = RAW_URL.replace("postgresql://", "postgresql+asyncpg://")
 elif RAW_URL.startswith("sqlite://"):

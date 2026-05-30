@@ -271,10 +271,10 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
               <div className="p-4 rounded-xl border border-white/[0.05] bg-white/[0.01] space-y-3">
                 <h5 className="text-xs font-semibold text-white/60 uppercase tracking-wider flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  Zero-PII Promise
+                  Local Control by Default
                 </h5>
                 <p className="text-xs text-white/40 leading-relaxed">
-                  Prompts and responses are SHA-256 hashed locally. Plaintext never leaves your machine.
+                  Local SDK ledger by default. Metadata-only sync. Plaintext never sent unless explicitly opted in.
                 </p>
               </div>
             </div>
@@ -301,8 +301,8 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
                 {[
                   {
-                    title: "Zero PII",
-                    desc: "SHA-256 hashes prompts locally. Plaintext never leaves the host.",
+                    title: "Local Control",
+                    desc: "Metadata-only sync by default. Cloud opt-in and project-scoped.",
                     icon: ShieldCheck
                   },
                   {
@@ -559,7 +559,7 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
                 Offline Heuristics Engine
               </h2>
               <p className="text-base text-white/60 leading-relaxed">
-                Runs offline against your ledger to flag cost issues. Aggregates findings into a Token Credit Score (0–100):
+                Runs offline against your ledger to flag cost issues and waste patterns:
               </p>
 
               {/* Heuristics Cards Grid */}
@@ -635,7 +635,7 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
               </h2>
               <div className="text-base text-white/60 space-y-4 leading-relaxed">
                 <p>
-                  Run the Aurex CLI in your CI pipeline (GitHub Actions, GitLab CI) to enforce cost policies. If the Token Credit Score drops below your threshold, the CLI exits with code <code className="text-red-400 font-mono">1</code>, failing the build.
+                  Run the Aurex CLI in your CI pipeline (GitHub Actions, GitLab CI) to enforce cost policies. Default is warn-only. Use --mode=block to hard-fail the build on cost threshold breaches.
                 </p>
               </div>
 
@@ -666,9 +666,9 @@ console.log(\`Wasted Spend: \$\${report.wasted_cost}\`);`;
                         <td className="p-3">Path to the generated JSONL log database file.</td>
                       </tr>
                       <tr>
-                        <td className="p-3 font-mono text-indigo-400 font-semibold font-semibold">--fail-under &lt;score&gt;</td>
-                        <td className="p-3 font-mono">0</td>
-                        <td className="p-3">Fails build if final Token Credit Score drops below this limit.</td>
+                        <td className="p-3 font-mono text-indigo-400 font-semibold font-semibold">--mode &lt;warn|block&gt;</td>
+                        <td className="p-3 font-mono">warn</td>
+                        <td className="p-3">warn: print alerts only. block: fail build on threshold breach.</td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-indigo-400 font-semibold">--max-waste-usd &lt;amount&gt;</td>

@@ -3,14 +3,31 @@ Unified LLM Event Schema
 This is the core data model for all LLM usage events
 """
 
-from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Text, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Text, ForeignKey, Enum as SAEnum
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 import uuid
+import enum
 
 Base = declarative_base()
+
+
+class OutcomeEnum(str, enum.Enum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    TIMEOUT = "timeout"
+    PENDING = "pending"
+
+
+class CostTypeEnum(str, enum.Enum):
+    INFERENCE = "inference"
+    EMBEDDING = "embedding"
+    VECTOR_SEARCH = "vector_search"
+    EVAL = "eval"
+    RETRY_OVERHEAD = "retry_overhead"
+    MEMORY = "memory"
 
 
 class LLMEvent(Base):
@@ -42,7 +59,11 @@ class LLMEvent(Base):
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)
     total_tokens = Column(Integer, nullable=False, default=0)
-    
+    cached_tokens = Column(Integer, nullable=False, default=0)
+    cache_write_tokens = Column(Integer, nullable=False, default=0)
+    reasoning_tokens = Column(Integer, nullable=False, default=0)
+    is_batch = Column(Integer, nullable=False, default=0)
+
     # Cost
     cost = Column(Float, nullable=False, default=0.0)
     
@@ -53,7 +74,15 @@ class LLMEvent(Base):
     # Optimization fields
     system_prompt_hash = Column(String, nullable=True, index=True)
     context_length = Column(Integer, nullable=True)
-    
+
+    # New fields for runtime control
+    retry_count = Column(Integer, nullable=False, default=0)
+    outcome = Column(SAEnum(OutcomeEnum, name="outcome_enum"), nullable=False, default=OutcomeEnum.PENDING)
+    cost_type = Column(SAEnum(CostTypeEnum, name="cost_type_enum"), nullable=False, default=CostTypeEnum.INFERENCE)
+    loop_score = Column(Float, nullable=True)  # 0.0-1.0 semantic similarity
+    team = Column(String, nullable=True, index=True)
+    tenant_id = Column(String, nullable=True, index=True)
+
     # Additional metadata (renamed from 'metadata' to avoid SQLAlchemy conflict)
     extra_metadata = Column(JSON, nullable=True)
     
@@ -91,11 +120,21 @@ class LLMEventCreate(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    cached_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    is_batch: bool = False
     cost: float = 0.0
     prompt: Optional[str] = None
     response: Optional[str] = None
     system_prompt_hash: Optional[str] = None
     context_length: Optional[int] = None
+    retry_count: int = 0
+    outcome: Optional[str] = None
+    cost_type: Optional[str] = None
+    loop_score: Optional[float] = None
+    team: Optional[str] = None
+    tenant_id: Optional[str] = None
     extra_metadata: Optional[Dict[str, Any]] = None
 
 
@@ -111,11 +150,21 @@ class LLMEventResponse(BaseModel):
     input_tokens: int
     output_tokens: int
     total_tokens: int
+    cached_tokens: int
+    cache_write_tokens: int
+    reasoning_tokens: int
+    is_batch: bool
     cost: float
     prompt: Optional[str]
     response: Optional[str]
     system_prompt_hash: Optional[str]
     context_length: Optional[int]
+    retry_count: int
+    outcome: Optional[str]
+    cost_type: Optional[str]
+    loop_score: Optional[float]
+    team: Optional[str]
+    tenant_id: Optional[str]
     extra_metadata: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime

@@ -175,6 +175,10 @@ export class AurexAPI {
         return null;
     }
 
+    getToken(): string | null {
+        return this.token;
+    }
+
     hasActiveSession(): boolean {
         return !!this.token;
     }
@@ -824,6 +828,6 @@ export class AurexAPI {
     }
 }
 
-export const aurixAPI = new AurexAPI();
+export const aurexAPI = new AurexAPI();
 
 

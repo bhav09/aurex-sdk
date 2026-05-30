@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { aurixAPI } from "@/lib/api-client";
+import { aurexAPI } from "@/lib/api-client";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const [ready, setReady] = useState(false);
 
     useEffect(() => {
-        if (!aurixAPI.hasActiveSession()) {
+        if (!aurexAPI.hasActiveSession()) {
             router.replace("/audit");
             return;
         }
@@ -25,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const userInfo = aurixAPI.getUserInfo();
+    const userInfo = aurexAPI.getUserInfo();
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -49,7 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <button
                             type="button"
                             onClick={() => {
-                                aurixAPI.clearSession();
+                                aurexAPI.clearSession();
                                 router.replace("/audit");
                             }}
                             className="rounded-md border px-3 py-1 text-xs hover:bg-muted"

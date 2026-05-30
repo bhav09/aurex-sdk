@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { UploadZone } from "@/components/audit/upload-zone";
 import { AgentPlanPanel } from "@/components/audit/agent-plan-panel";
 import { SettingsPanel } from "@/components/audit/settings-panel";
 import { SavingsPanel } from "@/components/audit/savings-panel";
 import { AuditCopilotDock } from "@/components/audit/audit-copilot-dock";
-import { aurixAPI, ExecutiveSummary, Issue, LLMEvent } from "@/lib/api-client";
+import { aurexAPI, ExecutiveSummary, Issue, LLMEvent } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -423,6 +424,7 @@ function OverviewTab({
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function AuditPage() {
+    const router = useRouter();
     const [analyzing, setAnalyzing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<string[]>([]);
@@ -449,7 +451,7 @@ export default function AuditPage() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     useEffect(() => {
-        const userInfo = aurixAPI.getUserInfo();
+        const userInfo = aurexAPI.getUserInfo();
         if (userInfo) {
             setCompanyName(userInfo.company_name);
             setUserEmail(userInfo.email);
@@ -471,9 +473,9 @@ export default function AuditPage() {
             return;
         }
         if (token && oauthEmail) {
-            aurixAPI.setToken(token);
+            aurexAPI.setToken(token);
             const info = { user_name: oauthUserName || oauthEmail.split('@')[0], email: oauthEmail, company_name: oauthCompanyName || '' };
-            aurixAPI.setUserInfo(info);
+            aurexAPI.setUserInfo(info);
             setUserEmail(oauthEmail);
             setCompanyName(oauthCompanyName || '');
             window.history.replaceState({}, '', window.location.pathname);
@@ -481,13 +483,13 @@ export default function AuditPage() {
     }, []);
 
     const handleRefreshAnalysis = async () => {
-        const activeEmail = userEmail || aurixAPI.getUserInfo()?.email;
+        const activeEmail = userEmail || aurexAPI.getUserInfo()?.email;
         if (!activeEmail) return;
         setAnalyzing(true);
         setProgress(0);
         setProgressSteps(["Querying updated pricing overrides...", "Recalculating event costs...", "Regenerating executive summary..."]);
         try {
-            const summary = await aurixAPI.getExecutiveSummary(activeEmail);
+            const summary = await aurexAPI.getExecutiveSummary(activeEmail);
             setData(summary);
             await loadEvents();
         } catch (e) {
@@ -500,16 +502,16 @@ export default function AuditPage() {
 
     const handleDownloadReport = async () => {
         let activeSessionId = sessionId;
-        const activeEmail = userEmail || aurixAPI.getUserInfo()?.email;
+        const activeEmail = userEmail || aurexAPI.getUserInfo()?.email;
         if (!activeSessionId && activeEmail) {
             try {
-                const history = await aurixAPI.getAuditHistory(activeEmail, 0, 1);
+                const history = await aurexAPI.getAuditHistory(activeEmail, 0, 1);
                 if (history.sessions?.length > 0) activeSessionId = history.sessions[0].id;
             } catch (err) { console.error(err); }
         }
         if (!activeSessionId) { alert("No audit session found. Please perform an audit first."); return; }
         try {
-            const blob = await aurixAPI.downloadExecutiveReport(activeSessionId);
+            const blob = await aurexAPI.downloadExecutiveReport(activeSessionId);
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
@@ -547,7 +549,7 @@ export default function AuditPage() {
         const iv = simulateProgress();
         try {
             setUserEmail(userInfo.email); setCompanyName(userInfo.company_name);
-            const { session, summary } = await aurixAPI.completeAudit(file, userInfo);
+            const { session, summary } = await aurexAPI.completeAudit(file, userInfo);
             setSessionId(session.id);
             clearInterval(iv);
             setProgressSteps(prev => [...prev, "Finalizing analysis..."]);
@@ -560,10 +562,10 @@ export default function AuditPage() {
             clearInterval(iv);
             const isAuth = ["verification", "authenticate", "authorized", "403", "401"].some(k => message.toLowerCase().includes(k));
             if (isAuth) {
-                aurixAPI.clearSession();
+                aurexAPI.clearSession();
                 setPendingFile(file); setPendingUserInfo(userInfo); setAuthRequired(true);
                 setAuthRequiredMessage("Your session expired. Please enter the new 6-digit verification code sent to your email.");
-                try { await aurixAPI.requestOTP(userInfo.email); } catch { }
+                try { await aurexAPI.requestOTP(userInfo.email); } catch { }
                 setError(null);
             } else {
                 setError(message);
@@ -591,7 +593,7 @@ export default function AuditPage() {
     const loadEvents = async (workflowFilter?: string) => {
         setLoadingEvents(true);
         try {
-            const fetched = await aurixAPI.getEvents({ limit: 1000, workflow_id: workflowFilter });
+            const fetched = await aurexAPI.getEvents({ limit: 1000, workflow_id: workflowFilter });
             setEvents(fetched);
         } catch (e) { console.error(e); } finally { setLoadingEvents(false); }
     };
@@ -733,7 +735,7 @@ export default function AuditPage() {
         <div className="min-h-screen bg-[#111111] text-white flex flex-col">
             {/* ── Top Header Bar ──────────────────────────────────────────── */}
             <header className="h-14 border-b border-[#222] bg-[#111] flex items-center px-6 gap-5 shrink-0 z-30">
-                <span className="font-display font-bold text-base tracking-wider text-white">AUREX</span>
+                <button onClick={() => router.push('/')} className="font-display font-bold text-base tracking-wider text-white hover:text-[#aaa] transition-colors cursor-pointer">AUREX</button>
                 <span className="text-[#333] text-sm">|</span>
                 <span className="text-[12px] text-[#555]">LLM Audit · Cost Intelligence</span>
                 <div className="ml-auto flex items-center gap-4">
@@ -743,10 +745,8 @@ export default function AuditPage() {
                     <span className="text-[11px] font-mono text-[#555] hidden sm:block">
                         {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                     </span>
-                    <a href="/docs">
-                        <Button className="h-8 bg-[#1e1e1e] hover:bg-[#2a2a2a] text-white border border-[#333] text-[12px] font-medium px-4 rounded-md flex items-center gap-2">
-                            <ExternalLink className="h-3.5 w-3.5" /> Connect SDK
-                        </Button>
+                    <a href="/docs" className="h-8 bg-[#1e1e1e] hover:bg-[#2a2a2a] text-white border border-[#333] text-[12px] font-medium px-4 rounded-md flex items-center gap-2 no-underline">
+                        <ExternalLink className="h-3.5 w-3.5" /> Connect SDK
                     </a>
                 </div>
             </header>
@@ -798,7 +798,7 @@ export default function AuditPage() {
                     <div className="border-t border-[#1e1e1e] p-3">
                         <button
                             type="button"
-                            onClick={() => { aurixAPI.trackClick("analyze_another_file_click", userEmail || undefined); resetAudit(); }}
+                            onClick={() => { aurexAPI.trackClick("analyze_another_file_click", userEmail || undefined); resetAudit(); }}
                             className="w-full text-[11px] text-[#555] hover:text-[#888] transition-colors py-1.5 text-left px-1"
                         >
                             ← New audit
