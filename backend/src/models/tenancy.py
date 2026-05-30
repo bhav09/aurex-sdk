@@ -74,6 +74,7 @@ class Project(Base):
     org_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     environment = Column(SAEnum(Environment, name="environment"), nullable=False, default=Environment.DEV)
+    slack_webhook_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     organization = relationship("Organization", back_populates="projects")

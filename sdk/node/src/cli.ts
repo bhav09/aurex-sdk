@@ -3,13 +3,14 @@
  * Aurex Node CLI.
  *
  * Subcommands:
- *   - install-hook    Writes a `.env.aurex` with NODE_OPTIONS=--require
- *                     aurex-sdk/hook so spawned node processes auto-instrument.
- *   - uninstall-hook  Removes the file written by install-hook.
+ *   install-hook    Writes `.env.aurex` for NODE_OPTIONS=--require aurex-sdk/hook
+ *   uninstall-hook  Removes the hook file
+ *   ci              Scan local ledger; warn or block on waste thresholds
  */
 
 import * as fs from "fs";
 import * as path from "path";
+import { formatGithubComment, loadCiConfig, runCiScan } from "./ci";
 
 const ENV_FILE = ".env.aurex";
 
@@ -23,7 +24,7 @@ function installHook(target?: string) {
     "# export AUREX_API_KEY=aux_dev_...\n";
   fs.writeFileSync(filePath, body, "utf-8");
   console.log(`[aurex] wrote ${filePath}`);
-  console.log("[aurex] run `source .env.aurex` (or load it via your process manager) and set AUREX_API_KEY.");
+  console.log("[aurex] run `source .env.aurex` and set AUREX_API_KEY.");
 }
 
 function uninstallHook(target?: string) {
@@ -34,6 +35,27 @@ function uninstallHook(target?: string) {
     console.log(`[aurex] removed ${filePath}`);
   } else {
     console.log("[aurex] no hook file found.");
+  }
+}
+
+function runCi(args: string[]) {
+  const modeArg = args.find((a) => a.startsWith("--mode="));
+  const githubComment = args.includes("--github-comment");
+  const config = loadCiConfig();
+  if (modeArg) config.mode = modeArg.split("=")[1] as "warn" | "block";
+  const result = runCiScan(config);
+  const comment = formatGithubComment(result);
+  if (githubComment) {
+    console.log(comment);
+  } else {
+    console.log(comment);
+    if (result.issues.length) {
+      for (const i of result.issues) console.error(`[${i.severity}] ${i.title}`);
+    }
+  }
+  const critical = result.issues.filter((i) => i.severity === "CRITICAL");
+  if (config.mode === "block" && critical.length > 0) {
+    process.exit(1);
   }
 }
 
@@ -48,5 +70,9 @@ if (cmd === "uninstall-hook") {
   uninstallHook(args[1]);
   process.exit(0);
 }
-console.log("Usage: aurex <install-hook|uninstall-hook> [target-dir]");
-process.exit(0);
+if (cmd === "ci") {
+  runCi(args.slice(1));
+  process.exit(0);
+}
+console.log("Usage: aurex <install-hook|uninstall-hook|ci> [--mode=warn|block] [--github-comment]");
+process.exit(cmd ? 1 : 0);

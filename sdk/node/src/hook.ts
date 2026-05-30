@@ -15,8 +15,8 @@
 import { AurexAuditor } from "./index";
 
 (function activate() {
-  if (process.env.AUREX_ENABLED !== "1") return;
   if (!process.env.AUREX_API_KEY) return;
+  if (process.env.AUREX_ENABLED === "0") return;
 
   try {
     const auditor = AurexAuditor.getInstance({

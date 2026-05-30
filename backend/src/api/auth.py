@@ -197,11 +197,13 @@ def _extract_prefix(api_key: str) -> str:
     """Return the lookup prefix for an API key.
 
     New format: ``aux_<env>_<32-urlsafe>`` -> first 8 chars (e.g. ``aux_live``).
+    Legacy ``ax_live_<hex>`` -> first 10 chars (matches ``routes.py`` mint).
     Legacy ``aurex_...`` -> 8 chars after ``aurex_``.
-    Anything else -> first 8 chars.
     """
     if api_key.startswith("aux_"):
         return api_key[:8]
+    if api_key.startswith("ax_live_"):
+        return api_key[:10]
     if api_key.startswith("aurex_"):
         return api_key[6:14]
     return api_key[:8]
@@ -692,21 +694,32 @@ async def google_login(data: GoogleLoginRequest):
 
     google_name = idinfo.get("name", google_email.split("@")[0])
 
-    # Issue our JWT
-    access_token = create_access_token(data={"sub": google_email})
-
     # Bootstrap tenancy on first login (idempotent).
     org_id = None
     default_project_id = None
+    role = None
     try:
         from src.services.onboarding import ensure_user_and_default_org
         from src.database import AsyncSessionLocal
+        from src.models import Membership
         async with AsyncSessionLocal() as db:
             user, org, project = await ensure_user_and_default_org(db, google_email, name=google_name)
             org_id = org.id
             default_project_id = project.id
+            membership = (await db.execute(
+                select(Membership).where(Membership.user_id == user.id, Membership.org_id == org.id)
+            )).scalar_one_or_none()
+            if membership:
+                role = membership.role.value if hasattr(membership.role, "value") else str(membership.role)
     except Exception as e:
         logger.warning("Onboarding bootstrap failed (non-fatal)", email=google_email, error=str(e))
+
+    access_token = create_access_token(data={
+        "sub": google_email,
+        "org_id": org_id,
+        "project_id": default_project_id,
+        "role": role,
+    })
 
     logger.info("Google OAuth login successful", email=google_email)
     from src.utils.analytics import log_analytics_event

@@ -1,6 +1,14 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import {
+  AurexDecision,
+  applyDecisionToCallParams,
+  compressMessages,
+  isExpensiveModel,
+  suggestCheaperModel,
+} from "./decisions";
+import { jaccardNGramSimilarity } from "./semantic";
 
 export interface BudgetGuardConfig {
   maxCostPerMinute?: number;      // e.g. 5.00
@@ -188,6 +196,9 @@ export class AurexAuditor {
   private sessionCosts: Record<string, number> = {};
   private budgetConfig: BudgetGuardConfig | null = null;
   private recentRequests: { timestamp: number; model: string; workflowId: string; systemPromptHash?: string; promptHash?: string; estimatedTokens: number }[] = [];
+  private recentResponses: { workflowId: string; responseHash?: string; responseText?: string; timestamp: number }[] = [];
+  private ignoredWorkflows = new Set<string>();
+  private sessionRetryCounts: Record<string, number> = {};
 
   private constructor(config?: AurexConfig) {
     const defaultLedger = ".aurex/ledger.jsonl";
@@ -195,12 +206,12 @@ export class AurexAuditor {
       apiKey: config?.apiKey || process.env.AUREX_API_KEY || "",
       project: config?.project || "default",
       ledgerPath: config?.ledgerPath || defaultLedger,
-      cloudSync: config?.cloudSync ?? false,
+      cloudSync: config?.cloudSync ?? !!(config?.apiKey || process.env.AUREX_API_KEY),
       cloudEndpoint: resolveCloudEndpoint(config),
       baseUrl: config?.baseUrl || process.env.AUREX_BASE_URL || "",
       flushIntervalMs: config?.flushIntervalMs || 30000,
       maxBatchSize: config?.maxBatchSize || 100,
-      localOnly: config?.localOnly ?? true,
+      localOnly: config?.localOnly ?? !(config?.apiKey || process.env.AUREX_API_KEY),
       budgetGuard: config?.budgetGuard || {},
       syncPromptHashes: config?.syncPromptHashes ?? (process.env.AUREX_SYNC_PROMPT_HASHES === "1" || process.env.AUREX_SYNC_PROMPT_HASHES === "true"),
     };
@@ -373,13 +384,43 @@ export class AurexAuditor {
     return 1;
   }
 
+  public markSuccess(workflowId: string, metadata?: Record<string, any>): void {
+    this.logEvent({
+      model: "aurex-outcome",
+      inputTokens: 0,
+      outputTokens: 0,
+      workflowId,
+      outcome: "success",
+      costType: "outcome_signal",
+      extraMetadata: metadata,
+    });
+  }
+
+  public markFailure(workflowId: string, reason?: string, metadata?: Record<string, any>): void {
+    this.logEvent({
+      model: "aurex-outcome",
+      inputTokens: 0,
+      outputTokens: 0,
+      workflowId,
+      outcome: "failure",
+      costType: "outcome_signal",
+      extraMetadata: { reason, ...metadata },
+    });
+  }
+
+  public ignore(workflowId?: string): void {
+    const wf = workflowId || process.env.AUREX_WORKFLOW_ID || "default_workflow";
+    this.ignoredWorkflows.add(wf);
+  }
+
   public preCallCheck(params: {
     model: string;
     prompt?: string;
     systemPrompt?: string;
     workflowId?: string;
     messages?: any[];
-  }): void {
+    retryCount?: number;
+  }): AurexDecision {
     const now = Date.now();
     const workflowId = params.workflowId || process.env.AUREX_WORKFLOW_ID || "default_workflow";
     const estTokens = this.estimateTokens(params.prompt, params.messages);
@@ -404,13 +445,25 @@ export class AurexAuditor {
     }
 
     const workflowRequests = this.recentRequests.filter(r => r.workflowId === workflowId);
-    const warnings: string[] = [];
+    let decision: AurexDecision = { action: "proceed", reason: "ok", originalModel: params.model };
+
+    if (this.ignoredWorkflows.has(workflowId)) {
+      return decision;
+    }
+
+    const retryCount = params.retryCount ?? this.sessionRetryCounts[workflowId] ?? 0;
+    const loopScore = this.computeSemanticLoopScore(workflowId, params.prompt || "");
 
     // 1. System Prompt Waste Detector
     if (sysPromptHash && workflowRequests.length >= 2) {
       const duplicates = workflowRequests.slice(0, -1).filter(r => r.systemPromptHash === sysPromptHash);
-      if (duplicates.length > 0) {
-        warnings.push(`System Prompt Waste: Redundant system prompt sent again in workflow '${workflowId}'. Enable Prompt Caching to optimize token spend.`);
+      if (duplicates.length > 0 && params.messages) {
+        decision = {
+          action: "compress",
+          reason: `System prompt waste in workflow '${workflowId}'`,
+          compressedMessages: compressMessages(params.messages),
+          originalModel: params.model,
+        };
       }
     }
 
@@ -419,43 +472,167 @@ export class AurexAuditor {
       const recent = workflowRequests.slice(-3);
       const sizes = recent.map(r => r.estimatedTokens);
       if (sizes[1] >= sizes[0] * 2.2 && sizes[2] >= sizes[1] * 2.2 && sizes[0] > 20) {
-        warnings.push(`Agent Runaway Loop: Prompt context size grew exponentially in workflow '${workflowId}' (${sizes[0]} -> ${sizes[1]} -> ${sizes[2]} estimated tokens). Add context pruning.`);
+        const cheaper = suggestCheaperModel(params.model);
+        decision = {
+          action: "downgrade",
+          reason: `Runaway context growth in '${workflowId}'`,
+          suggestedModel: cheaper,
+          injectSystemInstruction:
+            "Summarize prior context briefly, then continue with a shorter answer.",
+          originalModel: params.model,
+          loopScore,
+        };
+        this.sessionRetryCounts[workflowId] = (this.sessionRetryCounts[workflowId] || 0) + 1;
       }
     }
 
-    // 3. Expensive Model Misuse Detector
-    const [inputPrice] = getModelPricing(params.model);
-    const isExpensive = inputPrice > 2.00;
+    // 3. Expensive Model Misuse + adaptive downgrade near budget
     const isSimple = estTokens < 150;
-    if (isExpensive && isSimple) {
-      const recommended = params.model.includes("gpt") || params.model.startsWith("o1") ? "gpt-4o-mini" : "claude-3-5-haiku";
-      warnings.push(`Over-Provisioned Model: Using expensive model '${params.model}' for simple task (~${estTokens} tokens). Switch to '${recommended}'.`);
+    const nearBudget =
+      this.budgetConfig?.maxCostPerSession !== undefined &&
+      (this.sessionCosts[workflowId] || 0) > (this.budgetConfig.maxCostPerSession * 0.8);
+    if ((isExpensiveModel(params.model) && isSimple) || nearBudget) {
+      const recommended = suggestCheaperModel(params.model);
+      if (recommended) {
+        decision = {
+          action: "downgrade",
+          reason: nearBudget
+            ? `Budget threshold near for '${workflowId}'`
+            : `Over-provisioned model for simple task (~${estTokens} tokens)`,
+          suggestedModel: recommended,
+          originalModel: params.model,
+        };
+      }
     }
 
     // 4. Context Explosion Detector
-    if (workflowRequests.length >= 2) {
+    if (workflowRequests.length >= 2 && params.messages) {
       const initial = workflowRequests[0].estimatedTokens;
       const current = estTokens;
       if (initial > 0 && current >= initial * 3.5) {
-        warnings.push(`Context Explosion: Context grew ${(current / initial).toFixed(1)}x in workflow '${workflowId}' (${initial} -> ${current} estimated tokens). Recommend sliding window.`);
+        decision = {
+          action: "compress",
+          reason: `Context explosion in '${workflowId}' (${initial} -> ${current} est. tokens)`,
+          compressedMessages: compressMessages(params.messages),
+          originalModel: params.model,
+        };
       }
     }
 
-    if (warnings.length > 0) {
-      let mode = this.budgetConfig?.onBudgetExceeded || "warn";
-      if (process.env.AUREX_BLOCK_ON_WASTE === "1") {
-        mode = "throw";
-      }
+    // 5. Semantic loop detection
+    if (loopScore >= 0.8) {
+      decision = {
+        action: "compress",
+        reason: `Semantic loop detected (score ${loopScore.toFixed(2)})`,
+        loopScore,
+        injectSystemInstruction:
+          "You appear to be repeating yourself. Summarize your current state and try a different approach.",
+        compressedMessages: params.messages ? compressMessages(params.messages) : undefined,
+        originalModel: params.model,
+      };
+    }
 
-      for (const msg of warnings) {
-        const fullMsg = `[Aurex SDK Real-Time Guard] ${msg}`;
-        if (mode === "throw") {
-          throw new Error(fullMsg);
-        } else {
-          console.warn(fullMsg);
-        }
+    if (retryCount >= 3 && (loopScore >= 0.7 || decision.action !== "proceed")) {
+      void this.maybeEscalate(workflowId, this.sessionCosts[workflowId] || 0, retryCount, loopScore, decision.reason);
+    }
+
+    if (decision.action !== "proceed") {
+      const mode = process.env.AUREX_BLOCK_ON_WASTE === "1" ? "throw" : (this.budgetConfig?.onBudgetExceeded || "warn");
+      const msg = `[Aurex SDK] ${decision.action}: ${decision.reason}`;
+      if (mode === "throw" && decision.action === "block") {
+        throw new Error(msg);
+      } else if (mode !== "throw") {
+        console.warn(msg);
       }
     }
+
+    return decision;
+  }
+
+  private computeSemanticLoopScore(workflowId: string, promptText: string): number {
+    const recent = this.recentResponses
+      .filter((r) => r.workflowId === workflowId && r.responseText)
+      .slice(-5);
+    if (recent.length < 2 || !promptText) return 0;
+    const scores = recent.map((r) => jaccardNGramSimilarity(promptText, r.responseText || ""));
+    const high = scores.filter((s) => s >= 0.8);
+    return high.length >= 2 ? Math.max(...scores) : 0;
+  }
+
+  public recordResponse(workflowId: string, response?: string): void {
+    if (!response) return;
+    this.recentResponses.push({
+      workflowId,
+      responseHash: this.hashText(response),
+      responseText: response.slice(0, 2000),
+      timestamp: Date.now(),
+    });
+    if (this.recentResponses.length > 100) this.recentResponses.shift();
+  }
+
+  private async maybeEscalate(
+    workflowId: string,
+    costSoFar: number,
+    retryCount: number,
+    loopScore: number,
+    reason: string,
+  ): Promise<void> {
+    if (!this.config.apiKey || this.config.localOnly) return;
+    const base = (this.config.baseUrl || process.env.AUREX_BASE_URL || "http://localhost:8000/api/v1").replace(/\/$/, "");
+    try {
+      await fetch(`${base}/escalations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify({
+          workflow_id: workflowId,
+          cost_so_far: costSoFar,
+          retry_count: retryCount,
+          loop_score: loopScore,
+          reason,
+        }),
+      });
+    } catch {
+      /* fail silently */
+    }
+  }
+
+  public wrap<T extends Record<string, any>>(
+    callFn: (params: T) => Promise<any>,
+    buildParams: () => T,
+  ): Promise<any> {
+    const raw = buildParams();
+    const model = (raw as any).model || "unknown";
+    const messages = (raw as any).messages;
+    let systemPrompt = "";
+    let userPrompt = "";
+    if (Array.isArray(messages)) {
+      for (const m of messages) {
+        if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
+        if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
+      }
+    }
+    const decision = this.preCallCheck({
+      model,
+      prompt: userPrompt,
+      systemPrompt,
+      workflowId: (raw as any).metadata?.workflow_id || (raw as any).user,
+      messages,
+    });
+    const params = applyDecisionToCallParams(raw, decision);
+    return callFn(params).then((resp) => {
+      const text =
+        resp?.choices?.[0]?.message?.content ||
+        resp?.content?.[0]?.text ||
+        (typeof resp?.output === "string" ? resp.output : undefined);
+      this.recordResponse(
+        (raw as any).metadata?.workflow_id || process.env.AUREX_WORKFLOW_ID || "default_workflow",
+        text,
+      );
+      return resp;
+    });
   }
 
   private checkBudget(newEventCost: number, inputTokens: number, workflowId?: string): void {
@@ -638,13 +815,14 @@ export class AurexAuditor {
           if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
           else if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
         }
-        self.preCallCheck({
+        const decision = self.preCallCheck({
           model: params.model || "unknown",
           prompt: userPrompt,
           systemPrompt,
           workflowId: params.user || params.metadata?.workflow_id,
           messages,
         });
+        args[0] = applyDecisionToCallParams(params, decision);
       } catch (err: any) {
         if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
           throw err;
@@ -653,6 +831,10 @@ export class AurexAuditor {
       }
 
       const resp = await original(...args);
+      try {
+        const content = resp?.choices?.[0]?.message?.content;
+        self.recordResponse(params.user || params.metadata?.workflow_id || "default_workflow", content);
+      } catch {}
       try {
         const usage = resp?.usage || {};
         self.logEvent({
@@ -712,13 +894,14 @@ export class AurexAuditor {
                 break;
               }
             }
-            self.preCallCheck({
+            const decision = self.preCallCheck({
               model: params.model || "unknown",
               prompt: userPrompt,
               systemPrompt,
               workflowId: params.metadata?.workflow_id || params.user,
               messages,
             });
+            args[0] = applyDecisionToCallParams(params, decision);
           } catch (err: any) {
             if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
               throw err;
@@ -727,6 +910,10 @@ export class AurexAuditor {
           }
 
           const resp = await origCreate(...args);
+          try {
+            const text = resp?.content?.[0]?.text;
+            self.recordResponse(params.metadata?.workflow_id || params.user || "default_workflow", text);
+          } catch {}
           try {
             const usage = resp?.usage || {};
             self.logEvent({
@@ -783,13 +970,14 @@ export class AurexAuditor {
                 userPrompt = m.content;
               }
             }
-            self.preCallCheck({
+            const decision = self.preCallCheck({
               model: params.model || "unknown",
               prompt: userPrompt,
               systemPrompt,
               workflowId: params.user || params.metadata?.workflow_id,
               messages,
             });
+            args[0] = applyDecisionToCallParams(params, decision);
           } catch (err: any) {
             if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
               throw err;
@@ -799,6 +987,10 @@ export class AurexAuditor {
 
           const resp = await origCreate(...args);
           try {
+            self.recordResponse(
+              params.user || params.metadata?.workflow_id || "default_workflow",
+              resp?.choices?.[0]?.message?.content,
+            );
             const usage = resp?.usage || {};
             self.logEvent({
               model: params.model || "unknown",
@@ -833,3 +1025,6 @@ export class AurexAuditor {
     this.patchOpenAI();
   }
 }
+
+export type { AurexDecision, AurexAction } from "./decisions";
+export { applyDecisionToCallParams, suggestCheaperModel } from "./decisions";

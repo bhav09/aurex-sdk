@@ -1,0 +1,13 @@
+name: Aurex CI
+description: Run Aurex waste scan on PR (warn-first by default)
+inputs:
+  mode:
+    description: warn or block
+    required: false
+    default: warn
+runs:
+  using: composite
+  steps:
+    - name: Run Aurex CI
+      shell: bash
+      run: npx aurex ci --mode=${{ inputs.mode }} --github-comment
