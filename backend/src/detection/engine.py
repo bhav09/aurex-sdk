@@ -160,10 +160,18 @@ class EnhancedIssue:
 class EnhancedDetectionEngine:
     """Production-grade detection engine with executive insights (Async)"""
     
-    def __init__(self, db, session_id: Optional[str] = None, email: Optional[str] = None, config: Optional[DetectionConfig] = None):
+    def __init__(
+        self,
+        db,
+        session_id: Optional[str] = None,
+        email: Optional[str] = None,
+        project_id: Optional[str] = None,
+        config: Optional[DetectionConfig] = None,
+    ):
         self.db = db
         self.session_id = session_id
         self.email = email
+        self.project_id = project_id
         self.config = config or DetectionConfig()
         self.issues: List[EnhancedIssue] = []
         self.workflow_analyses: Dict[str, WorkflowAnalysis] = {}
@@ -209,7 +217,9 @@ class EnhancedDetectionEngine:
                 norm_key = normalize_model_name(override.model_name)
                 self.pricing_overrides[norm_key] = (override.input_price_per_1m, override.output_price_per_1m)
 
-        if self.session_id:
+        if self.project_id:
+            query = select(LLMEvent).where(LLMEvent.project_id == self.project_id)
+        elif self.session_id:
             query = select(LLMEvent).where(LLMEvent.upload_session_id == self.session_id)
         elif self.email:
             from src.models import AuditSession

@@ -141,3 +141,71 @@ async def send_slack_alert(
     except Exception as e:
         logger.error(f"Failed to send Slack alert: {e}")
         return False
+
+
+async def send_escalation(
+    webhook_url: str,
+    workflow_id: str,
+    cost_so_far: float,
+    retry_count: int,
+    project_id: str,
+    loop_score: Optional[float] = None,
+    reason: Optional[str] = None,
+) -> bool:
+    """Slack interactive-style escalation for runaway agent workflows."""
+    if not webhook_url:
+        return False
+    loop_txt = f"{loop_score:.2f}" if loop_score is not None else "n/a"
+    payload = {
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Aurex: Workflow escalation",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Workflow:*\n`{workflow_id}`"},
+                    {"type": "mrkdwn", "text": f"*Project:*\n`{project_id}`"},
+                    {"type": "mrkdwn", "text": f"*Cost so far:*\n${cost_so_far:.4f}"},
+                    {"type": "mrkdwn", "text": f"*Retries:*\n{retry_count}"},
+                    {"type": "mrkdwn", "text": f"*Loop score:*\n{loop_txt}"},
+                ],
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": reason or "Retry threshold exceeded — review before allowing more LLM calls.",
+                },
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Approve retry"},
+                        "style": "primary",
+                        "value": f"approve:{workflow_id}",
+                    },
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Kill workflow"},
+                        "style": "danger",
+                        "value": f"kill:{workflow_id}",
+                    },
+                ],
+            },
+        ]
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(webhook_url, json=payload)
+            return response.status_code < 400
+    except Exception as e:
+        logger.error("Failed to send escalation: %s", e)
+        return False

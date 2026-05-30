@@ -28,6 +28,7 @@ class CostTypeEnum(str, enum.Enum):
     EVAL = "eval"
     RETRY_OVERHEAD = "retry_overhead"
     MEMORY = "memory"
+    OUTCOME_SIGNAL = "outcome_signal"
 
 
 class LLMEvent(Base):

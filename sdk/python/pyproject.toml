@@ -1,27 +1,19 @@
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aurex-sdk"
+name = "aurex-python"
 version = "0.1.0"
-description = "Aurex AI FinOps SDK — zero-code LLM cost auditing."
+description = "Aurex Python SDK — auto-instrument OpenAI, Anthropic, LiteLLM"
 readme = "README.md"
-requires-python = ">=3.9"
-license = { text = "Apache-2.0" }
-authors = [{ name = "Aurex" }]
+requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-openai = ["openai>=1.0"]
-anthropic = ["anthropic>=0.20"]
-google = ["google-generativeai>=0.5"]
-litellm = ["litellm>=1.40"]
-dev = ["pytest>=7.0"]
-
-[project.scripts]
-aurex = "aurex_sdk.cli:run_cli"
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.25.0"]
+litellm = ["litellm>=1.0.0"]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["aurex_sdk*"]
+where = ["src"]
