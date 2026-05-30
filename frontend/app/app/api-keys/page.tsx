@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { aurixAPI, ApiKeyGenerated, ApiKeyMetadata } from "@/lib/api-client";
+import { aurexAPI, ApiKeyGenerated, ApiKeyMetadata } from "@/lib/api-client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,7 @@ export default function ApiKeysPage() {
         setLoading(true);
         setError(null);
         try {
-            const [k, p] = await Promise.all([aurixAPI.listKeysV1(), aurixAPI.listProjects()]);
+            const [k, p] = await Promise.all([aurexAPI.listKeysV1(), aurexAPI.listProjects()]);
             setKeys(k);
             setProjects(p);
             if (p.length > 0 && !projectId) setProjectId(p[0].id);
@@ -92,7 +92,7 @@ export default function ApiKeysPage() {
         if (!name || !projectId) return;
         setCreating(true);
         try {
-            const generated = await aurixAPI.createKeyV1({
+            const generated = await aurexAPI.createKeyV1({
                 name,
                 project_id: projectId,
                 environment,
@@ -113,7 +113,7 @@ export default function ApiKeysPage() {
 
     const onRevoke = async (k: ApiKeyMetadata) => {
         try {
-            await aurixAPI.revokeKeyV1(k.id);
+            await aurexAPI.revokeKeyV1(k.id);
             await loadAll();
         } catch (e: any) {
             setError(e?.message || "Failed to revoke key");
@@ -122,7 +122,7 @@ export default function ApiKeysPage() {
 
     const onRotate = async (k: ApiKeyMetadata) => {
         try {
-            const generated = await aurixAPI.rotateKeyV1(k.id);
+            const generated = await aurexAPI.rotateKeyV1(k.id);
             setReveal(generated);
             setConfirmedSafe(false);
             await loadAll();

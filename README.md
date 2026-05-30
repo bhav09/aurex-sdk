@@ -119,10 +119,10 @@ auditor.patchAll(); // covers LiteLLM, Anthropic, OpenAI
 
 ## Security & Privacy
 
-Aurex is built with a **Zero-PII local-first promise**:
-- Prompts and completions are hashed locally (SHA-256) inside the SDKs before being synced to the cloud.
-- Actual prompt text is never uploaded unless explicitly opted-in, preventing leak of sensitive business metadata or customer PII.
-- Real-time circuit breaking runs entirely in-memory within the host application thread, introducing <1ms of latency overhead.
+Aurex is built with a **local-first control plane**:
+- Local SDK ledger by default. Metadata-only sync by default—prompts never sent unless explicitly opted in.
+- Cloud sync is opt-in and project-scoped. Real-time circuit breaking runs entirely in-memory within the host application thread, introducing <0.1ms of latency overhead.
+- Enterprise-grade audit trail and compliance support for team dashboards and verified savings tracking.
 
 ---
 

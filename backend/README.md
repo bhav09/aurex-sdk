@@ -34,7 +34,7 @@ GET    /api/v1/audit/history/{email}   # View past audits
 
 SQLite by default. Set `DATABASE_URL` for PostgreSQL:
 ```bash
-export DATABASE_URL="postgresql://user:pass@localhost/aurix"
+export DATABASE_URL="postgresql://user:pass@localhost/aurex"
 ```
 
 ## Test with Sample Data

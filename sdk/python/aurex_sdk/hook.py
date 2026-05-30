@@ -28,7 +28,7 @@ def _activate() -> None:
         auditor = AurexAuditor(
             AurexConfig(
                 api_key=api_key,
-                project=os.environ.get("AUREX_WORKFLOW_ID") or os.environ.get("AUREX_PROJECT", "default"),
+                project=os.environ.get("AUREX_WORKFLOW_ID", "default"),
                 cloud_sync=True,
                 local_only=False,
                 base_url=os.environ.get("AUREX_BASE_URL"),

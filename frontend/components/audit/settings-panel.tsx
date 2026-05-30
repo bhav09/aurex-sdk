@@ -25,7 +25,7 @@ import {
     TableHeader,
     TableRow
 } from "@/components/ui/table";
-import { aurixAPI } from "@/lib/api-client";
+import { aurexAPI } from "@/lib/api-client";
 
 interface PricingOverride {
     id: string;
@@ -58,7 +58,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
         setLoading(true);
         setError(null);
         try {
-            const data = await aurixAPI.getPricingOverrides(companyName);
+            const data = await aurexAPI.getPricingOverrides(companyName);
             setOverrides(data);
         } catch (err: any) {
             console.error("Error fetching overrides:", err);
@@ -71,7 +71,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
     const fetchKeys = async () => {
         setKeyLoading(true);
         try {
-            const data = await aurixAPI.listApiKeys();
+            const data = await aurexAPI.listApiKeys();
             setKeys(data);
         } catch (err: any) {
             console.error("Error listing keys:", err);
@@ -85,7 +85,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
         if (!newKeyName.trim()) return;
         setKeyLoading(true);
         try {
-            const res = await aurixAPI.generateApiKey(newKeyName.trim(), companyName);
+            const res = await aurexAPI.generateApiKey(newKeyName.trim(), companyName);
             setGeneratedKey(res.key);
             setNewKeyName("");
             await fetchKeys();
@@ -102,7 +102,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
         }
         setKeyLoading(true);
         try {
-            await aurixAPI.revokeApiKey(id);
+            await aurexAPI.revokeApiKey(id);
             await fetchKeys();
         } catch (err: any) {
             alert(err.message || "Failed to revoke API Key");
@@ -144,7 +144,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
         setSuccess(null);
 
         try {
-            const res = await aurixAPI.uploadPricingOverrides(file, companyName);
+            const res = await aurexAPI.uploadPricingOverrides(file, companyName);
             setSuccess(`Successfully uploaded custom pricing! Loaded ${res.overrides_added} model overrides.`);
             await fetchOverrides();
             onRefreshAnalysis();
@@ -194,7 +194,7 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
             const emptyBlob = new Blob([JSON.stringify({})], { type: "application/json" });
             const file = new File([emptyBlob], "clear.json", { type: "application/json" });
 
-            await aurixAPI.uploadPricingOverrides(file, companyName);
+            await aurexAPI.uploadPricingOverrides(file, companyName);
             setSuccess("All custom pricing overrides cleared successfully.");
             await fetchOverrides();
             onRefreshAnalysis();

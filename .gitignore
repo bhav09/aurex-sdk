@@ -6,7 +6,9 @@ venv/
 .cursor/
 .venv/
 sample_data/
-aurix.db
+aurex.db
+*.pyc
+__pycache__/
 
 # Google service accounts
 aurex-*.json

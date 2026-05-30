@@ -5,7 +5,7 @@ import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { aurixAPI } from "@/lib/api-client";
+import { aurexAPI } from "@/lib/api-client";
 import { DataExportGuide } from "@/components/audit/data-export-guide";
 
 interface UploadZoneProps {
@@ -45,7 +45,7 @@ export function UploadZone({
     useEffect(() => {
         setIsMounted(true);
         if (!initialUserInfo) {
-            const userInfo = aurixAPI.getUserInfo();
+            const userInfo = aurexAPI.getUserInfo();
             if (userInfo) {
                 setUserName(userInfo.user_name);
                 setEmail(userInfo.email);
@@ -153,8 +153,8 @@ export function UploadZone({
             return;
         }
 
-        const storedUserInfo = aurixAPI.getUserInfo();
-        if (aurixAPI.hasActiveSession() && storedUserInfo) {
+        const storedUserInfo = aurexAPI.getUserInfo();
+        if (aurexAPI.hasActiveSession() && storedUserInfo) {
             onFileSelect(selectedFile, storedUserInfo);
             setSelectedFile(null);
             setIsOtpStep(false);
@@ -170,8 +170,8 @@ export function UploadZone({
         try {
             setOtpLoading(true);
             setError(null);
-            aurixAPI.trackClick("upload_and_analyze_click", email || undefined);
-            await aurixAPI.requestOTP(email);
+            aurexAPI.trackClick("upload_and_analyze_click", email || undefined);
+            await aurexAPI.requestOTP(email);
             setIsOtpStep(true);
         } catch (err: any) {
             setError(err.message || "Failed to send verification code. Please try again.");
@@ -191,8 +191,8 @@ export function UploadZone({
         try {
             setOtpLoading(true);
             setOtpError(null);
-            await aurixAPI.verifyOTP(email, otp);
-            aurixAPI.trackClick("verify_and_analyze_click", email || undefined);
+            await aurexAPI.verifyOTP(email, otp);
+            aurexAPI.trackClick("verify_and_analyze_click", email || undefined);
             // OTP verified! Proceed with upload
             onFileSelect(selectedFile!, {
                 user_name: userName,
@@ -262,14 +262,14 @@ export function UploadZone({
                     client_id: googleClientId,
                     callback: async (response: { credential: string }) => {
                         try {
-                            const data = await aurixAPI.loginWithGoogle(response.credential);
+                            const data = await aurexAPI.loginWithGoogle(response.credential);
                             
                             const userInfo = data.user_info;
                             setUserName(userInfo.user_name);
                             setEmail(userInfo.email);
                             setCompanyName(userInfo.company_name || '');
                             
-                            aurixAPI.trackClick("google_oauth_click", userInfo.email);
+                            aurexAPI.trackClick("google_oauth_click", userInfo.email);
                             
                             if (selectedFile) {
                                 onFileSelect(selectedFile, {
@@ -393,20 +393,20 @@ export function UploadZone({
                 <h3 className="text-lg font-semibold text-foreground">File Upload</h3>
 
                 {/* User Information Fields or Active Session badge */}
-                {isMounted && aurixAPI.hasActiveSession() && aurixAPI.getUserInfo() ? (
+                {isMounted && aurexAPI.hasActiveSession() && aurexAPI.getUserInfo() ? (
                     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 mt-4 flex items-center justify-between">
                         <div>
                             <p className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">AUDIT SESSION ACTIVE</p>
-                            <p className="text-sm font-semibold text-white mt-1">{aurixAPI.getUserInfo()?.user_name} · {aurixAPI.getUserInfo()?.company_name}</p>
-                            <p className="text-xs text-white/50">{aurixAPI.getUserInfo()?.email}</p>
+                            <p className="text-sm font-semibold text-white mt-1">{aurexAPI.getUserInfo()?.user_name} · {aurexAPI.getUserInfo()?.company_name}</p>
+                            <p className="text-xs text-white/50">{aurexAPI.getUserInfo()?.email}</p>
                         </div>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                aurixAPI.trackClick("change_user_click", aurixAPI.getUserInfo()?.email || undefined);
-                                aurixAPI.clearSession();
+                                aurexAPI.trackClick("change_user_click", aurexAPI.getUserInfo()?.email || undefined);
+                                aurexAPI.clearSession();
                                 setUserName("");
                                 setEmail("");
                                 setCompanyName("");

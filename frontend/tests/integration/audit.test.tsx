@@ -5,7 +5,7 @@ import * as React from 'react';
 
 // Mock the API client
 vi.mock('../../lib/api-client', () => ({
-  aurixAPI: {
+  aurexAPI: {
     uploadCSVWithUserInfo: vi.fn().mockResolvedValue({
       session: { id: 'session_123' },
       upload_result: { status: 'success' }

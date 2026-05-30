@@ -2,5 +2,5 @@
 .gitignore
 .venv/
 __pycache__/
-aurix.db
+aurex.db
 *.pyc
