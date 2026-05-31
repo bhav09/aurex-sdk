@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function BookPage() {
     return (
-        <div className="min-h-screen bg-[oklch(0.09_0.01_260)] text-white">
+        <div className="min-h-screen bg-background text-white">
             <Navigation />
 
             <main className="relative pt-32 pb-24 overflow-hidden">

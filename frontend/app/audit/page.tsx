@@ -77,7 +77,7 @@ function PromptDiffPanel({ event, issue }: { event: LLMEvent; issue: Issue | und
         : "Route this workload to a smaller model when token count is low; cache static system text; dedupe repeated prefixes.";
 
     return (
-        <div className="grid gap-4 border-t border-[#2a2a2a] bg-[#111111] p-5 md:grid-cols-2">
+        <div className="grid gap-4 border-t border-[#36363c] bg-[#18181c] p-5 md:grid-cols-2">
             <div className="rounded-lg border border-red-500/20 bg-red-950/10 overflow-hidden">
                 <div className="flex items-center justify-between bg-red-500/10 px-3 py-2 border-b border-red-500/20">
                     <span className="text-[10px] font-mono font-semibold tracking-wider text-red-400 uppercase">Current Input</span>
@@ -125,18 +125,18 @@ function SDKFooter() {
         setTimeout(() => setCopied(false), 2000);
     };
     return (
-        <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="rounded-xl border border-[#36363c] bg-[#222228] p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
                 <p className="text-[11px] text-[#888] mb-2">Connect SDK to get live data from your production environment</p>
-                <div className="flex items-center gap-2 bg-[#111] border border-[#2a2a2a] rounded-lg px-3 py-2">
-                    <SquareTerminal className="h-3.5 w-3.5 text-[#555] shrink-0" />
+                <div className="flex items-center gap-2 bg-[#18181c] border border-[#36363c] rounded-lg px-3 py-2">
+                    <SquareTerminal className="h-3.5 w-3.5 text-[#65656d] shrink-0" />
                     <code className="text-[11px] font-mono text-[#ccc] truncate">{snippet}</code>
-                    <button onClick={copy} className="ml-auto shrink-0 text-[#555] hover:text-[#aaa] transition-colors">
+                    <button onClick={copy} className="ml-auto shrink-0 text-[#65656d] hover:text-[#aaa] transition-colors">
                         {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                     </button>
                 </div>
             </div>
-            <Button className="shrink-0 bg-[#2a2a2a] hover:bg-[#333] text-white border border-[#3a3a3a] text-[11px] font-medium px-4 h-9 rounded-lg">
+            <Button className="shrink-0 bg-[#36363c] hover:bg-[#404048] text-white border border-[#46464e] text-[11px] font-medium px-4 h-9 rounded-lg">
                 Connect SDK
             </Button>
         </div>
@@ -223,11 +223,11 @@ function OverviewTab({
             {/* KPI Strip */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {kpis.map(kpi => (
-                    <div key={kpi.label} className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+                    <div key={kpi.label} className="rounded-xl border border-[#36363c] bg-[#222228] p-5">
                         <p className="text-[11px] font-mono font-semibold uppercase tracking-[0.12em] text-[#666]">{kpi.label}</p>
                         <div className="flex items-baseline gap-1.5 mt-2.5">
                             <p className={`text-3xl font-display font-bold tabular-nums leading-none ${kpi.valueColor}`}>{kpi.value}</p>
-                            {kpi.valueSuffix && <span className="text-base font-mono text-[#555]">{kpi.valueSuffix}</span>}
+                            {kpi.valueSuffix && <span className="text-base font-mono text-[#65656d]">{kpi.valueSuffix}</span>}
                         </div>
                         <div className="flex items-center gap-2 mt-2.5">
                             {kpi.delta && (
@@ -235,7 +235,7 @@ function OverviewTab({
                                     {kpi.delta}
                                 </span>
                             )}
-                            <span className="text-[12px] text-[#555]">{kpi.sub}</span>
+                            <span className="text-[12px] text-[#65656d]">{kpi.sub}</span>
                         </div>
                     </div>
                 ))}
@@ -258,10 +258,10 @@ function OverviewTab({
             {/* Two-Column Body */}
             <div className="grid gap-4 lg:grid-cols-5">
                 {/* Left: Top Inefficiencies */}
-                <div className="lg:col-span-3 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2a2a2a]">
+                <div className="lg:col-span-3 rounded-xl border border-[#36363c] bg-[#222228] overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#36363c]">
                         <div className="flex items-center gap-2.5">
-                            <div className="h-4 w-4 rounded border border-[#444] bg-[#2a2a2a]" />
+                            <div className="h-4 w-4 rounded border border-[#52525a] bg-[#36363c]" />
                             <span className="text-[14px] font-semibold text-white">Top inefficiencies</span>
                         </div>
                         <button
@@ -272,7 +272,7 @@ function OverviewTab({
                             View all <ExternalLink className="h-3.5 w-3.5" />
                         </button>
                     </div>
-                    <div className="divide-y divide-[#222]">
+                    <div className="divide-y divide-[#2e2e34]">
                         {data.top_issues.slice(0, 4).map(issue => {
                             const sev = issue.severity.toLowerCase();
                             const sevClass = sev === "critical"
@@ -287,9 +287,9 @@ function OverviewTab({
                                     key={issue.rank}
                                     type="button"
                                     onClick={() => onViewInData(issue)}
-                                    className="w-full flex items-start gap-4 px-5 py-4 text-left hover:bg-[#202020] transition-colors group"
+                                    className="w-full flex items-start gap-4 px-5 py-4 text-left hover:bg-[#2a2a30] transition-colors group"
                                 >
-                                    <span className="text-[11px] font-mono text-[#555] pt-0.5 w-6 shrink-0">#{issue.rank}</span>
+                                    <span className="text-[11px] font-mono text-[#65656d] pt-0.5 w-6 shrink-0">#{issue.rank}</span>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[13px] font-semibold text-[#e0e0e0] group-hover:text-white transition-colors leading-tight">
                                             {issue.title}
@@ -303,7 +303,7 @@ function OverviewTab({
                                             {sev}
                                         </span>
                                         <span className="text-[12px] font-mono font-bold text-red-400">
-                                            −${issue.weekly_cost.toFixed(2)}<span className="text-[#555] font-normal">/wk</span>
+                                            −${issue.weekly_cost.toFixed(2)}<span className="text-[#65656d] font-normal">/wk</span>
                                         </span>
                                     </div>
                                 </button>
@@ -315,9 +315,9 @@ function OverviewTab({
                 {/* Right: Model Breakdown + Cost per Outcome */}
                 <div className="lg:col-span-2 space-y-4">
                     {/* Model Breakdown */}
-                    <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+                    <div className="rounded-xl border border-[#36363c] bg-[#222228] p-5">
                         <div className="flex items-center gap-2.5 mb-4">
-                            <div className="h-4 w-4 rounded border border-[#444] bg-[#2a2a2a]" />
+                            <div className="h-4 w-4 rounded border border-[#52525a] bg-[#36363c]" />
                             <span className="text-[14px] font-semibold text-white">Model breakdown</span>
                         </div>
                         <div className="space-y-3.5">
@@ -329,7 +329,7 @@ function OverviewTab({
                                         <div className="w-20 shrink-0">
                                             <p className="text-[12px] font-mono text-[#ccc] truncate">{model}</p>
                                         </div>
-                                        <div className="flex-1 h-1.5 rounded-full bg-[#2a2a2a] overflow-hidden">
+                                        <div className="flex-1 h-1.5 rounded-full bg-[#36363c] overflow-hidden">
                                             <div
                                                 className="h-full rounded-full bg-[#888]"
                                                 style={{ width: barWidth }}
@@ -337,40 +337,40 @@ function OverviewTab({
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-[12px] font-mono text-[#ccc]">${stats.cost.toFixed(2)}</span>
-                                            <span className="text-[11px] text-[#555] w-8 text-right">{pct}%</span>
+                                            <span className="text-[11px] text-[#65656d] w-8 text-right">{pct}%</span>
                                         </div>
                                     </div>
                                 );
                             }) : (
-                                <p className="text-[12px] text-[#555] font-mono">No model data available</p>
+                                <p className="text-[12px] text-[#65656d] font-mono">No model data available</p>
                             )}
                         </div>
                     </div>
 
                     {/* Cost per Outcome */}
-                    <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+                    <div className="rounded-xl border border-[#36363c] bg-[#222228] p-5">
                         <span className="text-[14px] font-semibold text-white block mb-4">Cost per outcome</span>
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-lg border border-[#2a2a2a] bg-[#141414] p-3.5">
-                                <p className="text-[11px] font-mono text-[#555] uppercase tracking-wider">Current</p>
+                            <div className="rounded-lg border border-[#36363c] bg-[#1c1c22] p-3.5">
+                                <p className="text-[11px] font-mono text-[#65656d] uppercase tracking-wider">Current</p>
                                 <p className="text-xl font-display font-bold text-white mt-1.5 tabular-nums">
                                     ${data.executive_summary.cost_per_outcome_current?.toFixed(2) ?? (data.executive_summary.current_period_spend / Math.max(1, data.total_events)).toFixed(2)}
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-[#2a2a2a] bg-[#141414] p-3.5">
-                                <p className="text-[11px] font-mono text-[#555] uppercase tracking-wider">Optimized</p>
+                            <div className="rounded-lg border border-[#36363c] bg-[#1c1c22] p-3.5">
+                                <p className="text-[11px] font-mono text-[#65656d] uppercase tracking-wider">Optimized</p>
                                 <p className="text-xl font-display font-bold text-emerald-400 mt-1.5 tabular-nums">
                                     ${data.executive_summary.cost_per_outcome_optimized?.toFixed(2) ?? (data.executive_summary.optimized_spend / Math.max(1, data.total_events)).toFixed(2)}
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-[#2a2a2a] bg-[#141414] p-3.5">
-                                <p className="text-[11px] font-mono text-[#555] uppercase tracking-wider">Waste Rate</p>
+                            <div className="rounded-lg border border-[#36363c] bg-[#1c1c22] p-3.5">
+                                <p className="text-[11px] font-mono text-[#65656d] uppercase tracking-wider">Waste Rate</p>
                                 <p className="text-xl font-display font-bold text-white mt-1.5 tabular-nums">
                                     {(100 - data.executive_summary.waste_percentage).toFixed(0)}%
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-[#2a2a2a] bg-[#141414] p-3.5">
-                                <p className="text-[11px] font-mono text-[#555] uppercase tracking-wider">Workflows</p>
+                            <div className="rounded-lg border border-[#36363c] bg-[#1c1c22] p-3.5">
+                                <p className="text-[11px] font-mono text-[#65656d] uppercase tracking-wider">Workflows</p>
                                 <p className="text-xl font-display font-bold text-amber-400 mt-1.5 tabular-nums">
                                     {data.workflow_breakdown.length}
                                 </p>
@@ -381,10 +381,10 @@ function OverviewTab({
             </div>
 
             {/* Workflow Spend Table */}
-            <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2a2a2a]">
+            <div className="rounded-xl border border-[#36363c] bg-[#222228] overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#36363c]">
                     <div className="flex items-center gap-2.5">
-                        <div className="h-4 w-4 rounded border border-[#444] bg-[#2a2a2a]" />
+                        <div className="h-4 w-4 rounded border border-[#52525a] bg-[#36363c]" />
                         <span className="text-[14px] font-semibold text-white">
                             Workflow spend · {data.executive_summary.period_days}d
                         </span>
@@ -393,7 +393,7 @@ function OverviewTab({
                         Export <ExternalLink className="h-3.5 w-3.5" />
                     </button>
                 </div>
-                <div className="divide-y divide-[#222]">
+                <div className="divide-y divide-[#2e2e34]">
                     {data.workflow_breakdown.slice(0, 6).map(wf => {
                         const status = getWorkflowStatus(wf.workflow_id);
                         const displayName = wf.workflow_id === "unknown"
@@ -402,7 +402,7 @@ function OverviewTab({
                                 ? "Inferred Session"
                                 : wf.workflow_id;
                         return (
-                            <div key={wf.workflow_id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#202020] transition-colors">
+                            <div key={wf.workflow_id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#2a2a30] transition-colors">
                                 <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${status.dot}`} />
                                 <span className="text-[13px] font-mono text-[#ccc] flex-1 truncate min-w-0">{displayName}</span>
                                 <span className="text-[12px] text-[#666] shrink-0">{wf.request_count.toLocaleString()} calls</span>
@@ -651,7 +651,7 @@ export default function AuditPage() {
             HIGH: "bg-orange-500/15 text-orange-400 border-orange-500/20",
             CRITICAL: "bg-red-500/15 text-red-400 border-red-500/20",
         };
-        return m[severity] || "bg-[#333] text-[#aaa] border-[#444]";
+        return m[severity] || "bg-[#404048] text-[#aaa] border-[#52525a]";
     };
 
     const getIssueForWorkflow = (wfId: string) => data?.top_issues.find(i => i.affected_workflow === wfId);
@@ -698,7 +698,7 @@ export default function AuditPage() {
     if (!data && !analyzing) {
         if (isReportView) {
             return (
-                <div className="min-h-screen bg-[#111111] flex items-center justify-center p-8 text-white">
+                <div className="min-h-screen bg-[#18181c] flex items-center justify-center p-8 text-white">
                     <div className="w-full max-w-md space-y-4">
                         {error ? (
                             <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-6 space-y-4 text-center">
@@ -728,17 +728,17 @@ export default function AuditPage() {
         }
 
         return (
-            <div className="min-h-screen bg-[#111111] flex flex-col">
+            <div className="min-h-screen bg-[#18181c] flex flex-col">
                 {/* Top bar */}
-                <div className="h-12 border-b border-[#222] bg-[#111] flex items-center px-5 gap-4 shrink-0">
+                <div className="h-12 border-b border-[#2e2e34] bg-[#18181c] flex items-center px-5 gap-4 shrink-0">
                     <span className="font-display font-bold text-sm tracking-wider text-white">AUREX</span>
-                    <span className="text-[#444] text-sm">|</span>
+                    <span className="text-[#52525a] text-sm">|</span>
                     <span className="text-[11px] text-[#666]">LLM Audit · Cost Intelligence</span>
                     <div className="ml-auto flex items-center gap-3">
                         <span className="flex items-center gap-1.5 text-[10px] font-mono text-[#888]">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
                         </span>
-                        <span className="text-[10px] font-mono text-[#555]">
+                        <span className="text-[10px] font-mono text-[#65656d]">
                             {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                         </span>
                     </div>
@@ -752,7 +752,7 @@ export default function AuditPage() {
                                 <div>
                                     <p className="text-[12px] font-semibold text-red-300">Analysis failed</p>
                                     <p className="text-[11px] text-red-400/80 mt-1">{error}</p>
-                                    <button onClick={resetAudit} className="mt-3 text-[11px] text-white/60 hover:text-white border border-[#333] rounded-lg px-3 py-1.5 transition-colors">Try again</button>
+                                    <button onClick={resetAudit} className="mt-3 text-[11px] text-white/60 hover:text-white border border-[#404048] rounded-lg px-3 py-1.5 transition-colors">Try again</button>
                                 </div>
                             </div>
                         )}
@@ -772,8 +772,8 @@ export default function AuditPage() {
 
     if (analyzing) {
         return (
-            <div className="min-h-screen bg-[#111111] flex items-center justify-center">
-                <div className="w-full max-w-lg rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] p-8 space-y-6">
+            <div className="min-h-screen bg-[#18181c] flex items-center justify-center">
+                <div className="w-full max-w-lg rounded-2xl border border-[#36363c] bg-[#222228] p-8 space-y-6">
                     <div className="text-center">
                         <div className="mx-auto h-14 w-14 rounded-full border border-violet-500/30 bg-violet-500/10 flex items-center justify-center mb-4">
                             <Zap className="h-7 w-7 text-violet-400 animate-pulse" />
@@ -781,7 +781,7 @@ export default function AuditPage() {
                         <h2 className="font-display text-lg font-bold text-white">Analyzing your file</h2>
                         <p className="text-[12px] text-[#666] mt-1">{Math.round(progress)}% complete</p>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-[#2a2a2a]">
+                    <div className="h-1.5 w-full rounded-full bg-[#36363c]">
                         <div className="h-1.5 rounded-full bg-violet-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                     </div>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -795,7 +795,7 @@ export default function AuditPage() {
                             </div>
                         ))}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-[#555] border-t border-[#222] pt-4">
+                    <div className="flex items-center gap-2 text-[10px] text-[#65656d] border-t border-[#2e2e34] pt-4">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         <span>Runs via your API — nothing leaves your machine in dev.</span>
                     </div>
@@ -809,20 +809,20 @@ export default function AuditPage() {
     // ─── Main Dashboard Layout ───────────────────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-[#111111] text-white flex flex-col">
+        <div className="min-h-screen bg-[#18181c] text-white flex flex-col">
             {/* ── Top Header Bar ──────────────────────────────────────────── */}
-            <header className="h-14 border-b border-[#222] bg-[#111] flex items-center px-6 gap-5 shrink-0 z-30">
+            <header className="h-14 border-b border-[#2e2e34] bg-[#18181c] flex items-center px-6 gap-5 shrink-0 z-30">
                 <button onClick={() => router.push('/')} className="font-display font-bold text-base tracking-wider text-white hover:text-[#aaa] transition-colors cursor-pointer">AUREX</button>
-                <span className="text-[#333] text-sm">|</span>
-                <span className="text-[12px] text-[#555]">LLM Audit · Cost Intelligence</span>
+                <span className="text-[#404048] text-sm">|</span>
+                <span className="text-[12px] text-[#65656d]">LLM Audit · Cost Intelligence</span>
                 <div className="ml-auto flex items-center gap-4">
                     <span className="flex items-center gap-2 text-[11px] font-mono text-[#888]">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
                     </span>
-                    <span className="text-[11px] font-mono text-[#555] hidden sm:block">
+                    <span className="text-[11px] font-mono text-[#65656d] hidden sm:block">
                         {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                     </span>
-                    <a href="/docs" className="h-8 bg-[#1e1e1e] hover:bg-[#2a2a2a] text-white border border-[#333] text-[12px] font-medium px-4 rounded-md flex items-center gap-2 no-underline">
+                    <a href="/docs" className="h-8 bg-[#28282e] hover:bg-[#36363c] text-white border border-[#404048] text-[12px] font-medium px-4 rounded-md flex items-center gap-2 no-underline">
                         <ExternalLink className="h-3.5 w-3.5" /> Connect SDK
                     </a>
                 </div>
@@ -830,11 +830,11 @@ export default function AuditPage() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* ── Left Sidebar ─────────────────────────────────────────── */}
-                <aside className="w-56 shrink-0 border-r border-[#1e1e1e] bg-[#111] flex flex-col overflow-y-auto">
+                <aside className="w-56 shrink-0 border-r border-[#28282e] bg-[#18181c] flex flex-col overflow-y-auto">
                     <nav className="flex-1 py-5 space-y-6">
                         {NAV_GROUPS.map(group => (
                             <div key={group.label}>
-                                <p className="px-4 mb-2 text-[10px] font-mono font-semibold tracking-[0.15em] text-[#444] uppercase">
+                                <p className="px-4 mb-2 text-[10px] font-mono font-semibold tracking-[0.15em] text-[#52525a] uppercase">
                                     {group.label}
                                 </p>
                                 <div className="space-y-0.5">
@@ -848,12 +848,12 @@ export default function AuditPage() {
                                                 onClick={() => setActiveTab(item.id)}
                                                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors text-[13px] ${
                                                     isActive
-                                                        ? "bg-[#1e1e1e] text-white"
-                                                        : "text-[#666] hover:text-[#aaa] hover:bg-[#181818]"
+                                                        ? "bg-[#28282e] text-white"
+                                                        : "text-[#666] hover:text-[#aaa] hover:bg-[#222228]"
                                                     }`}
                                             >
                                                 <div className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors ${
-                                                    isActive ? "border-[#555] bg-[#333]" : "border-[#333] bg-transparent"
+                                                    isActive ? "border-[#65656d] bg-[#404048]" : "border-[#404048] bg-transparent"
                                                 }`}>
                                                     {isActive && <div className="h-2 w-2 rounded-sm bg-white/80" />}
                                                 </div>
@@ -872,11 +872,11 @@ export default function AuditPage() {
                     </nav>
 
                     {/* Bottom: Reset */}
-                    <div className="border-t border-[#1e1e1e] p-3">
+                    <div className="border-t border-[#28282e] p-3">
                         <button
                             type="button"
                             onClick={() => { aurexAPI.trackClick("analyze_another_file_click", userEmail || undefined); resetAudit(); }}
-                            className="w-full text-[11px] text-[#555] hover:text-[#888] transition-colors py-1.5 text-left px-1"
+                            className="w-full text-[11px] text-[#65656d] hover:text-[#888] transition-colors py-1.5 text-left px-1"
                         >
                             ← New audit
                         </button>
@@ -906,29 +906,29 @@ export default function AuditPage() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h2 className="font-display text-base font-bold text-white">Trace Workspace</h2>
-                                            <p className="text-[11px] text-[#555] font-mono mt-0.5">
+                                            <p className="text-[11px] text-[#65656d] font-mono mt-0.5">
                                                 {loadingEvents ? "Loading..." : `${events.length} spans · ${workflows.length} sessions`}
                                             </p>
                                         </div>
-                                        <button onClick={handleExportCSV} disabled={events.length === 0} className="flex items-center gap-1.5 text-[11px] text-[#666] hover:text-white border border-[#2a2a2a] rounded-lg px-3 py-1.5 transition-all hover:border-[#444] disabled:opacity-40">
+                                        <button onClick={handleExportCSV} disabled={events.length === 0} className="flex items-center gap-1.5 text-[11px] text-[#666] hover:text-white border border-[#36363c] rounded-lg px-3 py-1.5 transition-all hover:border-[#52525a] disabled:opacity-40">
                                             <Download className="h-3.5 w-3.5" /> Export CSV
                                         </button>
                                     </div>
 
                                     {loadingEvents ? (
-                                        <div className="py-16 text-center rounded-xl border border-[#2a2a2a]">
+                                        <div className="py-16 text-center rounded-xl border border-[#36363c]">
                                             <Zap className="mx-auto h-8 w-8 text-violet-400 animate-pulse mb-3" />
-                                            <p className="text-[11px] text-[#555] font-mono">Fetching trace pipelines...</p>
+                                            <p className="text-[11px] text-[#65656d] font-mono">Fetching trace pipelines...</p>
                                         </div>
                                     ) : (
                                         <div className="grid lg:grid-cols-12 gap-4">
                                             {/* Sidebar */}
-                                            <div className="lg:col-span-4 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-3 space-y-3">
-                                                <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-[#555] px-1">Sessions</p>
+                                            <div className="lg:col-span-4 rounded-xl border border-[#36363c] bg-[#222228] p-3 space-y-3">
+                                                <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-[#65656d] px-1">Sessions</p>
                                                 <input
                                                     type="text" placeholder="Filter workflow..."
                                                     value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                                    className="w-full rounded-lg border border-[#2a2a2a] bg-[#111] px-3 py-2 text-[11px] text-white placeholder-[#444] focus:outline-none focus:border-[#444] font-mono transition-colors"
+                                                    className="w-full rounded-lg border border-[#36363c] bg-[#18181c] px-3 py-2 text-[11px] text-white placeholder-[#52525a] focus:outline-none focus:border-[#52525a] font-mono transition-colors"
                                                 />
                                                 <div className="space-y-1 max-h-[560px] overflow-y-auto">
                                                     {workflows.filter(w => w.toLowerCase().includes(searchTerm.toLowerCase())).map(wf => {
@@ -938,11 +938,11 @@ export default function AuditPage() {
                                                         return (
                                                             <button key={wf} type="button"
                                                                 onClick={() => { setSelectedWorkflow(wf); setExpandedEventId(null); }}
-                                                                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2.5 rounded-lg border transition-all text-[11px] ${isActive ? "bg-[#222] border-[#444] text-white" : "bg-transparent border-transparent text-[#666] hover:bg-[#1e1e1e] hover:text-[#aaa]"}`}
+                                                                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2.5 rounded-lg border transition-all text-[11px] ${isActive ? "bg-[#2e2e34] border-[#52525a] text-white" : "bg-transparent border-transparent text-[#666] hover:bg-[#28282e] hover:text-[#aaa]"}`}
                                                             >
                                                                 <div className="min-w-0">
                                                                     <p className="font-mono font-semibold truncate">{wf === "unknown" ? "Unlabeled" : wf}</p>
-                                                                    <p className="text-[9px] text-[#555] mt-0.5">{wb?.request_count ?? 0} spans</p>
+                                                                    <p className="text-[9px] text-[#65656d] mt-0.5">{wb?.request_count ?? 0} spans</p>
                                                                 </div>
                                                                 <div className="shrink-0 text-right">
                                                                     <p className="font-mono font-bold text-emerald-400">${(wb?.total_cost ?? 0).toFixed(3)}</p>
@@ -967,8 +967,8 @@ export default function AuditPage() {
                                                                 { l: "Tokens", v: (wb?.total_tokens ?? 0).toLocaleString(), c: "text-indigo-300" },
                                                                 { l: "Cost / Span", v: `$${(wb?.cost_per_request ?? 0).toFixed(4)}`, c: "text-white" },
                                                             ].map(m => (
-                                                                <div key={m.l} className="rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-3">
-                                                                    <p className="text-[9px] font-mono text-[#555] uppercase tracking-wider">{m.l}</p>
+                                                                <div key={m.l} className="rounded-lg border border-[#36363c] bg-[#222228] p-3">
+                                                                    <p className="text-[9px] font-mono text-[#65656d] uppercase tracking-wider">{m.l}</p>
                                                                     <p className={`text-sm font-mono font-bold mt-1 ${m.c}`}>{m.v}</p>
                                                                 </div>
                                                             ))}
@@ -987,9 +987,9 @@ export default function AuditPage() {
                                                                     <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${getSeverityColor(currentIssue.severity)}`}>{currentIssue.severity}</span>
                                                                 </div>
                                                                 <p className="text-[11px] text-[#888] mt-1.5 leading-relaxed">{currentIssue.one_line_summary}</p>
-                                                                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#333]">
-                                                                    <div><p className="text-[9px] font-mono text-[#555]">Weekly Waste</p><p className="font-mono text-sm font-bold text-red-400">${currentIssue.weekly_cost.toFixed(2)}</p></div>
-                                                                    <div><p className="text-[9px] font-mono text-[#555]">Annual Savings</p><p className="font-mono text-sm font-bold text-emerald-400">${(currentIssue.weekly_cost * 52).toLocaleString()}</p></div>
+                                                                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#404048]">
+                                                                    <div><p className="text-[9px] font-mono text-[#65656d]">Weekly Waste</p><p className="font-mono text-sm font-bold text-red-400">${currentIssue.weekly_cost.toFixed(2)}</p></div>
+                                                                    <div><p className="text-[9px] font-mono text-[#65656d]">Annual Savings</p><p className="font-mono text-sm font-bold text-emerald-400">${(currentIssue.weekly_cost * 52).toLocaleString()}</p></div>
                                                                 </div>
                                                             </div>
                                                             <Button onClick={() => openCopilot(currentIssue)} className="bg-violet-600 hover:bg-violet-500 text-[11px] font-mono shrink-0 h-8 px-3 rounded-lg">
@@ -1000,14 +1000,14 @@ export default function AuditPage() {
                                                 )}
 
                                                 {/* Spans */}
-                                                <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] overflow-hidden">
-                                                    <div className="flex items-center justify-between px-4 py-3 border-b border-[#222]">
+                                                <div className="rounded-xl border border-[#36363c] bg-[#222228] overflow-hidden">
+                                                    <div className="flex items-center justify-between px-4 py-3 border-b border-[#2e2e34]">
                                                         <p className="text-[11px] font-mono font-semibold text-[#666] uppercase tracking-wider flex items-center gap-1.5">
                                                             <Sliders className="h-3.5 w-3.5 text-violet-400/70" /> Execution Spans
                                                         </p>
-                                                        <span className="text-[10px] bg-[#222] border border-[#333] px-2 py-0.5 rounded text-[#666] font-mono">{currentEvents.length} spans</span>
+                                                        <span className="text-[10px] bg-[#2e2e34] border border-[#404048] px-2 py-0.5 rounded text-[#666] font-mono">{currentEvents.length} spans</span>
                                                     </div>
-                                                    <div className="divide-y divide-[#1e1e1e]">
+                                                    <div className="divide-y divide-[#28282e]">
                                                         {paginatedEvents.map((event, idx) => {
                                                             const hasIssue = !!currentIssue;
                                                             const isHighCost = event.cost > 0.01;
@@ -1019,34 +1019,34 @@ export default function AuditPage() {
                                                                 <div key={event.id} className="overflow-hidden">
                                                                     <div
                                                                         onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
-                                                                        className={`flex items-center justify-between p-3 cursor-pointer gap-4 hover:bg-[#1e1e1e] transition-colors ${isExpanded ? "bg-[#1c1c1c]" : ""}`}
+                                                                        className={`flex items-center justify-between p-3 cursor-pointer gap-4 hover:bg-[#28282e] transition-colors ${isExpanded ? "bg-[#26262c]" : ""}`}
                                                                     >
                                                                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                                            <span className="text-[9px] font-mono text-[#444] w-5 text-right shrink-0">{(currentPage - 1) * 25 + idx + 1}</span>
+                                                                            <span className="text-[9px] font-mono text-[#52525a] w-5 text-right shrink-0">{(currentPage - 1) * 25 + idx + 1}</span>
                                                                             <div className="min-w-0 flex-1">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <span className="font-mono text-[11px] font-semibold text-[#ccc]">
                                                                                         {event.provider?.toUpperCase() || "LLM"} Call
                                                                                     </span>
-                                                                                    <span className="text-[9px] font-mono bg-[#222] border border-[#333] px-1.5 py-0.5 rounded text-[#666]">{event.model}</span>
+                                                                                    <span className="text-[9px] font-mono bg-[#2e2e34] border border-[#404048] px-1.5 py-0.5 rounded text-[#666]">{event.model}</span>
                                                                                     {latency > 0 && <span className="text-[10px] font-mono text-violet-400">{latency.toFixed(0)}ms</span>}
                                                                                 </div>
                                                                                 {latency > 0 && (
-                                                                                    <div className="w-32 h-1 rounded-full bg-[#222] mt-1.5 hidden sm:block overflow-hidden">
+                                                                                    <div className="w-32 h-1 rounded-full bg-[#2e2e34] mt-1.5 hidden sm:block overflow-hidden">
                                                                                         <div className="h-full rounded-full bg-violet-500/60" style={{ width: `${barPct}%` }} />
                                                                                     </div>
                                                                                 )}
                                                                             </div>
                                                                         </div>
                                                                         <div className="flex items-center gap-3 shrink-0">
-                                                                            <span className="text-[10px] font-mono text-[#555]">{event.input_tokens}→{event.output_tokens}</span>
+                                                                            <span className="text-[10px] font-mono text-[#65656d]">{event.input_tokens}→{event.output_tokens}</span>
                                                                             <span className="font-mono text-[11px] font-bold text-emerald-400">${event.cost.toFixed(4)}</span>
                                                                             {hasIssue && isHighCost
                                                                                 ? <span className="text-[9px] font-mono bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">waste</span>
                                                                                 : hasIssue ? <span className="text-[9px] font-mono bg-amber-500/15 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">warn</span>
                                                                                     : <span className="text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">ok</span>
                                                                             }
-                                                                            {isExpanded ? <ChevronDown className="h-4 w-4 text-violet-400" /> : <ChevronRight className="h-4 w-4 text-[#444]" />}
+                                                                            {isExpanded ? <ChevronDown className="h-4 w-4 text-violet-400" /> : <ChevronRight className="h-4 w-4 text-[#52525a]" />}
                                                                         </div>
                                                                     </div>
                                                                     {isExpanded && <PromptDiffPanel event={event} issue={currentIssue} />}
@@ -1055,14 +1055,14 @@ export default function AuditPage() {
                                                         })}
                                                     </div>
                                                     {/* Pagination */}
-                                                    <div className="flex items-center justify-between px-4 py-2.5 border-t border-[#222] bg-[#111]">
-                                                        <p className="text-[10px] font-mono text-[#555]">
+                                                    <div className="flex items-center justify-between px-4 py-2.5 border-t border-[#2e2e34] bg-[#18181c]">
+                                                        <p className="text-[10px] font-mono text-[#65656d]">
                                                             {Math.min(currentEvents.length, (currentPage - 1) * 25 + 1)}–{Math.min(currentEvents.length, currentPage * 25)} of {currentEvents.length}
                                                         </p>
                                                         <div className="flex items-center gap-2">
-                                                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="text-[10px] font-mono text-[#555] hover:text-white border border-[#2a2a2a] px-2 py-1 rounded disabled:opacity-30 transition-colors">Prev</button>
-                                                            <span className="text-[10px] font-mono text-[#555]">{currentPage}/{totalPages || 1}</span>
-                                                            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="text-[10px] font-mono text-[#555] hover:text-white border border-[#2a2a2a] px-2 py-1 rounded disabled:opacity-30 transition-colors">Next</button>
+                                                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="text-[10px] font-mono text-[#65656d] hover:text-white border border-[#36363c] px-2 py-1 rounded disabled:opacity-30 transition-colors">Prev</button>
+                                                            <span className="text-[10px] font-mono text-[#65656d]">{currentPage}/{totalPages || 1}</span>
+                                                            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="text-[10px] font-mono text-[#65656d] hover:text-white border border-[#36363c] px-2 py-1 rounded disabled:opacity-30 transition-colors">Next</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1076,15 +1076,15 @@ export default function AuditPage() {
                                 <motion.div key="compare" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }} className="space-y-5">
                                     <div>
                                         <h2 className="font-display text-base font-bold text-white">Pipeline Comparison</h2>
-                                        <p className="text-[11px] text-[#555] font-mono mt-0.5">Compare cost, load, and model performance side-by-side.</p>
+                                        <p className="text-[11px] text-[#65656d] font-mono mt-0.5">Compare cost, load, and model performance side-by-side.</p>
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2">
                                         {[{ label: "Pipeline A", val: compareWorkflowA, set: setCompareWorkflowA }, { label: "Pipeline B", val: compareWorkflowB, set: setCompareWorkflowB }].map(sel => (
                                             <div key={sel.label} className="space-y-1.5">
-                                                <label className="text-[9px] font-mono uppercase tracking-wider text-[#555]">{sel.label}</label>
+                                                <label className="text-[9px] font-mono uppercase tracking-wider text-[#65656d]">{sel.label}</label>
                                                 <select value={sel.val} onChange={e => sel.set(e.target.value)}
-                                                    className="w-full rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] px-3 py-2 text-[11px] text-white focus:outline-none focus:border-[#444] font-mono transition-colors">
-                                                    {allWorkflows.map(w => <option key={w} value={w} className="bg-[#1a1a1a]">{w === "unknown" ? "Unlabeled Workflow" : w}</option>)}
+                                                    className="w-full rounded-lg border border-[#36363c] bg-[#222228] px-3 py-2 text-[11px] text-white focus:outline-none focus:border-[#52525a] font-mono transition-colors">
+                                                    {allWorkflows.map(w => <option key={w} value={w} className="bg-[#222228]">{w === "unknown" ? "Unlabeled Workflow" : w}</option>)}
                                                 </select>
                                             </div>
                                         ))}
@@ -1100,10 +1100,10 @@ export default function AuditPage() {
                                         return (
                                             <div className="grid gap-4 md:grid-cols-2">
                                                 {[{ w: wA, label: "Pipeline A", issue: issueA, color: "text-violet-400", badge: "Baseline" }, { w: wB, label: "Pipeline B", issue: issueB, color: "text-indigo-400", badge: "Target" }].map(({ w, label, issue, color, badge }) => (
-                                                    <div key={label} className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5 space-y-4">
-                                                        <div className="flex justify-between items-start border-b border-[#222] pb-3">
+                                                    <div key={label} className="rounded-xl border border-[#36363c] bg-[#222228] p-5 space-y-4">
+                                                        <div className="flex justify-between items-start border-b border-[#2e2e34] pb-3">
                                                             <div>
-                                                                <p className="text-[9px] font-mono text-[#555]">{label}</p>
+                                                                <p className="text-[9px] font-mono text-[#65656d]">{label}</p>
                                                                 <p className={`text-[12px] font-bold font-mono truncate max-w-[180px] mt-0.5 ${color}`}>{w.workflow_id === "unknown" ? "Unlabeled" : w.workflow_id}</p>
                                                             </div>
                                                             <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${color === "text-violet-400" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" : "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"}`}>{badge}</span>
@@ -1115,8 +1115,8 @@ export default function AuditPage() {
                                                                 { l: "Cost/Span", v: `$${w.cost_per_request.toFixed(4)}` },
                                                                 { l: "Total Tokens", v: w.total_tokens.toLocaleString() },
                                                             ].map(m => (
-                                                                <div key={m.l} className="rounded-lg border border-[#222] bg-[#141414] p-3">
-                                                                    <p className="text-[9px] font-mono text-[#555]">{m.l}</p>
+                                                                <div key={m.l} className="rounded-lg border border-[#2e2e34] bg-[#1c1c22] p-3">
+                                                                    <p className="text-[9px] font-mono text-[#65656d]">{m.l}</p>
                                                                     <p className="font-mono text-sm font-bold text-white mt-1">{m.v}</p>
                                                                 </div>
                                                             ))}
@@ -1157,13 +1157,20 @@ export default function AuditPage() {
 
                             {activeTab === "savings" && (
                                 <motion.div key="savings" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-                                    <SavingsPanel companyName={companyName || "Aurex Corp"} />
+                                    <SavingsPanel
+                                        companyName={companyName || pendingUserInfo?.company_name || ""}
+                                        executiveSummary={data?.executive_summary}
+                                        hasActiveSession={!!sessionId}
+                                    />
                                 </motion.div>
                             )}
 
                             {activeTab === "settings" && (
                                 <motion.div key="settings" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-                                    <SettingsPanel companyName={companyName || "Aurex Corp"} onRefreshAnalysis={handleRefreshAnalysis} />
+                                    <SettingsPanel
+                                        companyName={companyName || pendingUserInfo?.company_name || ""}
+                                        onRefreshAnalysis={handleRefreshAnalysis}
+                                    />
                                 </motion.div>
                             )}
                         </AnimatePresence>

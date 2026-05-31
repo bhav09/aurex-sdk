@@ -249,6 +249,21 @@ export class AurexAPI {
         }
     }
 
+    private async parseErrorMessage(response: Response, fallback: string): Promise<string> {
+        try {
+            const body = await response.json();
+            if (typeof body?.detail === 'string') return body.detail;
+            if (Array.isArray(body?.detail)) {
+                return body.detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(', ') || fallback;
+            }
+        } catch {
+            /* ignore */
+        }
+        if (response.status === 401) return 'Sign in required to view this data';
+        if (response.status === 403) return 'Not authorized to access company data';
+        return fallback;
+    }
+
     private getHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
         const headers: Record<string, string> = { ...customHeaders };
         if (this.token) {
@@ -358,7 +373,7 @@ export class AurexAPI {
         const url = `${this.baseUrl}/analytics/savings-realization?company_name=${encodeURIComponent(companyName)}`;
         const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
         if (!response.ok) {
-            throw new Error('Failed to fetch savings realization');
+            throw new Error(await this.parseErrorMessage(response, 'Failed to fetch savings realization'));
         }
         return response.json();
     }
@@ -921,8 +936,7 @@ export class AurexAPI {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to fetch pricing overrides');
+            throw new Error(await this.parseErrorMessage(response, 'Failed to fetch pricing overrides'));
         }
 
         return response.json();

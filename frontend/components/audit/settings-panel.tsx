@@ -55,14 +55,27 @@ export function SettingsPanel({ companyName, onRefreshAnalysis }: SettingsPanelP
     const [sdkCopyState, setSdkCopyState] = useState<Record<string, boolean>>({});
 
     const fetchOverrides = async () => {
+        if (!companyName) {
+            setOverrides([]);
+            setError(null);
+            return;
+        }
         setLoading(true);
         setError(null);
+        setSuccess(null);
         try {
             const data = await aurexAPI.getPricingOverrides(companyName);
             setOverrides(data);
-        } catch (err: any) {
-            console.error("Error fetching overrides:", err);
-            setError(err.message || "Failed to load pricing overrides");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to load pricing overrides";
+            if (message.includes("Not authorized") || message.includes("Sign in")) {
+                setOverrides([]);
+                setError(null);
+                setSuccess("Sign in with your work email to manage contract pricing for this company.");
+            } else {
+                console.error("Error fetching overrides:", err);
+                setError(message);
+            }
         } finally {
             setLoading(false);
         }
@@ -273,7 +286,7 @@ await client.trackLLMCall({
             </div>
 
             {/* Pricing Overrides Info Banner */}
-            <Card className="border-violet-500/20 bg-gradient-to-br from-[#0c0c0e]/90 to-[#141416]/50 p-5 backdrop-blur-md relative overflow-hidden rounded-xl">
+            <Card className="border-violet-500/20 bg-gradient-to-br from-surface-raised/90 to-[#222228]/50 p-5 backdrop-blur-md relative overflow-hidden rounded-xl">
                 <div className="flex items-start gap-4">
                     <div className="h-10 w-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0 text-violet-400">
                         <Coins className="h-5 w-5" />
@@ -289,7 +302,7 @@ await client.trackLLMCall({
 
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Left Card: JSON Upload */}
-                <Card className="border-white/[0.08] bg-[#0c0c0e]/85 p-6 backdrop-blur-md flex flex-col justify-between rounded-xl shadow-xl transition-all hover:border-white/10">
+                <Card className="border-white/[0.08] bg-surface-raised/85 p-6 backdrop-blur-md flex flex-col justify-between rounded-xl shadow-xl transition-all hover:border-white/10">
                     <div>
                         <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
                             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50">Upload Custom Contract Pricing</h3>
@@ -382,7 +395,7 @@ await client.trackLLMCall({
                 </Card>
 
                 {/* Right Card: Table of active pricing overrides */}
-                <Card className="border-white/[0.08] bg-[#0c0c0e]/85 p-6 backdrop-blur-md flex flex-col justify-between rounded-xl shadow-xl transition-all hover:border-white/10">
+                <Card className="border-white/[0.08] bg-surface-raised/85 p-6 backdrop-blur-md flex flex-col justify-between rounded-xl shadow-xl transition-all hover:border-white/10">
                     <div className="space-y-4">
                         <div className="flex items-center justify-between border-b border-white/5 pb-3">
                             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
@@ -451,7 +464,7 @@ await client.trackLLMCall({
             </div>
 
             {/* API Keys Panel */}
-            <Card className="border-white/[0.08] bg-[#0c0c0e]/85 p-6 backdrop-blur-md rounded-xl mt-8 shadow-xl">
+            <Card className="border-white/[0.08] bg-surface-raised/85 p-6 backdrop-blur-md rounded-xl mt-8 shadow-xl">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 mb-6">
                     <div className="space-y-1">
                         <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50 flex items-center gap-2">
@@ -494,7 +507,7 @@ await client.trackLLMCall({
                                 placeholder="Key name (e.g. Prod API)"
                                 value={newKeyName}
                                 onChange={(e) => setNewKeyName(e.target.value)}
-                                className="w-full rounded-lg border border-white/10 bg-[#09090b] px-3 py-2 text-xs text-white placeholder-white/30 focus:border-violet-500/50 focus:outline-none font-mono"
+                                className="w-full rounded-lg border border-white/10 bg-surface-sunken px-3 py-2 text-xs text-white placeholder-white/30 focus:border-violet-500/50 focus:outline-none font-mono"
                             />
                             <Button
                                 type="submit"

@@ -20,7 +20,7 @@ export function TestimonialsSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative py-28 sm:py-36 bg-[#030303] text-white overflow-hidden border-t border-white/5">
+    <section ref={sectionRef} className="relative py-28 sm:py-36 bg-background text-white overflow-hidden border-t border-white/5">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.03] via-transparent to-rose-500/[0.03] blur-3xl pointer-events-none" />
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
@@ -56,8 +56,9 @@ export function TestimonialsSection() {
               <div className="space-y-2">
                 <span className="text-sm font-mono text-white/40 uppercase tracking-widest block">Identified Leakage</span>
                 <div className="text-5xl sm:text-7xl font-display font-bold text-[#eca8d6] flex items-baseline gap-2">
-                  $400<span className="text-2xl sm:text-3xl text-[#eca8d6]/60 font-light">/mo</span>
+                  $650<span className="text-2xl sm:text-3xl text-[#eca8d6]/60 font-light">/mo</span>
                 </div>
+                <p className="text-xs font-mono text-white/35">≈ $7,800 annualized run-rate</p>
               </div>
 
               <div className="pt-6 flex flex-wrap gap-4">
@@ -79,7 +80,7 @@ export function TestimonialsSection() {
               </span>
 
               <blockquote className="text-2xl sm:text-3xl font-display leading-[1.3] text-white/90">
-                &ldquo;Within 5 minutes of connecting the SDK, we found a $400/month runaway context loop in our customer support agent. Shifting simple classification calls to a smaller model reduced our spend by 90% instantly.&rdquo;
+                &ldquo;Within 5 minutes of connecting the SDK, we found $650/month in recoverable spend from a runaway context loop in our customer support agent. Shifting simple classification calls to a smaller model reduced our spend by 90% instantly.&rdquo;
               </blockquote>
 
               <div className="flex items-center gap-4">

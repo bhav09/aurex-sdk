@@ -88,7 +88,7 @@ export function UserDropdown() {
             <DropdownMenuContent 
                 align="end" 
                 sideOffset={8}
-                className="w-56 bg-[#0A0A0A]/95 border-white/[0.08] backdrop-blur-2xl rounded-xl p-1.5 shadow-2xl text-white"
+                className="w-56 bg-surface/95 border-white/[0.08] backdrop-blur-2xl rounded-xl p-1.5 shadow-2xl text-white"
             >
                 <DropdownMenuLabel className="px-2.5 py-2 flex flex-col gap-0.5">
                     <span className="text-xs font-semibold text-white/90 truncate">
