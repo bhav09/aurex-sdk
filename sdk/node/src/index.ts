@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { AsyncLocalStorage } from "async_hooks";
 import {
   AurexDecision,
   applyDecisionToCallParams,
@@ -9,6 +10,8 @@ import {
   suggestCheaperModel,
 } from "./decisions";
 import { jaccardNGramSimilarity } from "./semantic";
+
+export const aurexContext = new AsyncLocalStorage<Record<string, any>>();
 
 export interface BudgetGuardConfig {
   maxCostPerMinute?: number;      // e.g. 5.00
@@ -32,6 +35,16 @@ export interface AurexConfig {
   localOnly?: boolean;
   budgetGuard?: BudgetGuardConfig;
   syncPromptHashes?: boolean;
+  autoDowngradeSimplePrompts?: boolean;
+  otelExport?: boolean;
+  onCacheHit?: (workflowId: string, prompt: string) => string | undefined;
+  onCacheMiss?: (workflowId: string, prompt: string) => void;
+  pricingPath?: string;
+  defaultPricing?: { input: number; output: number };
+  simplePromptTokenLimit?: number;
+  runawayContextMultiplier?: number;
+  loopSimilarityThreshold?: number;
+  downgradeMap?: Record<string, string>;
 }
 
 function resolveCloudEndpoint(config?: AurexConfig): string {
@@ -60,6 +73,10 @@ export interface AurexEvent {
   retry_count?: number;
   outcome?: string;
   cost_type?: string;
+  tool_calls_count?: number;
+  tool_names?: string[];
+  tags?: Record<string, string>;
+  quality_score?: number;
 }
 
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -67,9 +84,13 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
   "gpt-4-turbo": { input: 10.00, output: 30.00 },
   "gpt-4.1": { input: 2.00, output: 8.00 },
+  "gpt-4.1-mini": { input: 0.40, output: 1.60 },
+  "gpt-4.1-nano": { input: 0.10, output: 0.40 },
   "gpt-5": { input: 5.00, output: 15.00 },
   "gpt-5.1": { input: 5.00, output: 15.00 },
   "o3-mini": { input: 1.10, output: 4.40 },
+  "o3": { input: 10.00, output: 40.00 },
+  "o4-mini": { input: 1.10, output: 4.40 },
   "o1": { input: 15.00, output: 60.00 },
   "gpt-4": { input: 30.00, output: 60.00 },
   "gpt-3.5-turbo": { input: 0.50, output: 1.50 },
@@ -78,9 +99,12 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   "gemini-2.0-flash": { input: 0.10, output: 0.40 },
   "gemini-2.5-pro": { input: 1.25, output: 5.00 },
   "gemini-2.5-flash": { input: 0.10, output: 0.40 },
+  "gemini-2.5-flash-lite": { input: 0.00, output: 0.00 },
+  "claude-opus-4": { input: 15.00, output: 75.00 },
   "claude-opus-4-20250514": { input: 15.00, output: 75.00 },
   "claude-3-opus": { input: 15.00, output: 75.00 },
   "claude-3-opus-20240229": { input: 15.00, output: 75.00 },
+  "claude-sonnet-4": { input: 3.00, output: 15.00 },
   "claude-3-5-sonnet": { input: 3.00, output: 15.00 },
   "claude-3-5-sonnet-20241022": { input: 3.00, output: 15.00 },
   "claude-sonnet-4-5-20250929": { input: 3.00, output: 15.00 },
@@ -92,10 +116,16 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   "claude-3-haiku-20240307": { input: 0.25, output: 1.25 },
   "claude-3-7-sonnet": { input: 3.00, output: 15.00 },
   "claude-3-7-sonnet-20250219": { input: 3.00, output: 15.00 },
+  "deepseek-r1": { input: 0.55, output: 2.19 },
+  "deepseek-v3": { input: 0.27, output: 1.10 },
   "llama3.1:70b": { input: 0.0, output: 0.0 },
   "llama3.1:8b": { input: 0.0, output: 0.0 },
+  "llama-4-scout": { input: 0.0, output: 0.0 },
+  "llama-4-maverick": { input: 0.0, output: 0.0 },
   "qwen2.5:72b": { input: 0.0, output: 0.0 },
+  "qwen3": { input: 0.0, output: 0.0 },
   "mistral:7b": { input: 0.0, output: 0.0 },
+  "mistral-large": { input: 2.00, output: 6.00 },
 };
 
 export function normalizeModelName(m: string): string {
@@ -105,15 +135,35 @@ export function normalizeModelName(m: string): string {
   if (ftMatch) {
     model = ftMatch[1];
   }
-  // Remove common prefixes
-  model = model.replace(/^(models\/|publishers\/google\/models\/|anthropic\.|amazon\.|bedrock\/)/g, "");
+  // Remove common prefixes & OpenRouter prefixes in a loop
+  let prev = "";
+  const prefixRegex = /^(models\/|publishers\/google\/models\/|anthropic\.|amazon\.|bedrock\/|openrouter\/|google\/|anthropic\/|meta-llama\/|deepseek\/|mistralai\/|openai\/|qwen\/)/;
+  while (model !== prev) {
+    prev = model;
+    model = model.replace(prefixRegex, "");
+  }
   model = model.replace(/[\s_]+/g, "-");
   return model;
+}
+
+function wildcardMatch(str: string, rule: string): boolean {
+  const escapeRegex = (s: string) => s.replace(/([.+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+  return new RegExp("^" + rule.split("*").map(escapeRegex).join(".*") + "$").test(str);
 }
 
 export function getModelPricing(model: string): [number, number] {
   if (!model) return [1.50, 6.00];
   const queryNorm = normalizeModelName(model);
+
+  // Check wildcard patterns first
+  for (const [pattern, pricing] of Object.entries(MODEL_PRICING)) {
+    if (pattern.includes("*")) {
+      if (wildcardMatch(queryNorm, pattern)) {
+        return [pricing.input, pricing.output];
+      }
+    }
+  }
+
   const pricing = MODEL_PRICING[queryNorm];
   if (pricing) return [pricing.input, pricing.output];
   
@@ -123,6 +173,21 @@ export function getModelPricing(model: string): [number, number] {
       return [MODEL_PRICING[key].input, MODEL_PRICING[key].output];
     }
   }
+
+  // Check if huggingface is the provider
+  const prov = extractProvider(model);
+  if (prov === "huggingface") {
+    return [0.0, 0.0];
+  }
+
+  // Fallback to configured default pricing on singleton instance if available
+  try {
+    const instance = AurexAuditor.getInstance();
+    if (instance && instance.defaultPricing) {
+      return [instance.defaultPricing.input, instance.defaultPricing.output];
+    }
+  } catch (e) {}
+
   // Moderate fallback — avoids extreme overcharging for unknown/new models
   return [1.50, 6.00];
 }
@@ -179,10 +244,15 @@ export function calculateCost(
 
 export function extractProvider(model: string): string {
   const modelLower = model.toLowerCase();
+  if (model.includes("/")) {
+    if (!["openai/", "google/", "anthropic/", "bedrock/"].some(x => modelLower.includes(x))) {
+      return "huggingface";
+    }
+  }
   if (modelLower.includes("claude")) return "anthropic";
-  if (modelLower.includes("gpt") || modelLower.startsWith("o1") || modelLower.startsWith("o3")) return "openai";
+  if (modelLower.includes("gpt") || modelLower.startsWith("o1") || modelLower.startsWith("o3") || modelLower.startsWith("o4")) return "openai";
   if (modelLower.includes("gemini")) return "google";
-  if (["llama", "mistral", "qwen"].some(x => modelLower.includes(x))) return "ollama";
+  if (["llama", "mistral", "qwen", "deepseek"].some(x => modelLower.includes(x))) return "ollama";
   return "unknown";
 }
 
@@ -202,6 +272,9 @@ export class AurexAuditor {
   private syncErrorCount = 0;
   private lastSyncError: string | null = null;
 
+  public downgradeMap: Record<string, string> = {};
+  public defaultPricing?: { input: number; output: number };
+
   private constructor(config?: AurexConfig) {
     const defaultLedger = ".aurex/ledger.jsonl";
     this.config = {
@@ -216,10 +289,43 @@ export class AurexAuditor {
       localOnly: config?.localOnly ?? !(config?.apiKey || process.env.AUREX_API_KEY),
       budgetGuard: config?.budgetGuard || {},
       syncPromptHashes: config?.syncPromptHashes ?? (process.env.AUREX_SYNC_PROMPT_HASHES === "1" || process.env.AUREX_SYNC_PROMPT_HASHES === "true"),
+      autoDowngradeSimplePrompts: config?.autoDowngradeSimplePrompts ?? false,
+      otelExport: config?.otelExport ?? false,
+      onCacheHit: config?.onCacheHit || (() => undefined),
+      onCacheMiss: config?.onCacheMiss || (() => {}),
+      pricingPath: config?.pricingPath || process.env.AUREX_PRICING_PATH || "",
+      defaultPricing: config?.defaultPricing || { input: 1.50, output: 6.00 },
+      simplePromptTokenLimit: config?.simplePromptTokenLimit ?? 120,
+      runawayContextMultiplier: config?.runawayContextMultiplier ?? 2.2,
+      loopSimilarityThreshold: config?.loopSimilarityThreshold ?? 0.8,
+      downgradeMap: config?.downgradeMap || {},
     };
+
+    this.downgradeMap = this.config.downgradeMap || {};
+    this.defaultPricing = this.config.defaultPricing;
 
     if (config?.budgetGuard) {
       this.budgetConfig = config.budgetGuard;
+    }
+
+    // Load custom pricing path if exists
+    if (this.config.pricingPath && fs.existsSync(this.config.pricingPath)) {
+      try {
+        const content = fs.readFileSync(this.config.pricingPath, "utf-8");
+        const customPricing = JSON.parse(content);
+        if (customPricing && typeof customPricing === "object") {
+          for (const [k, v] of Object.entries(customPricing)) {
+            if (v && typeof v === "object" && "input" in v && "output" in v) {
+              MODEL_PRICING[k] = {
+                input: Number((v as any).input),
+                output: Number((v as any).output),
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[Aurex Warning] Failed to load custom pricing from ${this.config.pricingPath}:`, err);
+      }
     }
 
     // Ensure ledger directory exists
@@ -305,6 +411,10 @@ export class AurexAuditor {
     return crypto.createHash("sha256").update(text).digest("hex");
   }
 
+  public registerModelPricing(model: string, inputCost: number, outputCost: number): void {
+    MODEL_PRICING[model] = { input: inputCost, output: outputCost };
+  }
+
   /**
    * Log LLM metadata asynchronously.
    * Prompts and completions are hashed locally (Zero-PII Promise) before logging.
@@ -325,6 +435,11 @@ export class AurexAuditor {
     retryCount?: number;
     outcome?: string;
     costType?: string;
+    toolCallsCount?: number;
+    toolNames?: string[];
+    tags?: Record<string, string>;
+    qualityScore?: number;
+    provider?: string;
   }) {
     const inputT = params.inputTokens || 0;
     const outputT = params.outputTokens || 0;
@@ -333,7 +448,7 @@ export class AurexAuditor {
     const reasoningT = params.reasoningTokens || 0;
     const isBatch = params.isBatch || false;
     const cost = calculateCost(params.model, inputT, outputT, cachedT, cacheWriteT, isBatch);
-    const provider = extractProvider(params.model);
+    const provider = params.provider || extractProvider(params.model);
 
     const event: AurexEvent = {
       timestamp: new Date().toISOString(),
@@ -355,7 +470,37 @@ export class AurexAuditor {
       retry_count: params.retryCount,
       outcome: params.outcome,
       cost_type: params.costType,
+      tool_calls_count: params.toolCallsCount,
+      tool_names: params.toolNames || [],
+      tags: params.tags || {},
+      quality_score: params.qualityScore,
     };
+
+    // Optional OpenTelemetry Export
+    if (this.config.otelExport) {
+      try {
+        const api = require("@opentelemetry/api");
+        const tracer = api.trace.getTracer("aurex-sdk");
+        const span = tracer.startSpan("llm_call");
+        span.setAttribute("llm.model", params.model);
+        span.setAttribute("llm.provider", provider);
+        span.setAttribute("llm.input_tokens", inputT);
+        span.setAttribute("llm.output_tokens", outputT);
+        span.setAttribute("llm.cost", cost);
+        if (params.workflowId) {
+          span.setAttribute("llm.workflow_id", params.workflowId);
+        }
+        if (params.tags) {
+          for (const [k, v] of Object.entries(params.tags)) {
+            span.setAttribute(`llm.tags.${k}`, v);
+          }
+        }
+        if (params.qualityScore !== undefined) {
+          span.setAttribute("llm.quality_score", params.qualityScore);
+        }
+        span.end();
+      } catch (err) {}
+    }
 
     // Track metrics for the sliding window
     this.lastMinuteEvents.push({ timestamp: Date.now(), cost });
@@ -443,14 +588,52 @@ export class AurexAuditor {
       workflowId,
       systemPromptHash: sysPromptHash,
       promptHash,
+      promptText: params.prompt,
       estimatedTokens: estTokens
     };
 
     // Filter recent requests to last 5 minutes
     this.recentRequests = this.recentRequests.filter(r => now - r.timestamp < 300000);
+    
+    // Semantic cache suggestion check
+    let cacheHitFound = false;
+    if (params.prompt) {
+      const workflowRequests = this.recentRequests.filter(r => r.workflowId === workflowId);
+      for (let i = workflowRequests.length - 1; i >= 0; i--) {
+        const prevPrompt = workflowRequests[i].promptText;
+        if (prevPrompt && jaccardNGramSimilarity(params.prompt, prevPrompt) > 0.9) {
+          cacheHitFound = true;
+          break;
+        }
+      }
+    }
+    
     this.recentRequests.push(reqMeta);
     if (this.recentRequests.length > 200) {
       this.recentRequests.shift();
+    }
+
+    // Trigger cache hooks
+    if (cacheHitFound && this.config.onCacheHit) {
+      try {
+        const cachedRes = this.config.onCacheHit(workflowId, params.prompt || "");
+        if (cachedRes) {
+          return {
+            action: "cache_suggest",
+            reason: `Semantic cache hit (similarity > 0.9) in workflow '${workflowId}'`,
+            response: cachedRes,
+            originalModel: params.model,
+          };
+        }
+      } catch (err: any) {
+        console.error(`[Aurex SDK Cache Callback Error]`, err);
+      }
+    } else if (!cacheHitFound && this.config.onCacheMiss) {
+      try {
+        this.config.onCacheMiss(workflowId, params.prompt || "");
+      } catch (err: any) {
+        console.error(`[Aurex SDK Cache Callback Error]`, err);
+      }
     }
 
     const workflowRequests = this.recentRequests.filter(r => r.workflowId === workflowId);
@@ -460,40 +643,48 @@ export class AurexAuditor {
       return decision;
     }
 
+    const ctx = aurexContext.getStore() || {};
+    const ctxBudget = ctx.budgetGuard || {};
+    const budgetConfig = { ...(this.budgetConfig || {}), ...ctxBudget };
+
+    const simplePromptTokenLimit = ctx.simplePromptTokenLimit !== undefined ? ctx.simplePromptTokenLimit : this.config.simplePromptTokenLimit;
+    const runawayContextMultiplier = ctx.runawayContextMultiplier !== undefined ? ctx.runawayContextMultiplier : this.config.runawayContextMultiplier;
+    const loopSimilarityThreshold = ctx.loopSimilarityThreshold !== undefined ? ctx.loopSimilarityThreshold : this.config.loopSimilarityThreshold;
+
     // Pre-emptive budget check
     const [inputPrice] = getModelPricing(params.model);
     const predictedCost = (estTokens / 1000000) * inputPrice;
     let budgetExceeded = false;
     let budgetReason = "";
 
-    if (this.budgetConfig) {
-      if (this.budgetConfig.maxCostPerSession !== undefined) {
+    if (budgetConfig) {
+      if (budgetConfig.maxCostPerSession !== undefined) {
         const currentSessionCost = this.sessionCosts[workflowId] || 0;
-        if (currentSessionCost + predictedCost > this.budgetConfig.maxCostPerSession) {
+        if (currentSessionCost + predictedCost > budgetConfig.maxCostPerSession) {
           budgetExceeded = true;
-          budgetReason += `Predicted cost $${predictedCost.toFixed(4)} plus session cost $${currentSessionCost.toFixed(4)} exceeds session limit of $${this.budgetConfig.maxCostPerSession.toFixed(4)}. `;
+          budgetReason += `Predicted cost $${predictedCost.toFixed(4)} plus session cost $${currentSessionCost.toFixed(4)} exceeds session limit of $${budgetConfig.maxCostPerSession.toFixed(4)}. `;
         }
       }
 
-      if (this.budgetConfig.maxCostPerMinute !== undefined) {
+      if (budgetConfig.maxCostPerMinute !== undefined) {
         const minuteCost = this.lastMinuteEvents.reduce((acc, e) => acc + e.cost, 0);
-        if (minuteCost + predictedCost > this.budgetConfig.maxCostPerMinute) {
+        if (minuteCost + predictedCost > budgetConfig.maxCostPerMinute) {
           budgetExceeded = true;
-          budgetReason += `Predicted cost $${predictedCost.toFixed(4)} plus minute cost $${minuteCost.toFixed(4)} exceeds minute limit of $${this.budgetConfig.maxCostPerMinute.toFixed(4)}. `;
+          budgetReason += `Predicted cost $${predictedCost.toFixed(4)} plus minute cost $${minuteCost.toFixed(4)} exceeds minute limit of $${budgetConfig.maxCostPerMinute.toFixed(4)}. `;
         }
       }
 
-      if (this.budgetConfig.maxRequestsPerMinute !== undefined) {
+      if (budgetConfig.maxRequestsPerMinute !== undefined) {
         const minuteRequests = this.lastMinuteEvents.length;
-        if (minuteRequests + 1 > this.budgetConfig.maxRequestsPerMinute) {
+        if (minuteRequests + 1 > budgetConfig.maxRequestsPerMinute) {
           budgetExceeded = true;
-          budgetReason += `Adding this request would exceed minute requests limit of ${this.budgetConfig.maxRequestsPerMinute}. `;
+          budgetReason += `Adding this request would exceed minute requests limit of ${budgetConfig.maxRequestsPerMinute}. `;
         }
       }
 
-      if (this.budgetConfig.maxContextTokens !== undefined && estTokens > this.budgetConfig.maxContextTokens) {
+      if (budgetConfig.maxContextTokens !== undefined && estTokens > budgetConfig.maxContextTokens) {
         budgetExceeded = true;
-        budgetReason += `Estimated input tokens ${estTokens} exceeds maximum context token limit of ${this.budgetConfig.maxContextTokens}. `;
+        budgetReason += `Estimated input tokens ${estTokens} exceeds maximum context token limit of ${budgetConfig.maxContextTokens}. `;
       }
     }
 
@@ -526,7 +717,7 @@ export class AurexAuditor {
       if (workflowRequests.length >= 3 && decision.action === "proceed") {
         const recent = workflowRequests.slice(-3);
         const sizes = recent.map(r => r.estimatedTokens);
-        if (sizes[1] >= sizes[0] * 2.2 && sizes[2] >= sizes[1] * 2.2 && sizes[0] > 20) {
+        if (sizes[1] >= sizes[0] * runawayContextMultiplier && sizes[2] >= sizes[1] * runawayContextMultiplier && sizes[0] > 20) {
           const cheaper = suggestCheaperModel(params.model);
           decision = {
             action: "downgrade",
@@ -542,11 +733,24 @@ export class AurexAuditor {
       }
 
       // 3. Expensive Model Misuse + adaptive downgrade near budget
-      const isSimple = estTokens < 150;
+      let isSimple = estTokens < simplePromptTokenLimit;
+      if (params.prompt && (params.prompt.includes("```") || params.prompt.includes("~~~"))) {
+        isSimple = false;
+      }
+      const sessionCost = this.sessionCosts[workflowId] || 0;
       const nearBudget =
-        this.budgetConfig?.maxCostPerSession !== undefined &&
-        (this.sessionCosts[workflowId] || 0) > (this.budgetConfig.maxCostPerSession * 0.8);
-      if (((isExpensiveModel(params.model) && isSimple) || nearBudget) && decision.action === "proceed") {
+        budgetConfig?.maxCostPerSession !== undefined &&
+        sessionCost > (budgetConfig.maxCostPerSession * 0.8);
+      
+      let shouldDowngrade = false;
+      if (decision.action === "proceed") {
+        if (nearBudget) {
+          shouldDowngrade = true;
+        } else if (this.config.autoDowngradeSimplePrompts && isExpensiveModel(params.model) && isSimple) {
+          shouldDowngrade = true;
+        }
+      }
+      if (shouldDowngrade && decision.action === "proceed") {
         const recommended = suggestCheaperModel(params.model);
         if (recommended) {
           decision = {
@@ -575,7 +779,7 @@ export class AurexAuditor {
       }
 
       // 5. Semantic loop detection
-      if (loopScore >= 0.8) {
+      if (loopScore >= loopSimilarityThreshold) {
         decision = {
           action: "compress",
           reason: `Semantic loop detected (score ${loopScore.toFixed(2)})`,
@@ -593,7 +797,7 @@ export class AurexAuditor {
     }
 
     if (decision.action !== "proceed") {
-      const mode = process.env.AUREX_BLOCK_ON_WASTE === "1" ? "throw" : (this.budgetConfig?.onBudgetExceeded || "warn");
+      const mode = process.env.AUREX_BLOCK_ON_WASTE === "1" ? "throw" : (budgetConfig?.onBudgetExceeded || "warn");
       const msg = `[Aurex SDK] ${decision.action}: ${decision.reason}`;
       if (mode === "throw" && decision.action === "block") {
         throw new Error(msg);
@@ -658,37 +862,47 @@ export class AurexAuditor {
   public wrap<T extends Record<string, any>>(
     callFn: (params: T) => Promise<any>,
     buildParams: () => T,
+    options?: Record<string, any>
   ): Promise<any> {
-    const raw = buildParams();
-    const model = (raw as any).model || "unknown";
-    const messages = (raw as any).messages;
-    let systemPrompt = "";
-    let userPrompt = "";
-    if (Array.isArray(messages)) {
-      for (const m of messages) {
-        if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
-        if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
+    const runInContext = () => {
+      const raw = buildParams();
+      const model = (raw as any).model || "unknown";
+      const messages = (raw as any).messages;
+      let systemPrompt = "";
+      let userPrompt = "";
+      if (Array.isArray(messages)) {
+        for (const m of messages) {
+          if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
+          if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
+        }
       }
+      const ctx = aurexContext.getStore() || {};
+      const decision = this.preCallCheck({
+        model,
+        prompt: userPrompt,
+        systemPrompt,
+        workflowId: (raw as any).metadata?.workflow_id || (raw as any).user || ctx.workflowId || "default_workflow",
+        messages,
+      });
+      const params = applyDecisionToCallParams(raw, decision);
+      return callFn(params).then((resp) => {
+        const text =
+          resp?.choices?.[0]?.message?.content ||
+          resp?.content?.[0]?.text ||
+          (typeof resp?.output === "string" ? resp.output : undefined);
+        this.recordResponse(
+          (raw as any).metadata?.workflow_id || (raw as any).user || ctx.workflowId || process.env.AUREX_WORKFLOW_ID || "default_workflow",
+          text,
+        );
+        return resp;
+      });
+    };
+
+    if (options) {
+      const merged = { ...(aurexContext.getStore() || {}), ...options };
+      return aurexContext.run(merged, runInContext);
     }
-    const decision = this.preCallCheck({
-      model,
-      prompt: userPrompt,
-      systemPrompt,
-      workflowId: (raw as any).metadata?.workflow_id || (raw as any).user,
-      messages,
-    });
-    const params = applyDecisionToCallParams(raw, decision);
-    return callFn(params).then((resp) => {
-      const text =
-        resp?.choices?.[0]?.message?.content ||
-        resp?.content?.[0]?.text ||
-        (typeof resp?.output === "string" ? resp.output : undefined);
-      this.recordResponse(
-        (raw as any).metadata?.workflow_id || process.env.AUREX_WORKFLOW_ID || "default_workflow",
-        text,
-      );
-      return resp;
-    });
+    return runInContext();
   }
 
   private checkBudget(newEventCost: number, inputTokens: number, workflowId?: string): void {
@@ -863,7 +1077,9 @@ export class AurexAuditor {
     workflowId: string,
     userPrompt: string,
     systemPrompt: string,
-    isAnthropic = false
+    isAnthropic = false,
+    tags?: Record<string, string>,
+    qualityScore?: number
   ): AsyncGenerator<any, void, unknown> {
     let accumulatedContent = "";
     let finalUsage: any = null;
@@ -891,7 +1107,7 @@ export class AurexAuditor {
     const inputTokens = finalUsage?.prompt_tokens || finalUsage?.input_tokens || this.estimateTokens(userPrompt, params.messages);
     const outputTokens = finalUsage?.completion_tokens || finalUsage?.output_tokens || Math.max(1, Math.floor(accumulatedContent.length / 4));
     const cachedTokens = finalUsage?.prompt_tokens_details?.cached_tokens || finalUsage?.cache_read_input_tokens || 0;
-    const reasoningTokens = finalUsage?.completion_tokens_details?.reasoning_tokens || 0;
+    const reasoningTokens = finalUsage?.prompt_tokens_details?.reasoning_tokens || 0;
 
     this.logEvent({
       model: params.model || "unknown",
@@ -904,7 +1120,33 @@ export class AurexAuditor {
       systemPrompt,
       extraMetadata: params.metadata,
       workflowId,
+      tags,
+      qualityScore
     });
+  }
+
+  private extractAurexExtraParams(params: any): { tags?: Record<string, string>; qualityScore?: number; workflowId?: string } {
+    if (!params) return {};
+    let tags = params.tags;
+    let qualityScore = params.qualityScore ?? params.quality_score;
+    let workflowId = params.workflowId ?? params.workflow_id;
+
+    const metadata = params.metadata;
+    if (metadata && typeof metadata === "object") {
+      if (!tags) tags = metadata.tags;
+      if (qualityScore === undefined) qualityScore = metadata.qualityScore ?? metadata.quality_score;
+      if (!workflowId) workflowId = metadata.workflowId ?? metadata.workflow_id;
+    }
+    
+    if (!workflowId) {
+      workflowId = params.user;
+    }
+
+    if (tags && typeof tags !== "object") {
+      tags = undefined;
+    }
+    
+    return { tags, qualityScore, workflowId };
   }
 
   // ==========================================================================
@@ -915,7 +1157,6 @@ export class AurexAuditor {
   public patchLiteLLM(): void {
     let lite: any;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       lite = require("litellm");
     } catch {
       return;
@@ -934,13 +1175,26 @@ export class AurexAuditor {
           if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
           else if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
         }
+        const extraParams = self.extractAurexExtraParams(params);
         const decision = self.preCallCheck({
           model: params.model || "unknown",
           prompt: userPrompt,
           systemPrompt,
-          workflowId: params.user || params.metadata?.workflow_id,
+          workflowId: extraParams.workflowId,
           messages,
         });
+        if (decision.action === "cache_suggest" && decision.response) {
+          if (params.stream) {
+            async function* mockLiteLLMStream() {
+              yield { choices: [{ delta: { content: decision.response } }] };
+            }
+            return mockLiteLLMStream();
+          }
+          return {
+            choices: [{ message: { role: "assistant", content: decision.response } }],
+            usage: { prompt_tokens: 0, completion_tokens: 0 }
+          };
+        }
         args[0] = applyDecisionToCallParams(params, decision);
       } catch (err: any) {
         if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
@@ -949,7 +1203,8 @@ export class AurexAuditor {
         console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
       }
 
-      const workflowId = params.user || params.metadata?.workflow_id || "default_workflow";
+      const extraParams = self.extractAurexExtraParams(params);
+      const workflowId = extraParams.workflowId || "default_workflow";
       let resp;
       try {
         resp = await original(...args);
@@ -959,7 +1214,7 @@ export class AurexAuditor {
       }
 
       if (params.stream) {
-        return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false);
+        return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false, extraParams.tags, extraParams.qualityScore);
       }
 
       try {
@@ -968,6 +1223,10 @@ export class AurexAuditor {
       } catch {}
       try {
         const usage = resp?.usage || {};
+        const toolCalls = resp?.choices?.[0]?.message?.tool_calls || [];
+        const toolCallsCount = toolCalls.length;
+        const toolNames = toolCalls.map((tc: any) => tc.function?.name || tc.name).filter(Boolean);
+
         self.logEvent({
           model: params.model || "unknown",
           prompt: userPrompt,
@@ -979,6 +1238,10 @@ export class AurexAuditor {
           systemPrompt,
           extraMetadata: params.metadata,
           workflowId,
+          tags: extraParams.tags,
+          qualityScore: extraParams.qualityScore,
+          toolCallsCount,
+          toolNames
         });
       } catch (e) {
         // never break the app
@@ -993,7 +1256,6 @@ export class AurexAuditor {
   public patchAnthropic(): void {
     let anthropicMod: any;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       anthropicMod = require("@anthropic-ai/sdk");
     } catch {
       return;
@@ -1029,13 +1291,26 @@ export class AurexAuditor {
                 break;
               }
             }
+            const extraParams = self.extractAurexExtraParams(params);
             const decision = self.preCallCheck({
               model: params.model || "unknown",
               prompt: userPrompt,
               systemPrompt,
-              workflowId: params.metadata?.workflow_id || params.user,
+              workflowId: extraParams.workflowId,
               messages,
             });
+            if (decision.action === "cache_suggest" && decision.response) {
+              if (params.stream) {
+                async function* mockAnthropicStream() {
+                  yield { type: "content_block_delta", delta: { text: decision.response } };
+                }
+                return mockAnthropicStream();
+              }
+              return {
+                content: [{ type: "text", text: decision.response }],
+                usage: { input_tokens: 0, output_tokens: 0 }
+              };
+            }
             args[0] = applyDecisionToCallParams(params, decision);
           } catch (err: any) {
             if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
@@ -1044,7 +1319,8 @@ export class AurexAuditor {
             console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
           }
 
-          const workflowId = params.metadata?.workflow_id || params.user || "default_workflow";
+          const extraParams = self.extractAurexExtraParams(params);
+          const workflowId = extraParams.workflowId || "default_workflow";
           let resp;
           try {
             resp = await origCreate(...args);
@@ -1054,7 +1330,7 @@ export class AurexAuditor {
           }
 
           if (params.stream) {
-            return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, true);
+            return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, true, extraParams.tags, extraParams.qualityScore);
           }
 
           try {
@@ -1063,6 +1339,11 @@ export class AurexAuditor {
           } catch {}
           try {
             const usage = resp?.usage || {};
+            const contentBlocks = resp?.content || [];
+            const toolCalls = contentBlocks.filter((b: any) => b.type === "tool_use");
+            const toolCallsCount = toolCalls.length;
+            const toolNames = toolCalls.map((b: any) => b.name);
+
             self.logEvent({
               model: params.model || "unknown",
               prompt: userPrompt,
@@ -1074,6 +1355,10 @@ export class AurexAuditor {
               systemPrompt,
               extraMetadata: params.metadata,
               workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              toolCallsCount,
+              toolNames
             });
           } catch {}
           return resp;
@@ -1122,13 +1407,26 @@ export class AurexAuditor {
                 userPrompt = m.content;
               }
             }
+            const extraParams = self.extractAurexExtraParams(params);
             const decision = self.preCallCheck({
               model: params.model || "unknown",
               prompt: userPrompt,
               systemPrompt,
-              workflowId: params.user || params.metadata?.workflow_id,
+              workflowId: extraParams.workflowId,
               messages,
             });
+            if (decision.action === "cache_suggest" && decision.response) {
+              if (params.stream) {
+                async function* mockOpenAIStream() {
+                  yield { choices: [{ delta: { content: decision.response } }] };
+                }
+                return mockOpenAIStream();
+              }
+              return {
+                choices: [{ message: { role: "assistant", content: decision.response } }],
+                usage: { prompt_tokens: 0, completion_tokens: 0 }
+              };
+            }
             args[0] = applyDecisionToCallParams(params, decision);
           } catch (err: any) {
             if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
@@ -1137,7 +1435,8 @@ export class AurexAuditor {
             console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
           }
 
-          const workflowId = params.user || params.metadata?.workflow_id || "default_workflow";
+          const extraParams = self.extractAurexExtraParams(params);
+          const workflowId = extraParams.workflowId || "default_workflow";
           let resp;
           try {
             resp = await origCreate(...args);
@@ -1147,7 +1446,7 @@ export class AurexAuditor {
           }
 
           if (params.stream) {
-            return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false);
+            return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false, extraParams.tags, extraParams.qualityScore);
           }
 
           try {
@@ -1156,6 +1455,10 @@ export class AurexAuditor {
               resp?.choices?.[0]?.message?.content,
             );
             const usage = resp?.usage || {};
+            const toolCalls = resp?.choices?.[0]?.message?.tool_calls || [];
+            const toolCallsCount = toolCalls.length;
+            const toolNames = toolCalls.map((tc: any) => tc.function?.name || tc.name).filter(Boolean);
+
             self.logEvent({
               model: params.model || "unknown",
               prompt: userPrompt,
@@ -1167,6 +1470,10 @@ export class AurexAuditor {
               systemPrompt,
               extraMetadata: params.metadata,
               workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              toolCallsCount,
+              toolNames
             });
           } catch {}
           return resp;
@@ -1183,10 +1490,719 @@ export class AurexAuditor {
     if (openaiMod.OpenAI) openaiMod.OpenAI = Wrapped;
   }
 
+  /** Best-effort Google GenAI SDK patcher (@google/genai). */
+  public patchGoogle(): void {
+    let googleMod: any;
+    try {
+      googleMod = require("@google/genai");
+    } catch {
+      return;
+    }
+    const Cls = googleMod.GoogleGenAI;
+    if (!Cls || Cls.__aurex_patched__) return;
+
+    const self = this;
+    const Wrapped: any = function (...ctorArgs: any[]) {
+      // @ts-ignore
+      const inst = new Cls(...ctorArgs);
+      const models = inst.models;
+      if (models && typeof models.generateContent === "function" && !models.generateContent.__aurex_patched__) {
+        const origGenerate = models.generateContent.bind(models);
+        const patchedGenerate: any = async function (...args: any[]) {
+          const params = args[0] || {};
+          let model = params.model || "gemini-2.5-flash";
+          const contents = params.contents;
+          let userPrompt = "";
+          if (typeof contents === "string") {
+            userPrompt = contents;
+          } else if (Array.isArray(contents)) {
+            userPrompt = contents.map((c: any) => typeof c === "string" ? c : (c.text || JSON.stringify(c))).join(" ");
+          } else if (contents) {
+            userPrompt = typeof contents === "object" ? JSON.stringify(contents) : String(contents);
+          }
+          
+          let systemPrompt = "";
+          const config = params.config;
+          if (config) {
+            if (typeof config.systemInstruction === "string") {
+              systemPrompt = config.systemInstruction;
+            } else if (config.systemInstruction) {
+              const instr = config.systemInstruction;
+              if (Array.isArray(instr.parts)) {
+                systemPrompt = instr.parts.map((p: any) => typeof p === "string" ? p : (p.text || "")).join(" ");
+              } else {
+                systemPrompt = String(instr);
+              }
+            }
+          }
+          
+          const extraParams = self.extractAurexExtraParams(params);
+          const workflowId = extraParams.workflowId || "default_workflow";
+          
+          let decision;
+          try {
+            decision = self.preCallCheck({
+              model,
+              prompt: userPrompt,
+              systemPrompt,
+              workflowId,
+              messages: Array.isArray(contents) ? contents : undefined,
+            });
+            if (decision.action === "cache_suggest" && decision.response) {
+              return {
+                text: decision.response,
+                usageMetadata: {
+                  promptTokenCount: 0,
+                  candidatesTokenCount: 0,
+                  totalTokenCount: 0
+                }
+              };
+            }
+            if (decision.action === "downgrade" && decision.suggestedModel) {
+              params.model = decision.suggestedModel;
+              model = decision.suggestedModel;
+            }
+            if (decision.injectSystemInstruction) {
+              if (!params.config) params.config = {};
+              params.config.systemInstruction = (params.config.systemInstruction ? params.config.systemInstruction + "\n" : "") + decision.injectSystemInstruction;
+            }
+          } catch (err: any) {
+            if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+              throw err;
+            }
+            console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+          }
+          
+          let resp;
+          try {
+            resp = await origGenerate(...args);
+          } catch (ex: any) {
+            self.markFailure(workflowId, ex.message || String(ex));
+            throw ex;
+          }
+          
+          try {
+            const usage = resp?.usageMetadata || {};
+            self.logEvent({
+              model,
+              prompt: userPrompt,
+              response: resp?.text,
+              inputTokens: usage.promptTokenCount || 0,
+              outputTokens: usage.candidatesTokenCount || 0,
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              provider: "google"
+            });
+            if (resp?.text) {
+              self.recordResponse(workflowId, resp.text);
+            }
+          } catch {}
+          return resp;
+        };
+        patchedGenerate.__aurex_patched__ = true;
+        models.generateContent = patchedGenerate;
+      }
+      
+      if (models && typeof models.generateContentStream === "function" && !models.generateContentStream.__aurex_patched__) {
+        const origGenerateStream = models.generateContentStream.bind(models);
+        const patchedGenerateStream: any = async function (...args: any[]) {
+          const params = args[0] || {};
+          let model = params.model || "gemini-2.5-flash";
+          const contents = params.contents;
+          let userPrompt = "";
+          if (typeof contents === "string") {
+            userPrompt = contents;
+          } else if (Array.isArray(contents)) {
+            userPrompt = contents.map((c: any) => typeof c === "string" ? c : (c.text || JSON.stringify(c))).join(" ");
+          } else if (contents) {
+            userPrompt = typeof contents === "object" ? JSON.stringify(contents) : String(contents);
+          }
+          
+          let systemPrompt = "";
+          const config = params.config;
+          if (config) {
+            if (typeof config.systemInstruction === "string") {
+              systemPrompt = config.systemInstruction;
+            } else if (config.systemInstruction) {
+              const instr = config.systemInstruction;
+              if (Array.isArray(instr.parts)) {
+                systemPrompt = instr.parts.map((p: any) => typeof p === "string" ? p : (p.text || "")).join(" ");
+              } else {
+                systemPrompt = String(instr);
+              }
+            }
+          }
+          
+          const extraParams = self.extractAurexExtraParams(params);
+          const workflowId = extraParams.workflowId || "default_workflow";
+          
+          let decision;
+          try {
+            decision = self.preCallCheck({
+              model,
+              prompt: userPrompt,
+              systemPrompt,
+              workflowId,
+              messages: Array.isArray(contents) ? contents : undefined,
+            });
+            if (decision.action === "cache_suggest" && decision.response) {
+              const cachedResponse = decision.response;
+              const mockChunk = {
+                text: cachedResponse,
+                usageMetadata: {
+                  promptTokenCount: 0,
+                  candidatesTokenCount: 0,
+                  totalTokenCount: 0
+                }
+              };
+              async function* mockStream() {
+                yield mockChunk;
+              }
+              return mockStream();
+            }
+            if (decision.action === "downgrade" && decision.suggestedModel) {
+              params.model = decision.suggestedModel;
+              model = decision.suggestedModel;
+            }
+            if (decision.injectSystemInstruction) {
+              if (!params.config) params.config = {};
+              params.config.systemInstruction = (params.config.systemInstruction ? params.config.systemInstruction + "\n" : "") + decision.injectSystemInstruction;
+            }
+          } catch (err: any) {
+            if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+              throw err;
+            }
+            console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+          }
+          
+          let resp;
+          try {
+            resp = await origGenerateStream(...args);
+          } catch (ex: any) {
+            self.markFailure(workflowId, ex.message || String(ex));
+            throw ex;
+          }
+          
+          async function* wrapGoogleStream(stream: any) {
+            let accumulatedContent = "";
+            let finalUsage: any = null;
+            for await (const chunk of stream) {
+              if (chunk.text) {
+                accumulatedContent += chunk.text;
+              }
+              if (chunk.usageMetadata) {
+                finalUsage = chunk.usageMetadata;
+              }
+              yield chunk;
+            }
+            self.recordResponse(workflowId, accumulatedContent);
+            const inputTokens = finalUsage?.promptTokenCount || self.estimateTokens(userPrompt, Array.isArray(contents) ? contents : undefined);
+            const outputTokens = finalUsage?.candidatesTokenCount || Math.max(1, Math.floor(accumulatedContent.length / 4));
+            self.logEvent({
+              model,
+              prompt: userPrompt,
+              response: accumulatedContent,
+              inputTokens,
+              outputTokens,
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              provider: "google"
+            });
+          }
+          return wrapGoogleStream(resp);
+        };
+        patchedGenerateStream.__aurex_patched__ = true;
+        models.generateContentStream = patchedGenerateStream;
+      }
+      
+      return inst;
+    };
+    Wrapped.prototype = Cls.prototype;
+    Wrapped.__aurex_patched__ = true;
+
+    if (googleMod.GoogleGenAI) googleMod.GoogleGenAI = Wrapped;
+  }
+
+  private patchOllamaMethods(target: any) {
+    const self = this;
+
+    if (typeof target.chat === "function" && !target.chat.__aurex_patched__) {
+      const originalChat = target.chat.bind(target);
+      const patchedChat: any = async function (...args: any[]) {
+        const params = args[0] || {};
+        let model = params.model || "llama-4-scout";
+        const messages = params.messages || [];
+        
+        let userPrompt = "";
+        let systemPrompt = "";
+        for (const m of messages) {
+          if (m.role === "system" && typeof m.content === "string") {
+            systemPrompt = m.content;
+          } else if (m.role === "user" && typeof m.content === "string") {
+            userPrompt = m.content;
+          }
+        }
+        
+        const extraParams = self.extractAurexExtraParams(params);
+        const workflowId = extraParams.workflowId || "default_workflow";
+        
+        let decision;
+        try {
+          decision = self.preCallCheck({
+            model,
+            prompt: userPrompt,
+            systemPrompt,
+            workflowId,
+            messages,
+          });
+          if (decision.action === "cache_suggest" && decision.response) {
+            return {
+              model,
+              message: { role: "assistant", content: decision.response },
+              done: true,
+              prompt_eval_count: 0,
+              eval_count: 0
+            };
+          }
+          if (decision.action === "downgrade" && decision.suggestedModel) {
+            params.model = decision.suggestedModel;
+            model = decision.suggestedModel;
+          }
+          if (decision.injectSystemInstruction) {
+            messages.unshift({ role: "system", content: decision.injectSystemInstruction });
+            params.messages = messages;
+          }
+        } catch (err: any) {
+          if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+            throw err;
+          }
+          console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+        }
+        
+        let resp;
+        try {
+          resp = await originalChat(...args);
+        } catch (ex: any) {
+          self.markFailure(workflowId, ex.message || String(ex));
+          throw ex;
+        }
+        
+        if (params.stream) {
+          async function* wrapOllamaStream(stream: any) {
+            let accumulatedContent = "";
+            let prompt_eval_count = 0;
+            let eval_count = 0;
+            for await (const chunk of stream) {
+              if (chunk.message?.content) {
+                accumulatedContent += chunk.message.content;
+              }
+              if (chunk.prompt_eval_count) prompt_eval_count = chunk.prompt_eval_count;
+              if (chunk.eval_count) eval_count = chunk.eval_count;
+              yield chunk;
+            }
+            self.recordResponse(workflowId, accumulatedContent);
+            self.logEvent({
+              model,
+              prompt: userPrompt,
+              response: accumulatedContent,
+              inputTokens: prompt_eval_count,
+              outputTokens: eval_count,
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              provider: "ollama"
+            });
+          }
+          return wrapOllamaStream(resp);
+        }
+        
+        try {
+          const content = resp?.message?.content;
+          self.recordResponse(workflowId, content);
+          self.logEvent({
+            model,
+            prompt: userPrompt,
+            response: content,
+            inputTokens: resp?.prompt_eval_count || 0,
+            outputTokens: resp?.eval_count || 0,
+            systemPrompt,
+            extraMetadata: params.metadata,
+            workflowId,
+            tags: extraParams.tags,
+            qualityScore: extraParams.qualityScore,
+            provider: "ollama"
+          });
+        } catch {}
+        return resp;
+      };
+      patchedChat.__aurex_patched__ = true;
+      target.chat = patchedChat;
+    }
+    
+    if (typeof target.generate === "function" && !target.generate.__aurex_patched__) {
+      const originalGenerate = target.generate.bind(target);
+      const patchedGenerate: any = async function (...args: any[]) {
+        const params = args[0] || {};
+        let model = params.model || "llama-4-scout";
+        const userPrompt = params.prompt || "";
+        const systemPrompt = params.system || "";
+        
+        const extraParams = self.extractAurexExtraParams(params);
+        const workflowId = extraParams.workflowId || "default_workflow";
+        
+        let decision;
+        try {
+          decision = self.preCallCheck({
+            model,
+            prompt: userPrompt,
+            systemPrompt,
+            workflowId,
+          });
+          if (decision.action === "cache_suggest" && decision.response) {
+            return {
+              model,
+              response: decision.response,
+              done: true,
+              prompt_eval_count: 0,
+              eval_count: 0
+            };
+          }
+          if (decision.action === "downgrade" && decision.suggestedModel) {
+            params.model = decision.suggestedModel;
+            model = decision.suggestedModel;
+          }
+          if (decision.injectSystemInstruction) {
+            params.prompt = `${decision.injectSystemInstruction}\n${userPrompt}`;
+          }
+        } catch (err: any) {
+          if (process.env.AUREX_BLOCK_ON_WASTE === "1" || self.budgetConfig?.onBudgetExceeded === "throw") {
+            throw err;
+          }
+          console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
+        }
+        
+        let resp;
+        try {
+          resp = await originalGenerate(...args);
+        } catch (ex: any) {
+          self.markFailure(workflowId, ex.message || String(ex));
+          throw ex;
+        }
+        
+        if (params.stream) {
+          async function* wrapOllamaStream(stream: any) {
+            let accumulatedContent = "";
+            let prompt_eval_count = 0;
+            let eval_count = 0;
+            for await (const chunk of stream) {
+              if (chunk.response) {
+                accumulatedContent += chunk.response;
+              }
+              if (chunk.prompt_eval_count) prompt_eval_count = chunk.prompt_eval_count;
+              if (chunk.eval_count) eval_count = chunk.eval_count;
+              yield chunk;
+            }
+            self.recordResponse(workflowId, accumulatedContent);
+            self.logEvent({
+              model,
+              prompt: userPrompt,
+              response: accumulatedContent,
+              inputTokens: prompt_eval_count,
+              outputTokens: eval_count,
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              provider: "ollama"
+            });
+          }
+          return wrapOllamaStream(resp);
+        }
+        
+        try {
+          const content = resp?.response;
+          self.recordResponse(workflowId, content);
+          self.logEvent({
+            model,
+            prompt: userPrompt,
+            response: content,
+            inputTokens: resp?.prompt_eval_count || 0,
+            outputTokens: resp?.eval_count || 0,
+            systemPrompt,
+            extraMetadata: params.metadata,
+            workflowId,
+            tags: extraParams.tags,
+            qualityScore: extraParams.qualityScore,
+            provider: "ollama"
+          });
+        } catch {}
+        return resp;
+      };
+      patchedGenerate.__aurex_patched__ = true;
+      target.generate = patchedGenerate;
+    }
+  }
+
+  /** Best-effort Ollama SDK patcher (ollama). */
+  public patchOllama(): void {
+    let ollamaMod: any;
+    try {
+      ollamaMod = require("ollama");
+    } catch {
+      return;
+    }
+    const Cls = ollamaMod.Ollama || ollamaMod.default?.Ollama;
+    const targetClass = Cls || (typeof ollamaMod.default === "function" ? ollamaMod.default : null);
+    if (!targetClass) {
+      const defaultExport = ollamaMod.default || ollamaMod;
+      if (defaultExport && typeof defaultExport.chat === "function" && !defaultExport.chat.__aurex_patched__) {
+        this.patchOllamaMethods(defaultExport);
+      }
+      return;
+    }
+
+    if (targetClass.prototype && !targetClass.prototype.chat?.__aurex_patched__) {
+      this.patchOllamaMethods(targetClass.prototype);
+    }
+  }
+
+  /** Best-effort Hugging Face SDK patcher (@huggingface/inference). */
+  public patchHuggingFace(): void {
+    let hfMod: any;
+    try {
+      hfMod = require("@huggingface/inference");
+    } catch {
+      return;
+    }
+    const Cls = hfMod.HfInference;
+    if (!Cls || Cls.__aurex_patched__) return;
+
+    const self = this;
+
+    if (Cls.prototype.chatCompletion && !Cls.prototype.chatCompletion.__aurex_patched__) {
+      const origChat = Cls.prototype.chatCompletion;
+      Cls.prototype.chatCompletion = async function (this: any, ...args: any[]) {
+        const params = args[0] || {};
+        const model = params.model || "unknown";
+        const messages = params.messages || [];
+        
+        let systemPrompt = "";
+        let userPrompt = "";
+        for (const m of messages) {
+          if (m.role === "system" && typeof m.content === "string") {
+            systemPrompt = m.content;
+          } else if (m.role === "user" && typeof m.content === "string") {
+            userPrompt = m.content;
+          }
+        }
+        
+        const ctx = aurexContext.getStore() || {};
+        const extraParams = self.extractAurexExtraParams(params);
+        const workflowId = extraParams.workflowId || ctx.workflowId || "default_workflow";
+        
+        const decision = self.preCallCheck({
+          model,
+          prompt: userPrompt,
+          systemPrompt,
+          workflowId,
+          messages,
+        });
+        
+        if (decision.action === "block") {
+          throw new Error(`[Aurex] Blocked: ${decision.reason}`);
+        }
+        if (decision.action === "downgrade" && decision.suggestedModel) {
+          params.model = decision.suggestedModel;
+        }
+        
+        let resp;
+        try {
+          resp = await origChat.call(this, ...args);
+        } catch (ex: any) {
+          self.markFailure(workflowId, ex.message);
+          throw ex;
+        }
+        
+        // Handle streaming
+        if (params.stream) {
+          const origStream = resp;
+          async function* wrappedChatStream() {
+            const accumulated: string[] = [];
+            for await (const chunk of origStream) {
+              const text = chunk?.choices?.[0]?.delta?.content || "";
+              if (text) accumulated.push(text);
+              yield chunk;
+            }
+            const fullContent = accumulated.join("");
+            self.recordResponse(workflowId, fullContent);
+            self.logEvent({
+              model: params.model || model,
+              prompt: userPrompt,
+              response: fullContent,
+              inputTokens: self.estimateTokens(userPrompt, messages),
+              outputTokens: Math.max(1, Math.floor(fullContent.length / 4)),
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId,
+              tags: extraParams.tags,
+              qualityScore: extraParams.qualityScore,
+              provider: "huggingface",
+            });
+          }
+          return wrappedChatStream();
+        }
+        
+        // Non-streaming response
+        const text = resp?.choices?.[0]?.message?.content || "";
+        self.recordResponse(workflowId, text);
+        const inputTokens = resp?.usage?.prompt_tokens || self.estimateTokens(userPrompt, messages);
+        const outputTokens = resp?.usage?.completion_tokens || Math.max(1, Math.floor(text.length / 4));
+        self.logEvent({
+          model: params.model || model,
+          prompt: userPrompt,
+          response: text,
+          inputTokens,
+          outputTokens,
+          systemPrompt,
+          extraMetadata: params.metadata,
+          workflowId,
+          tags: extraParams.tags,
+          qualityScore: extraParams.qualityScore,
+          provider: "huggingface",
+        });
+        return resp;
+      };
+      Cls.prototype.chatCompletion.__aurex_patched__ = true;
+    }
+
+    if (Cls.prototype.textGeneration && !Cls.prototype.textGeneration.__aurex_patched__) {
+      const origGen = Cls.prototype.textGeneration;
+      Cls.prototype.textGeneration = async function (this: any, ...args: any[]) {
+        const params = args[0] || {};
+        const model = params.model || "unknown";
+        const prompt = params.inputs || "";
+        
+        const ctx = aurexContext.getStore() || {};
+        const extraParams = self.extractAurexExtraParams(params);
+        const workflowId = extraParams.workflowId || ctx.workflowId || "default_workflow";
+        
+        const decision = self.preCallCheck({
+          model,
+          prompt,
+          workflowId,
+        });
+        
+        if (decision.action === "block") {
+          throw new Error(`[Aurex] Blocked: ${decision.reason}`);
+        }
+        if (decision.action === "downgrade" && decision.suggestedModel) {
+          params.model = decision.suggestedModel;
+        }
+        
+        let resp;
+        try {
+          resp = await origGen.call(this, ...args);
+        } catch (ex: any) {
+          self.markFailure(workflowId, ex.message);
+          throw ex;
+        }
+        
+        const text = typeof resp === "string" ? resp : (resp?.generated_text || "");
+        self.recordResponse(workflowId, text);
+        self.logEvent({
+          model: params.model || model,
+          prompt,
+          response: text,
+          inputTokens: self.estimateTokens(prompt),
+          outputTokens: Math.max(1, Math.floor(text.length / 4)),
+          extraMetadata: params.metadata,
+          workflowId,
+          tags: extraParams.tags,
+          qualityScore: extraParams.qualityScore,
+          provider: "huggingface",
+        });
+        return resp;
+      };
+      Cls.prototype.textGeneration.__aurex_patched__ = true;
+    }
+
+    if (Cls.prototype.textGenerationStream && !Cls.prototype.textGenerationStream.__aurex_patched__) {
+      const origGenStream = Cls.prototype.textGenerationStream;
+      Cls.prototype.textGenerationStream = async function (this: any, ...args: any[]) {
+        const params = args[0] || {};
+        const model = params.model || "unknown";
+        const prompt = params.inputs || "";
+        
+        const ctx = aurexContext.getStore() || {};
+        const extraParams = self.extractAurexExtraParams(params);
+        const workflowId = extraParams.workflowId || ctx.workflowId || "default_workflow";
+        
+        const decision = self.preCallCheck({
+          model,
+          prompt,
+          workflowId,
+        });
+        
+        if (decision.action === "block") {
+          throw new Error(`[Aurex] Blocked: ${decision.reason}`);
+        }
+        if (decision.action === "downgrade" && decision.suggestedModel) {
+          params.model = decision.suggestedModel;
+        }
+        
+        let resp;
+        try {
+          resp = await origGenStream.call(this, ...args);
+        } catch (ex: any) {
+          self.markFailure(workflowId, ex.message);
+          throw ex;
+        }
+        
+        const origStream = resp;
+        async function* wrappedGenStream() {
+          const accumulated: string[] = [];
+          for await (const chunk of origStream) {
+            const text = chunk?.token?.text || chunk?.generated_text || "";
+            if (text) accumulated.push(text);
+            yield chunk;
+          }
+          const fullContent = accumulated.join("");
+          self.recordResponse(workflowId, fullContent);
+          self.logEvent({
+            model: params.model || model,
+            prompt,
+            response: fullContent,
+            inputTokens: self.estimateTokens(prompt),
+            outputTokens: Math.max(1, Math.floor(fullContent.length / 4)),
+            extraMetadata: params.metadata,
+            workflowId,
+            tags: extraParams.tags,
+            qualityScore: extraParams.qualityScore,
+            provider: "huggingface",
+          });
+        }
+        return wrappedGenStream();
+      };
+      Cls.prototype.textGenerationStream.__aurex_patched__ = true;
+    }
+  }
+
   public patchAll(): void {
     this.patchLiteLLM();
     this.patchAnthropic();
     this.patchOpenAI();
+    this.patchGoogle();
+    this.patchOllama();
+    this.patchHuggingFace();
   }
 }
 

@@ -19,9 +19,19 @@ import {
   Bot,
   Target,
   Zap,
+  BookOpen,
+  CheckCircle,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 
-function CodeBlock({ code, language, id }: { code: string; language: string; id: string }) {
+interface CodeBlockProps {
+  code: string;
+  language: string;
+  id: string;
+}
+
+function CodeBlock({ code, language, id }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -65,169 +75,473 @@ function CodeBlock({ code, language, id }: { code: string; language: string; id:
   );
 }
 
+interface DualCodeBlockProps {
+  pythonCode: string;
+  nodeCode: string;
+  pythonId: string;
+  nodeId: string;
+  pythonTitle?: string;
+  nodeTitle?: string;
+}
+
+function DualCodeBlock({
+  pythonCode,
+  nodeCode,
+  pythonId,
+  nodeId,
+  pythonTitle = "Python",
+  nodeTitle = "Node.js",
+}: DualCodeBlockProps) {
+  const [copiedPy, setCopiedPy] = useState(false);
+  const [copiedNode, setCopiedNode] = useState(false);
+
+  const handleCopyPy = async () => {
+    try {
+      await navigator.clipboard.writeText(pythonCode);
+      setCopiedPy(true);
+      setTimeout(() => setCopiedPy(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy!", err);
+    }
+  };
+
+  const handleCopyNode = async () => {
+    try {
+      await navigator.clipboard.writeText(nodeCode);
+      setCopiedNode(true);
+      setTimeout(() => setCopiedNode(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy!", err);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+      {/* Python Panel */}
+      <div className="relative group rounded-xl border border-white/[0.08] bg-[#0c0c0c] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.05] bg-white/[0.02] text-xs font-mono text-white/40">
+          <span className="text-emerald-400 font-semibold">{pythonTitle}</span>
+          <button
+            id={pythonId}
+            onClick={handleCopyPy}
+            className="flex items-center gap-1.5 hover:text-white transition-colors"
+          >
+            {copiedPy ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+        <div className="p-4 overflow-x-auto flex-1">
+          <pre className="font-mono text-[13px] text-white/80 leading-relaxed whitespace-pre select-all">
+            {pythonCode}
+          </pre>
+        </div>
+      </div>
+
+      {/* Node Panel */}
+      <div className="relative group rounded-xl border border-white/[0.08] bg-[#0c0c0c] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.05] bg-white/[0.02] text-xs font-mono text-white/40">
+          <span className="text-indigo-400 font-semibold">{nodeTitle}</span>
+          <button
+            id={nodeId}
+            onClick={handleCopyNode}
+            className="flex items-center gap-1.5 hover:text-white transition-colors"
+          >
+            {copiedNode ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+        <div className="p-4 overflow-x-auto flex-1">
+          <pre className="font-mono text-[13px] text-white/80 leading-relaxed whitespace-pre select-all">
+            {nodeCode}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DocsPage() {
-  const [activeTab, setActiveTab] = useState<"python" | "node">("node");
   const [activeSection, setActiveSection] = useState("overview");
 
-  const sections = [
-    { id: "overview", label: "Overview" },
-    { id: "agent-cheatsheet", label: "AI agent cheat sheet" },
-    { id: "quickstart", label: "Quick start" },
-    { id: "autohook", label: "Zero-code hook" },
-    { id: "integration", label: "Manual integration" },
-    { id: "outcomes", label: "Success & failure" },
-    { id: "guards", label: "Real-time guards" },
-    { id: "heuristics", label: "Offline analysis" },
-    { id: "cicd", label: "CI gate" },
+  const sectionGroups = [
+    {
+      title: "Getting Started",
+      items: [
+        { id: "overview", label: "Overview" },
+        { id: "quickstart", label: "Quick Start & Installation" },
+        { id: "autohook", label: "Zero-Code Auto-Hook" },
+      ],
+    },
+    {
+      title: "Core API Reference",
+      items: [
+        { id: "integration", label: "Manual Integration" },
+        { id: "config-reference", label: "AurexConfig Options" },
+        { id: "budget-guard-config", label: "BudgetGuard Setup" },
+        { id: "provider-matrix", label: "Supported Providers" },
+      ],
+    },
+    {
+      title: "Advanced Features",
+      items: [
+        { id: "guards", label: "Real-Time Guards" },
+        { id: "context-wrappers", label: "Context Overrides & Wrappers" },
+        { id: "outcomes", label: "Success & Failure Signals" },
+        { id: "health-monitoring", label: "Health & Crash Recovery" },
+      ],
+    },
+    {
+      title: "CI/CD & CLI Reference",
+      items: [
+        { id: "heuristics", label: "Offline Heuristics CLI" },
+        { id: "cicd", label: "CI Policy Gate" },
+      ],
+    },
   ];
 
-  const nodeInstall = `npm install aurex-sdk`;
-  const pythonInstall = `pip install -e sdk/python   # from repo root; package name: aurex-python`;
+  const sections = sectionGroups.flatMap((g) => g.items);
 
-  const nodeHook = `# 1) Write .env.aurex in your project
+  const pythonInstallCode = `pip install aurex-sdk`;
+  const nodeInstallCode = `npm install aurex-sdk`;
+
+  const pythonHookCode = `# 1) Install the hook into your site-packages
+aurex install-hook
+
+# 2) Configure env vars and run your application
+export AUREX_ENABLED=1
+export AUREX_API_KEY=aux_dev_yourkey
+python your_app.py   # all OpenAI, Anthropic, Google Gemini, LiteLLM calls tracked`;
+
+  const nodeHookCode = `# 1) Generate workspace environment file (.env.aurex)
 npx aurex install-hook
+
+# 2) Source settings, configure key and run your app
 source .env.aurex
+export AUREX_API_KEY=aux_dev_yourkey
+node your_app.js    # all OpenAI, Anthropic, LiteLLM calls tracked`;
 
-# 2) Set your API key (from /app/api-keys)
-export AUREX_API_KEY=aux_live_...
+  const pythonManualCode = `from aurex_sdk import AurexAuditor, AurexConfig
 
-# Optional
-export AUREX_BASE_URL=http://localhost:8000/api/v1
-export AUREX_WORKFLOW_ID=my_agent
+# Initialize singleton with configuration
+auditor = AurexAuditor(AurexConfig(
+    api_key="aux_dev_yourkey",
+    project="my-project",
+    storage_mode="file",                  # "file" or "memory"
+    ledger_path=".aurex/ledger.jsonl",
+    cloud_sync=True                       # Enable backend sync
+))
 
-# 3) Run your app — OpenAI, Anthropic, LiteLLM calls are tracked
-node your_app.js`;
+# Log manual event (or see patch_all below)
+auditor.log_event(
+    model="gpt-4o-mini",
+    input_tokens=120,
+    output_tokens=40,
+    workflow_id="checkout_agent"
+)
 
-  const nodeManual = `import { AurexAuditor } from "aurex-sdk";
+# Force-flush pending sync queue
+auditor.flush()
 
-const aurex = AurexAuditor.getInstance({
-  apiKey: process.env.AUREX_API_KEY,
-  cloudSync: true,           // on by default when apiKey is set
-  baseUrl: "http://localhost:8000/api/v1",
+# Cleanup background sync thread on exit
+auditor.shutdown()`;
+
+  const nodeManualCode = `import { AurexAuditor } from "aurex-sdk";
+
+// Initialize singleton with configuration
+const auditor = AurexAuditor.getInstance({
+  apiKey: "aux_dev_yourkey",
+  project: "my-project",
   ledgerPath: ".aurex/ledger.jsonl",
+  cloudSync: true                         // Enable backend sync
 });
 
-// After each LLM call (or use patchAll() below)
-aurex.logEvent({
+// Log manual event (or see patchAll below)
+auditor.logEvent({
   model: "gpt-4o-mini",
   inputTokens: 120,
   outputTokens: 40,
-  workflowId: "checkout_agent",
+  workflowId: "checkout_agent"
 });
 
-aurex.flush();
-process.on("SIGINT", () => { aurex.shutdown(); process.exit(0); });`;
+// Force-flush pending sync queue
+auditor.flush();
 
-  const nodePatch = `import { AurexAuditor } from "aurex-sdk";
+// Cleanup sync resources on shutdown
+process.on("SIGINT", () => {
+  auditor.shutdown();
+  process.exit(0);
+});`;
 
-const aurex = AurexAuditor.getInstance({ apiKey: process.env.AUREX_API_KEY });
-aurex.patchAll();  // LiteLLM + Anthropic + OpenAI
+  const pythonPatchCode = `from aurex_sdk import AurexAuditor
 
-// Calls are logged automatically. preCallCheck runs before each call.`;
+auditor = AurexAuditor()
 
-  const nodeOutcomes = `import { AurexAuditor } from "aurex-sdk";
+# Patch all supported providers at once
+auditor.patch_all()
 
-const aurex = AurexAuditor.getInstance({ apiKey: process.env.AUREX_API_KEY });
+# Or selectively patch individual clients
+# auditor.patch_openai()
+# auditor.patch_anthropic()
+# auditor.patch_google()  # Google Gemini support (Python Only)
+# auditor.patch_litellm()
+# auditor.patch_huggingface()  # Hugging Face support`;
 
-// Call these when your workflow finishes (not on every LLM call)
-aurex.markSuccess("checkout_agent", { ticketId: "T-123" });
-aurex.markFailure("checkout_agent", "timeout", { retries: 3 });
+  const nodePatchCode = `import { AurexAuditor } from "aurex-sdk";
 
-// Powers /app metrics: cost per successful outcome, success rate`;
+const auditor = AurexAuditor.getInstance();
 
-  const nodeGuards = `import { AurexAuditor, applyDecisionToCallParams } from "aurex-sdk";
+// Patch all supported clients at once
+auditor.patchAll();
 
-const aurex = AurexAuditor.getInstance({ apiKey: process.env.AUREX_API_KEY });
+// Or selectively patch individual clients
+// auditor.patchOpenAI();
+// auditor.patchAnthropic();
+// auditor.patchLiteLLM();
+// auditor.patchHuggingFace();  // Hugging Face support`;
 
-const decision = aurex.preCallCheck({
-  model: "gpt-4o",
-  prompt: "Say hi",
-  workflowId: "my_agent",
-  messages: [{ role: "user", content: "Say hi" }],
+  const pythonPricingCode = `# Configure pricing via custom JSON file or fallback
+auditor = AurexAuditor(AurexConfig(
+    pricing_path="path/to/custom_pricing.json",
+    default_pricing={"input": 0.15, "output": 0.60}  # Fallback for unknown models
+))
+
+# Programmatic pricing registration (supports wildcard matchers like "local/*")
+auditor.register_model_pricing("custom-llama-3", input_cost=0.15, output_cost=0.60)
+auditor.register_model_pricing("local/*", input_cost=0.00, output_cost=0.00)`;
+
+  const nodePricingCode = `// Configure pricing via custom JSON file or fallback
+const auditor = AurexAuditor.getInstance({
+  pricingPath: "path/to/custom_pricing.json",
+  defaultPricing: { input: 0.15, output: 0.60 }  // Fallback for unknown models
 });
 
-// decision.action: "proceed" | "downgrade" | "compress" | "block"
-// decision.suggestedModel — cheaper model when downgrade
-// decision.injectSystemInstruction — loop / context hints
+// Programmatic pricing registration (supports wildcard matchers like "local/*")
+auditor.registerModelPricing("custom-llama-3", 0.15, 0.60);
+auditor.registerModelPricing("local/*", 0.00, 0.00);`;
 
-const params = applyDecisionToCallParams(openaiParams, decision);
+  const pythonWrapCode = `import openai
+from aurex_sdk import AurexAuditor
 
-// Or use the helper:
-// await aurex.wrap((p) => openai.chat.completions.create(p), () => openaiParams);
+auditor = AurexAuditor()
+auditor.patch_all()
 
-// Skip guards for one workflow:
-aurex.ignore("my_agent");`;
+# Wrap calls to intercept and apply request-scoped options & budgets
+res = auditor.wrap(
+    call_fn=openai.chat.completions.create,
+    build_params=lambda: {
+        "model": "gpt-4o",
+        "messages": [{"role": "user", "content": "Process request details"}]
+    },
+    options={
+        "workflow_id": "tenant_abc_session",
+        "tags": {"tier": "enterprise"},
+        "simple_prompt_token_limit": 50,  # override default simple limit
+        "budget_guard": {
+            "max_cost_per_session": 0.05,  # custom budget for this tenant
+            "on_budget_exceeded": "throw"
+        },
+        "downgrade_map": {
+            "gpt-4o": "gpt-4o-mini"  # model swap downgrade target
+        }
+    }
+)`;
 
-  const nodeCi = `# Warn only (default) — prints markdown report
-npx aurex ci --mode=warn --github-comment
+  const nodeWrapCode = `import OpenAI from "openai";
+import { AurexAuditor } from "aurex-sdk";
 
-# Fail CI on CRITICAL waste
-npx aurex ci --mode=block
+const auditor = AurexAuditor.getInstance();
+const openai = new OpenAI();
 
-# Config: .aurex/config.json
-# { "ci": { "mode": "warn", "max_waste_percentage": 30 } }`;
+// Wrap calls to intercept and apply request-scoped options & budgets (via AsyncLocalStorage)
+const response = await auditor.wrap(
+  async (params) => openai.chat.completions.create(params),
+  () => ({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: "Process request details" }]
+  }),
+  {
+    workflowId: "tenant_abc_session",
+    tags: { tier: "enterprise" },
+    simplePromptTokenLimit: 50,  // override default simple limit
+    budgetGuard: {
+      maxCostPerSession: 0.05,   // custom budget for this tenant
+      onBudgetExceeded: "throw"
+    },
+    downgradeMap: {
+      "gpt-4o": "gpt-4o-mini"    // model swap downgrade target
+    }
+  }
+);`;
 
-  const pythonManual = `from aurex import AurexAuditor, mark_success, mark_failure
+  const pythonOutcomesCode = `from aurex_sdk import AurexAuditor
 
-auditor = AurexAuditor.get_instance(api_key="aux_live_...")
+auditor = AurexAuditor()
 
-auditor.log_event(
-    model="gpt-4o-mini",
-    input_tokens=100,
-    output_tokens=50,
-    workflow_id="my_agent",
+# Call once per workflow completion to record outcomes
+auditor.mark_success("checkout_agent", {"ticket_id": "T-123"})
+
+# Or signal failure
+auditor.mark_failure("checkout_agent", "timeout", {"retries": 3})`;
+
+  const nodeOutcomesCode = `import { AurexAuditor } from "aurex-sdk";
+
+const auditor = AurexAuditor.getInstance();
+
+// Call once per workflow completion to record outcomes
+auditor.markSuccess("checkout_agent", { ticketId: "T-123" });
+
+// Or signal failure
+auditor.markFailure("checkout_agent", "timeout", { retries: 3 });`;
+
+  const pythonGuardsCode = `from aurex_sdk import AurexAuditor, AurexDecision, AurexAction
+
+auditor = AurexAuditor()
+
+# Evaluate guards locally before calling LLM
+decision: AurexDecision = auditor.pre_call_check(
+    model="gpt-4o",
+    prompt="Generate python code...",
+    system_prompt="You are an AI assistant...",
+    workflow_id="user_session_123",
+    messages=[{"role": "user", "content": "..."}]
 )
 
-mark_success("my_agent", {"order_id": "123"})
-mark_failure("my_agent", "timeout", {"retries": 2})`;
+# Handle action
+if decision.action == "block":
+    raise Exception(f"Blocked by guard: {decision.reason}")
+elif decision.action == "downgrade":
+    # Swap to cheaper model suggestion
+    model = decision.suggested_model  # e.g., "gpt-4o-mini"
+elif decision.action == "compress":
+    # Pruned system prompts
+    messages = decision.compressed_messages
 
-  const pythonPatch = `from aurex import patch_openai, patch_anthropic, patch_litellm
+# Ignore specific workflows
+auditor.ignore("admin_workflow_456")`;
 
-patch_openai()    # optional: install openai
-patch_anthropic() # optional: install anthropic
-patch_litellm()   # optional: install litellm
+  const nodeGuardsCode = `import { AurexAuditor, AurexDecision } from "aurex-sdk";
 
-# Then use providers normally — events sync when AUREX_API_KEY is set`;
+const auditor = AurexAuditor.getInstance();
 
-  const nodeHeuristics = `// LocalHeuristicsEngine lives in sdk/node/src/heuristics.ts
-// Not exported from the npm package main entry yet.
-// Use CI instead for pipelines:
-npx aurex ci --mode=warn`;
+// Evaluate guards locally before calling LLM
+const decision: AurexDecision = auditor.preCallCheck({
+  model: "gpt-4o",
+  prompt: "Generate python code...",
+  systemPrompt: "You are an AI assistant...",
+  workflowId: "user_session_123",
+  messages: [{ role: "user", content: "..." }]
+});
+
+// Handle action
+if (decision.action === "block") {
+  throw new Error(\`Blocked by guard: \${decision.reason}\`);
+} else if (decision.action === "downgrade") {
+  // Swap to cheaper model suggestion
+  const model = decision.suggestedModel;  // e.g., "gpt-4o-mini"
+} else if (decision.action === "compress") {
+  // Pruned system prompts
+  const messages = decision.compressedMessages;
+}
+
+// Ignore specific workflows
+auditor.ignore("admin_workflow_456");`;
+
+  const pythonHealthCode = `from aurex_sdk import AurexAuditor
+
+auditor = AurexAuditor()
+
+# Get telemetry sync thread health status
+health = auditor.get_health()
+print(health)
+# Output:
+# {
+#   "status": "healthy",
+#   "queue_size": 0,
+#   "pending_file_exists": False,
+#   "thread_active": True,
+#   "events_logged": 42
+# }`;
+
+  const nodeHealthCode = `import { AurexAuditor } from "aurex-sdk";
+
+const auditor = AurexAuditor.getInstance();
+
+// Get telemetry sync status
+const health = auditor.getHealth();
+console.log(health);
+// Output:
+// {
+//   status: "healthy",
+//   queueSize: 0,
+//   threadActive: true,
+//   eventsLogged: 12
+// }`;
+
+  const pythonCliCode = `# Heuristics analysis on local ledger
+aurex audit --ledger .aurex/ledger.jsonl
+
+# Fail build if score is under 85 or waste exceeds $5
+aurex audit --fail-under 85 --max-waste-usd 5.00 --mode block`;
+
+  const nodeCliCode = `# CI heuristics analysis on local ledger
+npx aurex ci
+
+# Fail CI if critical waste is found
+npx aurex ci --mode=block --github-comment`;
 
   return (
     <main className="min-h-screen bg-[#030303] text-foreground font-sans relative overflow-x-hidden">
       <SEOHead />
       <Navigation />
 
+      {/* Header Hero Section */}
       <div className="relative pt-32 pb-12 border-b border-white/[0.05] bg-gradient-to-b from-indigo-500/[0.02] via-transparent to-transparent">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">SDK v0.1</span>
+              <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">SDK v0.2 Parity</span>
             </div>
             <h1 className="text-4xl lg:text-5xl font-display font-bold tracking-tight text-white mb-2">
-              Aurex SDK docs
+              Aurex SDK Documentation
             </h1>
             <p className="text-base text-white/50 max-w-xl">
-              Track LLM cost locally, sync metadata to your project, and catch waste before it hits your bill.
+              Track LLM cost locally, sync metadata to your project, and block waste using real-time circuit breakers in both Python and Node.js.
             </p>
           </div>
 
-          <div className="flex items-start gap-3 p-4 rounded-xl border border-white/[0.08] bg-[#0a0a0a] max-w-sm">
+          <div className="flex items-start gap-3 p-4 rounded-xl border border-white/[0.08] bg-[#0a0a0a] max-w-sm backdrop-blur-md">
             <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
             <div>
-              <h4 className="text-sm font-semibold text-white">For AI coding agents</h4>
+              <h4 className="text-sm font-semibold text-white">Agent-Friendly Reference</h4>
               <p className="text-xs text-white/40 mt-1 mb-2 leading-relaxed">
-                Load <code className="text-indigo-400">/llms.txt</code> or jump to the cheat sheet below.
+                Direct plain-text configuration specs for AI coding assistants can be referenced under <code className="text-indigo-400">/llms.txt</code>.
               </p>
               <a
                 href="/llms.txt"
                 target="_blank"
-                className="text-xs font-medium text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1"
+                className="text-xs font-medium text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1 group"
               >
                 Open /llms.txt
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </a>
             </div>
           </div>
@@ -236,50 +550,56 @@ npx aurex ci --mode=warn`;
 
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
         <div className="flex flex-col lg:flex-row gap-12">
+          {/* Sidebar Navigation */}
           <aside className="w-full lg:w-64 shrink-0">
             <div className="sticky top-28 space-y-6">
-              <div className="space-y-1">
-                <span className="text-xs font-mono text-white/30 uppercase tracking-widest block px-3 mb-2">
-                  On this page
-                </span>
-                {sections.map((section) => (
-                  <button
-                    key={section.id}
-                    onClick={() => {
-                      setActiveSection(section.id);
-                      document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-all ${
-                      activeSection === section.id
-                        ? "bg-white/[0.05] text-white border-l-2 border-emerald-500 pl-4 font-semibold"
-                        : "text-white/40 hover:text-white/80"
-                    }`}
-                  >
-                    {section.label}
-                  </button>
+              <div className="space-y-6">
+                {sectionGroups.map((group) => (
+                  <div key={group.title} className="space-y-1">
+                    <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest block px-3 mb-2 font-bold">
+                      {group.title}
+                    </span>
+                    {group.items.map((section) => (
+                      <button
+                        key={section.id}
+                        onClick={() => {
+                          setActiveSection(section.id);
+                          document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm rounded-lg transition-all flex items-center justify-between group ${
+                          activeSection === section.id
+                            ? "bg-white/[0.05] text-white border-l-2 border-emerald-500 pl-4 font-semibold"
+                            : "text-white/45 hover:text-white/80 hover:bg-white/[0.02]"
+                        }`}
+                      >
+                        <span>{section.label}</span>
+                        <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeSection === section.id ? "opacity-100 text-emerald-400" : "text-white/30"}`} />
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
 
-              <div className="p-4 rounded-xl border border-white/[0.05] bg-white/[0.01] text-xs text-white/45 space-y-2">
-                <p>
-                  <strong className="text-white/70">Node package:</strong> <code>aurex-sdk</code>
-                </p>
-                <p>
-                  <strong className="text-white/70">Python package:</strong> <code>aurex</code> (repo:{" "}
-                  <code>sdk/python</code>)
-                </p>
-                <p>
-                  <strong className="text-white/70">Cloud ingest:</strong>{" "}
-                  <code>POST /api/v1/ledger/events</code>
-                </p>
-                <p>
-                  <strong className="text-white/70">Dashboard:</strong> <a href="/app" className="text-emerald-400 hover:underline">/app</a>
-                </p>
+              {/* Sidebar Quick Meta Info */}
+              <div className="p-4 rounded-xl border border-white/[0.05] bg-white/[0.01] text-xs text-white/45 space-y-3">
+                <div>
+                  <strong className="text-white/70 block mb-0.5">Python SDK</strong>
+                  <code className="bg-white/[0.04] px-1.5 py-0.5 rounded text-[11px]">from aurex_sdk import ...</code>
+                </div>
+                <div>
+                  <strong className="text-white/70 block mb-0.5">Node.js SDK</strong>
+                  <code className="bg-white/[0.04] px-1.5 py-0.5 rounded text-[11px]">import {'{'} AurexAuditor {'}'} from "aurex-sdk"</code>
+                </div>
+                <div>
+                  <strong className="text-white/70 block mb-0.5">Cloud Sync Ingestion</strong>
+                  <code className="bg-white/[0.04] px-1.5 py-0.5 rounded text-[11px]">POST /api/v1/ledger/events</code>
+                </div>
               </div>
             </div>
           </aside>
 
-          <div className="flex-1 space-y-16 max-w-4xl">
+          {/* Main Content Area */}
+          <div className="flex-1 space-y-20 max-w-4xl">
             {/* Overview */}
             <section id="overview" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
@@ -288,322 +608,561 @@ npx aurex ci --mode=warn`;
               </h2>
               <div className="text-white/60 space-y-4 leading-relaxed">
                 <p>
-                  Aurex watches your LLM calls. It writes a local file (<code className="text-indigo-400">.aurex/ledger.jsonl</code>
-                  ), optionally sends <strong className="text-white/80">metadata only</strong> to the backend (tokens, model, cost, hashes — not raw prompts unless you opt in).
+                  Aurex watches your LLM calls. It registers telemetry locally to a disk file (<code className="text-indigo-400">.aurex/ledger.jsonl</code>
+                  ) and optionally streams <strong className="text-white/80">metadata-only telemetry</strong> asynchronously to the backend dashboard. 
+                  This metadata includes input/output token counts, cached status, cost calculations, and prompt hashes. Prompts/responses themselves are hashed locally and are never synced to the cloud unless explicitly opted in.
                 </p>
-                <p>
-                  <strong className="text-white/80">Node.js</strong> is the most complete SDK today: auto-hooks, real-time guards, outcomes, and CI.
-                  <strong className="text-white/80"> Python</strong> supports logging, patches, and outcome helpers.
-                </p>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] text-sm text-white/50">
+                  <Info className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white font-medium block">Complete Feature Parity</strong>
+                    Both the Python and Node.js SDKs support the full feature matrix including auto-patchers, outcomes tracking, CLI tools, and real-time budget guard checks (which evaluate locally in-process without network overhead).
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { title: "Local first", desc: "Ledger on disk. Cloud sync is optional.", icon: ShieldCheck },
-                  { title: "Project scoped", desc: "Use API keys from /app/api-keys (aux_live_*).", icon: Target },
-                  { title: "Acts before calls", desc: "Downgrade, compress, or warn — in-process, no extra HTTP.", icon: Zap },
+                  { title: "Local First Control Plane", desc: "Disk-backed ledger buffering. Real-time budget breakers evaluate offline to prevent blocking network calls.", icon: ShieldCheck },
+                  { title: "Project Scoped Keys", desc: "Initialize with aux_live_* tokens to organize telemetry logs by team workspace and projects.", icon: Target },
+                  { title: "Zero Latency Guards", desc: "Intercept calls, compress system messages, and swap to cheap models instantly in-process.", icon: Zap },
                 ].map((item, idx) => (
                   <div key={idx} className="p-5 rounded-xl border border-white/[0.05] bg-white/[0.01]">
                     <item.icon className="w-5 h-5 text-emerald-400 mb-2" />
                     <h3 className="text-sm font-semibold text-white">{item.title}</h3>
-                    <p className="text-xs text-white/40 mt-1">{item.desc}</p>
+                    <p className="text-xs text-white/40 mt-1 leading-relaxed">{item.desc}</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            {/* Agent cheat sheet */}
-            <section id="agent-cheatsheet" className="scroll-mt-32 space-y-4">
+            {/* Quick Start */}
+            <section id="quickstart" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
-                <Bot className="w-5 h-5 text-indigo-400" />
-                AI agent cheat sheet
+                <Settings className="w-5 h-5 text-indigo-400" />
+                Quick Start & Installation
               </h2>
               <p className="text-white/60 text-sm">
-                Copy this block when wiring Aurex in a codebase. Paths are relative to the tbank monorepo.
+                Add Aurex to your project dependencies:
               </p>
-              <CodeBlock
-                id="copy-agent-cheatsheet"
-                language="text"
-                code={`# === AUREX SDK — QUICK FACTS FOR AGENTS ===
-
-# Install
-#   Node: npm install aurex-sdk  (source: sdk/node/)
-#   Python: pip install -e sdk/python  (import: from aurex import ...)
-
-# Required for cloud + /app dashboard
-#   AUREX_API_KEY=aux_live_...   # create at /app/api-keys
-#   AUREX_BASE_URL=http://localhost:8000/api/v1
-
-# Node zero-code
-#   npx aurex install-hook && source .env.aurex
-#   Needs AUREX_API_KEY (AUREX_ENABLED=1 in .env.aurex is fine)
-#   Hook file: sdk/node/src/hook.ts → dist/hook.js
-
-# Node API (AurexAuditor.getInstance)
-#   logEvent({ model, inputTokens, outputTokens, workflowId, ... })
-#   markSuccess(workflowId, metadata?)
-#   markFailure(workflowId, reason?, metadata?)
-#   preCallCheck(...) → AurexDecision { action, suggestedModel, reason, ... }
-#   patchAll() | patchOpenAI() | patchAnthropic() | patchLiteLLM()
-#   wrap(callFn, buildParams)  ignore(workflowId?)
-#   flush()  shutdown()
-
-# Cloud endpoint (default)
-#   POST {baseUrl}/ledger/events  body: { events: [...] }
-#   Legacy keys ax_live_* need project_id on the key row for ledger ingest
-
-# Backend (for context)
-#   backend/src/services/ledger.py — ingest_events
-#   backend/src/api/dashboard.py — /dashboard/overview (JWT + project scope)
-#   frontend/app/app/page.tsx — live dashboard
-
-# CI
-#   npx aurex ci --mode=warn|block --github-comment
-#   .aurex/config.json → { "ci": { "max_waste_percentage": 30 } }`}
+              <DualCodeBlock
+                pythonCode={pythonInstallCode}
+                nodeCode={nodeInstallCode}
+                pythonId="copy-py-install"
+                nodeId="copy-node-install"
+                pythonTitle="Python Installation"
+                nodeTitle="Node.js Installation"
               />
-            </section>
-
-            {/* Quick start */}
-            <section id="quickstart" className="scroll-mt-32 space-y-6">
-              <div className="flex items-center justify-between border-b border-white/[0.05] pb-4">
-                <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-indigo-400" />
-                  Quick start
-                </h2>
-                <div className="flex bg-white/[0.03] border border-white/[0.05] rounded-lg p-0.5">
-                  <button
-                    onClick={() => setActiveTab("node")}
-                    className={`px-3 py-1 text-sm rounded-md ${activeTab === "node" ? "bg-white/[0.08] text-white" : "text-white/45"}`}
-                  >
-                    Node.js
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("python")}
-                    className={`px-3 py-1 text-sm rounded-md ${activeTab === "python" ? "bg-white/[0.08] text-white" : "text-white/45"}`}
-                  >
-                    Python
-                  </button>
-                </div>
-              </div>
-
-              <CodeBlock id="copy-install" code={activeTab === "node" ? nodeInstall : pythonInstall} language="bash" />
 
               <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 space-y-3 text-sm text-white/50">
-                <h4 className="text-white font-semibold">Environment variables</h4>
-                <ul className="space-y-2 font-mono text-xs">
+                <h4 className="text-white font-semibold flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-emerald-400" />
+                  Common SDK Environment Variables
+                </h4>
+                <ul className="space-y-2.5 font-mono text-xs">
                   <li>
-                    <strong className="text-white/70">AUREX_API_KEY</strong> — Required for cloud sync. Get from{" "}
-                    <a href="/app/api-keys" className="text-emerald-400 hover:underline">/app/api-keys</a>. Prefer{" "}
-                    <code className="text-indigo-400">aux_live_...</code> (project-scoped). Legacy{" "}
-                    <code className="text-indigo-400">ax_live_...</code> works if the key is linked to a project.
+                    <strong className="text-white/70 block mb-0.5">AUREX_API_KEY</strong> 
+                    <span className="text-white/45 font-sans">Your project API key (e.g. <code>aux_live_...</code> generated in the <a href="/app/api-keys" className="text-emerald-400 hover:underline">API keys dashboard</a>).</span>
                   </li>
                   <li>
-                    <strong className="text-white/70">AUREX_BASE_URL</strong> — Default{" "}
-                    <code className="text-indigo-400">http://localhost:8000/api/v1</code>
+                    <strong className="text-white/70 block mb-0.5">AUREX_BASE_URL</strong> 
+                    <span className="text-white/45 font-sans">Specifies the endpoint base for backend syncing. Default: <code>http://localhost:8000/api/v1</code>.</span>
                   </li>
                   <li>
-                    <strong className="text-white/70">AUREX_WORKFLOW_ID</strong> — Labels a workflow in logs (Node hook uses this as project label).
+                    <strong className="text-white/70 block mb-0.5">AUREX_WORKFLOW_ID</strong> 
+                    <span className="text-white/45 font-sans">Attribute LLM spend and success rates to logical operations (e.g. <code>checkout_flow</code>).</span>
                   </li>
                   <li>
-                    <strong className="text-white/70">AUREX_ENABLED</strong> — Node: set to <code className="text-indigo-400">0</code> to disable hook. Otherwise only <code className="text-indigo-400">AUREX_API_KEY</code> is required.
+                    <strong className="text-white/70 block mb-0.5">AUREX_ENABLED</strong> 
+                    <span className="text-white/45 font-sans">Set to <code>0</code> or <code>false</code> to quickly disable all Aurex interceptors. Default: <code>1</code>.</span>
                   </li>
                   <li>
-                    <strong className="text-white/70">AUREX_BLOCK_ON_WASTE</strong> — Set to <code className="text-indigo-400">1</code> to throw on guard violations.
-                  </li>
-                  <li>
-                    <strong className="text-white/70">AUREX_DEBUG</strong> — Set to <code className="text-indigo-400">1</code> for hook debug logs on stderr.
+                    <strong className="text-white/70 block mb-0.5">AUREX_SYNC_PROMPT_HASHES</strong> 
+                    <span className="text-white/45 font-sans">Set to <code>1</code> to hash and send prompt structures. Defaults to <code>0</code> for maximum privacy.</span>
                   </li>
                 </ul>
               </div>
-
-              {activeTab === "node" && (
-                <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 space-y-2 text-sm text-white/50">
-                  <h4 className="text-white font-semibold">AurexConfig (Node)</h4>
-                  <ul className="font-mono text-xs space-y-1">
-                    <li><code>apiKey</code> — enables cloud when set</li>
-                    <li><code>cloudSync</code> — default true if apiKey is set</li>
-                    <li><code>localOnly</code> — default false if apiKey is set</li>
-                    <li><code>ledgerPath</code> — default <code>.aurex/ledger.jsonl</code></li>
-                    <li><code>baseUrl</code> — API root including <code>/api/v1</code></li>
-                    <li><code>budgetGuard</code> — optional spend limits per minute / session</li>
-                  </ul>
-                </div>
-              )}
             </section>
 
-            {/* Zero-code hook */}
+            {/* Zero-Code Auto-Hook */}
             <section id="autohook" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <Terminal className="w-5 h-5 text-emerald-400" />
-                Zero-code hook
+                Zero-Code Auto-Hook
               </h2>
-              <p className="text-white/60 leading-relaxed">
-                No imports in your app. The hook patches OpenAI, Anthropic, and LiteLLM when those packages are installed.
-                Events show up on the <a href="/app" className="text-emerald-400 hover:underline">/app</a> dashboard within about 30 seconds.
+              <p className="text-white/60 leading-relaxed text-sm">
+                No code modification needed. Aurex injects an import hook at the runtime level to automatically wrap standard LLM packages (such as <code>openai</code>, <code>anthropic</code>, and <code>litellm</code>).
               </p>
+              
+              <DualCodeBlock
+                pythonCode={pythonHookCode}
+                nodeCode={nodeHookCode}
+                pythonId="copy-py-hook"
+                nodeId="copy-node-hook"
+                pythonTitle="Python CLI Hook"
+                nodeTitle="Node.js CLI Hook"
+              />
 
-              {activeTab === "node" ? (
-                <CodeBlock id="copy-node-hook" code={nodeHook} language="bash" />
-              ) : (
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-white/60">
-                  Python zero-code site-packages hook is not shipped yet. Use manual patches:
-                  <CodeBlock id="copy-python-hook" code={pythonPatch} language="python" />
-                  Set <code className="text-indigo-400">AUREX_API_KEY</code> in the environment so{" "}
-                  <code className="text-indigo-400">AurexAuditor</code> syncs to the cloud.
-                </div>
-              )}
-
-              <p className="text-xs text-white/40">
-                Uninstall Node hook: <code className="text-indigo-400">npx aurex uninstall-hook</code>
+              <p className="text-xs text-white/40 italic">
+                To deactivate the hook run <code className="text-indigo-400">aurex uninstall-hook</code> (Python) or <code className="text-indigo-400">npx aurex uninstall-hook</code> (Node.js).
               </p>
             </section>
 
-            {/* Manual integration */}
+            {/* Manual Integration */}
             <section id="integration" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <Code className="w-5 h-5 text-rose-400" />
-                Manual integration
+                Manual Integration
               </h2>
-              {activeTab === "node" ? (
-                <>
-                  <CodeBlock id="copy-node-manual" code={nodeManual} language="typescript" />
-                  <h3 className="text-sm font-semibold text-white">Auto-patch providers</h3>
-                  <CodeBlock id="copy-node-patch" code={nodePatch} language="typescript" />
-                </>
-              ) : (
-                <>
-                  <CodeBlock id="copy-python-manual" code={pythonManual} language="python" />
-                  <h3 className="text-sm font-semibold text-white">Auto-patch providers</h3>
-                  <CodeBlock id="copy-python-patch" code={pythonPatch} language="python" />
-                </>
-              )}
-              <p className="text-sm text-white/50">
-                Prompts and responses are hashed locally (SHA-256) before logging. Raw text is not sent to the cloud unless you pass it and enable hash sync via config.
+              <p className="text-white/60 text-sm">
+                Initialize the SDK manually in your code and patch your LLM clients:
               </p>
+
+              <DualCodeBlock
+                pythonCode={pythonManualCode}
+                nodeCode={nodeManualCode}
+                pythonId="copy-py-manual"
+                nodeId="copy-node-manual"
+                pythonTitle="Python Manual Start"
+                nodeTitle="Node.js Manual Start"
+              />
+
+              <h3 className="text-lg font-semibold text-white mt-8">Automatic Client Patching</h3>
+              <p className="text-white/60 text-sm">
+                Call the patch method to hook directly into import wrappers:
+              </p>
+
+              <DualCodeBlock
+                pythonCode={pythonPatchCode}
+                nodeCode={nodePatchCode}
+                pythonId="copy-py-patch"
+                nodeId="copy-node-patch"
+                pythonTitle="Python Auto-Patcher"
+                nodeTitle="Node.js Auto-Patcher"
+              />
+
+              <h3 className="text-lg font-semibold text-white mt-8">Dynamic Pricing & Custom Costs</h3>
+              <p className="text-white/60 text-sm">
+                Aurex supports custom JSON pricing files loaded via configuration or environment variables, wildcard matchers (like <code className="text-indigo-400">custom/*</code>), and programmatic model pricing registration:
+              </p>
+
+              <DualCodeBlock
+                pythonCode={pythonPricingCode}
+                nodeCode={nodePricingCode}
+                pythonId="copy-py-pricing"
+                nodeId="copy-node-pricing"
+                pythonTitle="Python Pricing Registry"
+                nodeTitle="Node.js Pricing Registry"
+              />
             </section>
 
-            {/* Outcomes */}
-            <section id="outcomes" className="scroll-mt-32 space-y-6">
+            {/* AurexConfig Options Reference */}
+            <section id="config-reference" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
-                <Target className="w-5 h-5 text-emerald-400" />
-                Success & failure signals
+                <Sliders className="w-5 h-5 text-indigo-400" />
+                AurexConfig Reference Parameters
               </h2>
-              <p className="text-white/60 leading-relaxed">
-                LLM calls alone do not know if a workflow succeeded. Call <code className="text-indigo-400">markSuccess</code> or{" "}
-                <code className="text-indigo-400">markFailure</code> once per workflow when the job finishes. These emit lightweight{" "}
-                <code className="text-indigo-400">outcome_signal</code> events so the dashboard can show success rate and cost per successful outcome.
+              <p className="text-white/60 text-sm">
+                Configure your auditor singleton using these options:
               </p>
-              {activeTab === "node" ? (
-                <CodeBlock id="copy-node-outcomes" code={nodeOutcomes} language="typescript" />
-              ) : (
-                <CodeBlock
-                  id="copy-python-outcomes"
-                  language="python"
-                  code={`from aurex import mark_success, mark_failure
 
-mark_success("checkout_agent", {"ticket_id": "T-123"})
-mark_failure("checkout_agent", "timeout", {"retries": 3})`}
-                />
-              )}
+              <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
+                <table className="w-full text-sm text-white/60 text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/[0.08] text-white">
+                      <th className="p-3 text-sm font-semibold">Python Config</th>
+                      <th className="p-3 text-sm font-semibold">Node.js Config</th>
+                      <th className="p-3 text-sm font-semibold">Default</th>
+                      <th className="p-3 text-sm font-semibold">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
+                    <tr>
+                      <td className="p-3 text-indigo-400">api_key</td>
+                      <td className="p-3 text-indigo-400">apiKey</td>
+                      <td className="p-3">None</td>
+                      <td className="p-3 font-sans">Aurex project key. Enables cloud sync.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">project</td>
+                      <td className="p-3 text-indigo-400">project</td>
+                      <td className="p-3">"default"</td>
+                      <td className="p-3 font-sans">Group telemetry under a workspace code.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">ledger_path</td>
+                      <td className="p-3 text-indigo-400">ledgerPath</td>
+                      <td className="p-3">".aurex/ledger.jsonl"</td>
+                      <td className="p-3 font-sans">Local JSONL ledger location.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">cloud_sync</td>
+                      <td className="p-3 text-indigo-400">cloudSync</td>
+                      <td className="p-3">False</td>
+                      <td className="p-3 font-sans">Toggle background upload of event logs.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">base_url</td>
+                      <td className="p-3 text-indigo-400">baseUrl</td>
+                      <td className="p-3">http://localhost:8000/api/v1</td>
+                      <td className="p-3 font-sans">Target REST backend base endpoint.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">flush_interval_seconds</td>
+                      <td className="p-3 text-indigo-400">flushIntervalMs</td>
+                      <td className="p-3">30.0s / 30000ms</td>
+                      <td className="p-3 font-sans">Interval for bulk ledger transmissions.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">max_batch_size</td>
+                      <td className="p-3 text-indigo-400">maxBatchSize</td>
+                      <td className="p-3">100</td>
+                      <td className="p-3 font-sans">Maximum number of events per upload request.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">storage_mode</td>
+                      <td className="p-3 text-indigo-400">N/A</td>
+                      <td className="p-3">"file"</td>
+                      <td className="p-3 font-sans">Write ledger: <code>"file"</code> (disk) or <code>"memory"</code> (RAM). (Python only)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">sync_prompt_hashes</td>
+                      <td className="p-3 text-indigo-400">syncPromptHashes</td>
+                      <td className="p-3">False</td>
+                      <td className="p-3 font-sans">Send SHA-256 signatures of prompts to dashboard.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">pricing_path</td>
+                      <td className="p-3 text-indigo-400">pricingPath</td>
+                      <td className="p-3">None</td>
+                      <td className="p-3 font-sans">Path to custom JSON pricing configuration file.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">default_pricing</td>
+                      <td className="p-3 text-indigo-400">defaultPricing</td>
+                      <td className="p-3">None</td>
+                      <td className="p-3 font-sans">Fallback pricing dictionary with input/output costs per 1M tokens.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">simple_prompt_token_limit</td>
+                      <td className="p-3 text-indigo-400">simplePromptTokenLimit</td>
+                      <td className="p-3">120</td>
+                      <td className="p-3 font-sans">Threshold token count below which prompts are classified as simple.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">runaway_context_multiplier</td>
+                      <td className="p-3 text-indigo-400">runawayContextMultiplier</td>
+                      <td className="p-3">2.2</td>
+                      <td className="p-3 font-sans">Scaling factor indicating context runaway checks.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">loop_similarity_threshold</td>
+                      <td className="p-3 text-indigo-400">loopSimilarityThreshold</td>
+                      <td className="p-3">0.8</td>
+                      <td className="p-3 font-sans">Jaccard similarity index limit for loop checking.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">downgrade_map</td>
+                      <td className="p-3 text-indigo-400">downgradeMap</td>
+                      <td className="p-3">None</td>
+                      <td className="p-3 font-sans">Custom map defining cheaper alternatives for models (e.g. gpt-4o &rarr; gpt-4o-mini).</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </section>
 
-            {/* Real-time guards */}
+            {/* BudgetGuard Setup */}
+            <section id="budget-guard-config" className="scroll-mt-32 space-y-6">
+              <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                BudgetGuard Setup
+              </h2>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Prevent rogue agent cascades and overspending. Passing <code>budget_guard</code> enforces client-side circuit breakers.
+              </p>
+
+              <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
+                <table className="w-full text-sm text-white/60 text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/[0.08] text-white">
+                      <th className="p-3 text-sm font-semibold">Python Guard Key</th>
+                      <th className="p-3 text-sm font-semibold">Node.js Guard Key</th>
+                      <th className="p-3 text-sm font-semibold">Type</th>
+                      <th className="p-3 text-sm font-semibold">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
+                    <tr>
+                      <td className="p-3 text-indigo-400">max_cost_per_minute</td>
+                      <td className="p-3 text-indigo-400">maxCostPerMinute</td>
+                      <td className="p-3">float</td>
+                      <td className="p-3 font-sans">Max allowed LLM spend in USD per rolling 60s.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">max_cost_per_session</td>
+                      <td className="p-3 text-indigo-400">maxCostPerSession</td>
+                      <td className="p-3">float</td>
+                      <td className="p-3 font-sans">Max allowed LLM spend in USD for a single workflow/session.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">max_requests_per_minute</td>
+                      <td className="p-3 text-indigo-400">maxRequestsPerMinute</td>
+                      <td className="p-3">integer</td>
+                      <td className="p-3 font-sans">Rate limit of LLM request events per rolling 60s.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">max_context_tokens</td>
+                      <td className="p-3 text-indigo-400">maxContextTokens</td>
+                      <td className="p-3">integer</td>
+                      <td className="p-3 font-sans">Maximum token context allowed for a single API check.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">on_budget_exceeded</td>
+                      <td className="p-3 text-indigo-400">onBudgetExceeded</td>
+                      <td className="p-3">string</td>
+                      <td className="p-3 font-sans">Action when limit hit: <code>"throw"</code> (crash call), <code>"warn"</code>, or <code>"webhook"</code>.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">webhook_url</td>
+                      <td className="p-3 text-indigo-400">webhookUrl</td>
+                      <td className="p-3">string</td>
+                      <td className="p-3 font-sans">Destination URL for payload sync if webhook option is configured.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-indigo-400">dry_run</td>
+                      <td className="p-3 text-indigo-400">dryRun</td>
+                      <td className="p-3">boolean</td>
+                      <td className="p-3 font-sans">Evaluate guards and track metrics without blocking/throwing.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* Supported Providers Matrix */}
+            <section id="provider-matrix" className="scroll-mt-32 space-y-6">
+              <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-emerald-400" />
+                Supported Providers Matrix
+              </h2>
+              <p className="text-white/60 text-sm">
+                Features automatically intercepted and supported by SDK auto-patching:
+              </p>
+
+              <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
+                <table className="w-full text-sm text-white/60 text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/[0.08] text-white">
+                      <th className="p-3 text-sm font-semibold">LLM Provider</th>
+                      <th className="p-3 text-sm font-semibold">Python SDK</th>
+                      <th className="p-3 text-sm font-semibold">Node.js SDK</th>
+                      <th className="p-3 text-sm font-semibold">Telemetry Hook Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04] text-xs font-mono">
+                    <tr>
+                      <td className="p-3 text-white font-sans font-medium">OpenAI (v1.0+)</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 font-sans text-white/50">Full auto-wrap including reasoning tokens and caches.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-white font-sans font-medium">Anthropic (v0.18+)</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 font-sans text-white/50">Wraps system prompt inputs and token counts.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-white font-sans font-medium">Google Gemini</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 text-rose-500 font-bold">❌ No</td>
+                      <td className="p-3 font-sans text-white/50">Patches <code>google-genai</code> and legacy <code>google-generativeai</code> SDKs. (Python Only)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-white font-sans font-medium">LiteLLM / Portkey</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 font-sans text-white/50">Patches multi-provider routing frameworks.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-white font-sans font-medium">Ollama / Custom</td>
+                      <td className="p-3 text-amber-400 font-bold">⚠️ Partial</td>
+                      <td className="p-3 text-amber-400 font-bold">⚠️ Partial</td>
+                      <td className="p-3 font-sans text-white/50">Trackable via LiteLLM or OpenAI endpoint proxy configuration.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-white font-sans font-medium">Hugging Face</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 text-emerald-400 font-bold">✅ Yes</td>
+                      <td className="p-3 font-sans text-white/50">Patches <code>huggingface_hub</code> (Python) and <code>@huggingface/inference</code> (Node.js). Serverless cost: $0.00.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* Real-Time Guards */}
             <section id="guards" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-400" />
-                Real-time guards (Node)
+                Real-Time Guards & Decision Engine
               </h2>
-              <p className="text-white/60 leading-relaxed">
-                <code className="text-indigo-400">preCallCheck()</code> runs in your process before each call (no network). It returns an{" "}
-                <code className="text-indigo-400">AurexDecision</code>. Auto-patchers apply downgrade and compress automatically.
+              <p className="text-white/60 leading-relaxed text-sm">
+                Evaluate calls against cost efficiency and runaway policies locally in-process without network overhead. The pre-call checker evaluates n-gram similarity, cost ceilings, and token volumes, returning an <code>AurexDecision</code>.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 {[
-                  { action: "proceed", desc: "No change needed." },
-                  { action: "downgrade", desc: "Swap to a cheaper model (e.g. gpt-4o → gpt-4o-mini)." },
-                  { action: "compress", desc: "Remove duplicate system messages in the chat payload." },
-                  { action: "block", desc: "Throw if AUREX_BLOCK_ON_WASTE=1." },
+                  { action: "proceed", desc: "No violation detected. Let the API call pass through normally." },
+                  { action: "downgrade", desc: "Auto-replace model with cheaper option (e.g. claude-3-opus -> claude-3-haiku)." },
+                  { action: "compress", desc: "Filter duplicate system prompts from context to save input token costs." },
+                  { action: "block", desc: "Violates budget thresholds. Halts execution or logs an override alert." },
                 ].map((row) => (
                   <div key={row.action} className="p-3 rounded-lg border border-white/[0.06] bg-white/[0.01]">
-                    <code className="text-emerald-400">{row.action}</code>
-                    <p className="text-white/45 text-xs mt-1">{row.desc}</p>
+                    <code className="text-emerald-400 font-mono">{row.action}</code>
+                    <p className="text-white/45 text-xs mt-1 leading-relaxed">{row.desc}</p>
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-white/50">Detectors include: system prompt waste, runaway context growth, expensive model on tiny prompts, context explosion, semantic loops (n-gram similarity), and budget-based downgrade.</p>
-              {activeTab === "node" && <CodeBlock id="copy-node-guards" code={nodeGuards} language="typescript" />}
-              {activeTab === "python" && (
-                <p className="text-sm text-amber-400/90">preCallCheck / AurexDecision are Node-only today. Use the backend detection engine on uploaded CSVs for Python-only stacks.</p>
-              )}
+
+              <DualCodeBlock
+                pythonCode={pythonGuardsCode}
+                nodeCode={nodeGuardsCode}
+                pythonId="copy-py-guards"
+                nodeId="copy-node-guards"
+                pythonTitle="Python pre_call_check"
+                nodeTitle="Node.js preCallCheck"
+              />
             </section>
 
-            {/* Offline heuristics */}
+            {/* Context Overrides & Wrappers */}
+            <section id="context-wrappers" className="scroll-mt-32 space-y-6">
+              <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-indigo-400" />
+                Context Overrides & Wrappers
+              </h2>
+              <p className="text-white/60 leading-relaxed text-sm">
+                Aurex is built for multi-tenant applications. Using thread-local variables (<code className="text-indigo-400">contextvars</code> in Python) and async-local variables (<code className="text-indigo-400">AsyncLocalStorage</code> in Node.js), developers can override configuration options, budget guardrails, and metadata dynamically per execution context without altering global singleton states.
+              </p>
+
+              <DualCodeBlock
+                pythonCode={pythonWrapCode}
+                nodeCode={nodeWrapCode}
+                pythonId="copy-py-wrap"
+                nodeId="copy-node-wrap"
+                pythonTitle="Python wrap() Context Options"
+                nodeTitle="Node.js wrap() Context Options"
+              />
+            </section>
+
+            {/* Success & Failure Signals */}
+            <section id="outcomes" className="scroll-mt-32 space-y-6">
+              <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
+                <Target className="w-5 h-5 text-emerald-400" />
+                Success & Failure Signals
+              </h2>
+              <p className="text-white/60 leading-relaxed text-sm">
+                LLM tokens alone don't reveal task outcomes. Register successful or failed operations once logical workflows finish to feed cost-efficiency calculations on the analytics dashboard.
+              </p>
+              
+              <DualCodeBlock
+                pythonCode={pythonOutcomesCode}
+                nodeCode={nodeOutcomesCode}
+                pythonId="copy-py-outcomes"
+                nodeId="copy-node-outcomes"
+                pythonTitle="Python Outcomes Logging"
+                nodeTitle="Node.js Outcomes Logging"
+              />
+            </section>
+
+            {/* Health & Crash Recovery */}
+            <section id="health-monitoring" className="scroll-mt-32 space-y-6">
+              <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
+                <Info className="w-5 h-5 text-indigo-400" />
+                Health & Crash Recovery
+              </h2>
+              <p className="text-white/60 text-sm leading-relaxed">
+                The Aurex daemon maintains crash durability. If a system shutdown occurs mid-run, telemetry is buffered locally to <code>pending.jsonl</code>. On start, the auditor flushes this backup file to prevent data loss.
+              </p>
+
+              <DualCodeBlock
+                pythonCode={pythonHealthCode}
+                nodeCode={nodeHealthCode}
+                pythonId="copy-py-health"
+                nodeId="copy-node-health"
+                pythonTitle="Python Health Checker"
+                nodeTitle="Node.js Health Checker"
+              />
+            </section>
+
+            {/* Offline Heuristics CLI */}
             <section id="heuristics" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <Flame className="w-5 h-5 text-amber-400" />
-                Offline analysis
+                Offline Heuristics CLI
               </h2>
-              <p className="text-white/60">
-                Scan <code className="text-indigo-400">.aurex/ledger.jsonl</code> for waste patterns. Prefer{" "}
-                <code className="text-indigo-400">aurex ci</code> in CI; use the backend engine for full audit reports on{" "}
-                <a href="/audit" className="text-emerald-400 hover:underline">/audit</a>.
+              <p className="text-white/60 text-sm leading-relaxed">
+                Scan your local ledger files (<code>ledger.jsonl</code>) offline to detect loops, context spikes, or waste drivers without launching a database:
               </p>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 {[
-                  "System prompt waste (repeated system prompts)",
-                  "Agent runaway loops (context grows fast)",
-                  "Expensive model misuse (big model, small task)",
-                  "Context explosion (total context 3.5×+)",
-                  "Semantic loops (Node guards — similar replies)",
-                  "Retry cascades (backend engine on uploads)",
+                  "System prompt duplication alerts",
+                  "Agent runaway looping heuristics",
+                  "Over-provisioned expensive model misuse",
+                  "Excessive context expansion ratios (3.5x+)",
+                  "Semantic loop repeating detection",
+                  "Client retry cascade analytics",
                 ].map((title) => (
-                  <div key={title} className="p-3 rounded-lg border border-white/[0.06] text-white/50">
+                  <div key={title} className="p-3 rounded-lg border border-white/[0.06] text-white/50 font-sans">
                     {title}
                   </div>
                 ))}
               </div>
-              {activeTab === "node" && <CodeBlock id="copy-heuristics" code={nodeHeuristics} language="bash" />}
+
+              <DualCodeBlock
+                pythonCode={pythonCliCode}
+                nodeCode={nodeCliCode}
+                pythonId="copy-py-cli"
+                nodeId="copy-node-cli"
+                pythonTitle="Python Heuristics CLI"
+                nodeTitle="Node.js Heuristics CLI"
+              />
             </section>
 
-            {/* CI */}
+            {/* CI Policy Gate */}
             <section id="cicd" className="scroll-mt-32 space-y-6">
               <h2 className="text-2xl font-display font-semibold text-white flex items-center gap-2">
                 <RefreshCw className="w-5 h-5 text-emerald-400" />
-                CI gate (Node)
+                CI Policy Gate & Build Breaker
               </h2>
-              <p className="text-white/60">
-                Fail or warn on retry-heavy spend in your local ledger. Use in GitHub Actions via{" "}
-                <code className="text-indigo-400">.github/actions/aurex-ci</code> in this repo.
+              <p className="text-white/60 text-sm leading-relaxed">
+                Fail commits or PR builds automatically when cost thresholds or Token Credit Scores fall below threshold values. 
               </p>
-              <CodeBlock id="copy-ci" code={nodeCi} language="bash" />
-              <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
-                <table className="w-full text-sm text-white/60">
+
+              <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
+                <table className="w-full text-sm text-white/60 text-left border-collapse">
                   <thead>
                     <tr className="border-b border-white/[0.08] text-white">
-                      <th className="p-3 text-left">Flag / config</th>
-                      <th className="p-3 text-left">Default</th>
-                      <th className="p-3 text-left">Meaning</th>
+                      <th className="p-3 text-sm font-semibold">CI Flag</th>
+                      <th className="p-3 text-sm font-semibold">Mode Option</th>
+                      <th className="p-3 text-sm font-semibold">CI Behavior</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
                     <tr>
                       <td className="p-3 text-indigo-400">--mode warn</td>
-                      <td className="p-3">yes</td>
-                      <td className="p-3 font-sans">Print report; exit 0</td>
+                      <td className="p-3">warn (Default)</td>
+                      <td className="p-3 font-sans text-white/50">Prints comprehensive Markdown efficiency report; exits with code 0.</td>
                     </tr>
                     <tr>
                       <td className="p-3 text-indigo-400">--mode block</td>
-                      <td className="p-3">—</td>
-                      <td className="p-3 font-sans">Exit 1 if any CRITICAL issue</td>
+                      <td className="p-3">block</td>
+                      <td className="p-3 font-sans text-white/50">Halts pipeline execution with exit code 1 if policies are violated.</td>
                     </tr>
                     <tr>
                       <td className="p-3 text-indigo-400">--github-comment</td>
-                      <td className="p-3">off</td>
-                      <td className="p-3 font-sans">Markdown for PR comments</td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 text-indigo-400">ci.max_waste_percentage</td>
-                      <td className="p-3">30</td>
-                      <td className="p-3 font-sans">In .aurex/config.json</td>
+                      <td className="p-3">—</td>
+                      <td className="p-3 font-sans text-white/50">Outputs structured Markdown layout suitable for posting as PR summary comments.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -624,7 +1183,7 @@ function SEOHead() {
       <title>Aurex SDK Documentation — LLM cost tracking & guards</title>
       <meta
         name="description"
-        content="Aurex SDK docs: zero-code Node hook, markSuccess/markFailure, real-time guards, cloud sync to /app dashboard, and CI waste gate."
+        content="Aurex SDK docs: side-by-side Python & Node.js instructions, zero-code hooks, real-time guards, cloud sync parameters, and CI/CD policies."
       />
     </>
   );
