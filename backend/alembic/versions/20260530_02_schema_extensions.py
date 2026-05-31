@@ -17,6 +17,8 @@ LLM_EVENT_COLS = [
     ("loop_score", sa.Float(), None),
     ("team", sa.String(), None),
     ("tenant_id", sa.String(), None),
+    ("outcome", sa.String(), "pending"),
+    ("cost_type", sa.String(), "inference"),
 ]
 
 

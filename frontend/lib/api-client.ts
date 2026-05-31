@@ -959,6 +959,23 @@ export class AurexAPI {
 
         return response.json();
     }
+
+    async submitFeedback(data: { rating: number; comment: string; email?: string }): Promise<any> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/feedback`, {
+            method: 'POST',
+            headers: this.getHeaders({
+                'Content-Type': 'application/json',
+            }),
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to submit feedback');
+        }
+
+        return response.json();
+    }
 }
 
 export const aurexAPI = new AurexAPI();

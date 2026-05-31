@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { aurexAPI } from "@/lib/api-client";
 import { OnboardingModal } from "@/components/app/onboarding-modal";
 import { UserDropdown } from "@/components/app/user-dropdown";
+import { Loader2 } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -63,7 +64,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                 </div>
             </header>
-            <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+            <main className="mx-auto max-w-6xl px-6 py-8">
+                {showOnboarding ? (
+                    <div className="flex flex-col items-center justify-center py-32 gap-3">
+                        <Loader2 className="w-8 h-8 animate-spin text-white/40" />
+                        <span className="text-xs text-white/40 font-mono">Setting up your workspace…</span>
+                    </div>
+                ) : (
+                    children
+                )}
+            </main>
 
             <OnboardingModal 
                 isOpen={showOnboarding} 
