@@ -16,4 +16,5 @@ anthropic = ["anthropic>=0.25.0"]
 litellm = ["litellm>=1.0.0"]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["aurex_sdk*"]

@@ -5,10 +5,12 @@ import queue
 import threading
 import time
 import hashlib
-from datetime import datetime
-from typing import Dict, Any, Optional, List, Tuple
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, List, Tuple, Literal, Set
 import urllib.request
 import urllib.error
+from aurex_sdk.decisions import AurexDecision, AurexAction, suggest_cheaper_model, is_expensive_model, compress_messages, apply_decision_to_call_params
+from aurex_sdk.semantic import jaccard_ngram_similarity
 
 # In-memory database of pricing
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
@@ -195,7 +197,12 @@ class AurexAuditor:
         self._memory_events = []
         self._last_minute_events = []
         self._recent_requests = []
+        self._recent_responses = []
+        self._ignored_workflows = set()
+        self._session_retry_counts = {}
         self._session_costs = {}
+        self._sync_error_count = 0
+        self._last_sync_error = None
         self._budget_config = self.config.budget_guard or {}
         
         # Create ledger folder structure if not exists (only if file storage mode)
@@ -287,7 +294,7 @@ class AurexAuditor:
             reasoning_tokens: Internal reasoning/thinking tokens (o1/o3 series, billed as output)
             is_batch: Whether this call used the Batch API (50% discount)
         """
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
         
         # Generate locally hashes for zero-trust compliance
         prompt_hash = None
@@ -380,14 +387,404 @@ class AurexAuditor:
             return max(1, len(prompt) // 4)
         return 1
 
+    def _debug_log(self, msg: str):
+        if os.getenv("AUREX_DEBUG") == "1":
+            print(f"[Aurex Debug] {msg}", file=sys.stderr)
+
+    def _compute_semantic_loop_score(self, workflow_id: str, prompt_text: str) -> float:
+        with self._lock:
+            recent = [
+                r for r in self._recent_responses
+                if r["workflow_id"] == workflow_id and r.get("response_text")
+            ][-5:]
+        if len(recent) < 2 or not prompt_text:
+            return 0.0
+        scores = [jaccard_ngram_similarity(prompt_text, r["response_text"]) for r in recent]
+        high = [s for s in scores if s >= 0.8]
+        return max(scores) if len(high) >= 2 else 0.0
+
+    def _maybe_escalate(
+        self,
+        workflow_id: str,
+        cost_so_far: float,
+        retry_count: int,
+        loop_score: float,
+        reason: str
+    ):
+        if not self.config.api_key or self.config.local_only:
+            return
+        
+        base_endpoint = self.config.cloud_endpoint
+        import re
+        base = re.sub(r"/ledger/events/?$", "", base_endpoint)
+        escalation_url = f"{base}/escalations"
+        
+        payload = {
+            "workflow_id": workflow_id,
+            "cost_so_far": cost_so_far,
+            "retry_count": retry_count,
+            "loop_score": loop_score,
+            "reason": reason
+        }
+        
+        def run_escalation():
+            try:
+                req_data = json.dumps(payload).encode("utf-8")
+                req = urllib.request.Request(
+                    escalation_url,
+                    data=req_data,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.config.api_key}"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                    resp.read()
+            except Exception as e:
+                self._debug_log(f"Escalation request failed: {e}")
+
+        threading.Thread(target=run_escalation, daemon=True).start()
+
+    def record_response(self, workflow_id: Optional[str], response: Optional[str]):
+        """Record the model response content for semantic loop detection."""
+        if not response or not workflow_id:
+            return
+        response_hash = hashlib.sha256(response.encode("utf-8")).hexdigest()
+        with self._lock:
+            self._recent_responses.append({
+                "workflow_id": workflow_id,
+                "response_hash": response_hash,
+                "response_text": response[:2000],
+                "timestamp": time.time()
+            })
+            if len(self._recent_responses) > 100:
+                self._recent_responses.pop(0)
+
+    def ignore(self, workflow_id: Optional[str] = None):
+        """Mark a workflow to skip pre-call checks."""
+        wf = workflow_id or os.environ.get("AUREX_WORKFLOW_ID") or "default_workflow"
+        with self._lock:
+            self._ignored_workflows.add(wf)
+
+    def wrap(self, call_fn, build_params):
+        """
+        High-level wrapper mirroring Node SDK's wrap().
+        """
+        params = build_params()
+        model = params.get("model", "unknown")
+        messages = params.get("messages", [])
+        system_prompt = None
+        user_prompt = None
+        for m in messages:
+            if isinstance(m, dict):
+                if m.get("role") == "system":
+                    system_prompt = m.get("content")
+                elif m.get("role") == "user":
+                    user_prompt = m.get("content")
+                    
+        workflow_id = params.get("user") or (params.get("metadata", {}).get("workflow_id") if isinstance(params.get("metadata"), dict) else None) or "default_workflow"
+        
+        decision = self.pre_call_check(
+            model=model,
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            workflow_id=workflow_id,
+            messages=messages
+        )
+        
+        modified_params = apply_decision_to_call_params(params, decision)
+        
+        try:
+            resp = call_fn(modified_params)
+        except Exception as ex:
+            self.mark_failure(workflow_id, str(ex))
+            raise ex
+            
+        response_content = None
+        input_tokens = 0
+        output_tokens = 0
+        cached_tokens = 0
+        cache_write_tokens = 0
+        reasoning_tokens = 0
+        
+        if hasattr(resp, "usage") and resp.usage:
+            input_tokens = getattr(resp.usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(resp.usage, "completion_tokens", 0) or 0
+            if hasattr(resp.usage, "prompt_tokens_details") and resp.usage.prompt_tokens_details:
+                cached_tokens = getattr(resp.usage.prompt_tokens_details, "cached_tokens", 0) or 0
+            if hasattr(resp.usage, "completion_tokens_details") and resp.usage.completion_tokens_details:
+                reasoning_tokens = getattr(resp.usage.completion_tokens_details, "reasoning_tokens", 0) or 0
+        elif hasattr(resp, "usage") and hasattr(resp.usage, "input_tokens"):
+            input_tokens = getattr(resp.usage, "input_tokens", 0) or 0
+            output_tokens = getattr(resp.usage, "output_tokens", 0) or 0
+            cached_tokens = getattr(resp.usage, "cache_read_input_tokens", 0) or 0
+            cache_write_tokens = getattr(resp.usage, "cache_creation_input_tokens", 0) or 0
+            
+        if hasattr(resp, "choices") and resp.choices:
+            choice = resp.choices[0]
+            if hasattr(choice, "message") and choice.message and hasattr(choice.message, "content"):
+                response_content = choice.message.content
+        elif hasattr(resp, "content") and resp.content:
+            if isinstance(resp.content, list):
+                response_content = "".join(getattr(b, "text", str(b)) for b in resp.content)
+            else:
+                response_content = str(resp.content)
+                
+        if response_content:
+            self.record_response(workflow_id, response_content)
+        
+        self.log_event(
+            model=modified_params.get("model", model),
+            prompt=user_prompt,
+            response=response_content,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            cache_write_tokens=cache_write_tokens,
+            reasoning_tokens=reasoning_tokens,
+            workflow_id=workflow_id,
+            system_prompt=system_prompt,
+            extra_metadata=params.get("metadata")
+        )
+        return resp
+
+    async def awrap(self, call_fn, build_params):
+        """
+        Asynchronous high-level wrapper.
+        """
+        params = build_params()
+        model = params.get("model", "unknown")
+        messages = params.get("messages", [])
+        system_prompt = None
+        user_prompt = None
+        for m in messages:
+            if isinstance(m, dict):
+                if m.get("role") == "system":
+                    system_prompt = m.get("content")
+                elif m.get("role") == "user":
+                    user_prompt = m.get("content")
+                    
+        workflow_id = params.get("user") or (params.get("metadata", {}).get("workflow_id") if isinstance(params.get("metadata"), dict) else None) or "default_workflow"
+        
+        decision = self.pre_call_check(
+            model=model,
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            workflow_id=workflow_id,
+            messages=messages
+        )
+        
+        modified_params = apply_decision_to_call_params(params, decision)
+        
+        try:
+            resp = await call_fn(modified_params)
+        except Exception as ex:
+            self.mark_failure(workflow_id, str(ex))
+            raise ex
+            
+        response_content = None
+        input_tokens = 0
+        output_tokens = 0
+        cached_tokens = 0
+        cache_write_tokens = 0
+        reasoning_tokens = 0
+        
+        if hasattr(resp, "usage") and resp.usage:
+            input_tokens = getattr(resp.usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(resp.usage, "completion_tokens", 0) or 0
+            if hasattr(resp.usage, "prompt_tokens_details") and resp.usage.prompt_tokens_details:
+                cached_tokens = getattr(resp.usage.prompt_tokens_details, "cached_tokens", 0) or 0
+            if hasattr(resp.usage, "completion_tokens_details") and resp.usage.completion_tokens_details:
+                reasoning_tokens = getattr(resp.usage.completion_tokens_details, "reasoning_tokens", 0) or 0
+        elif hasattr(resp, "usage") and hasattr(resp.usage, "input_tokens"):
+            input_tokens = getattr(resp.usage, "input_tokens", 0) or 0
+            output_tokens = getattr(resp.usage, "output_tokens", 0) or 0
+            cached_tokens = getattr(resp.usage, "cache_read_input_tokens", 0) or 0
+            cache_write_tokens = getattr(resp.usage, "cache_creation_input_tokens", 0) or 0
+            
+        if hasattr(resp, "choices") and resp.choices:
+            choice = resp.choices[0]
+            if hasattr(choice, "message") and choice.message and hasattr(choice.message, "content"):
+                response_content = choice.message.content
+        elif hasattr(resp, "content") and resp.content:
+            if isinstance(resp.content, list):
+                response_content = "".join(getattr(b, "text", str(b)) for b in resp.content)
+            else:
+                response_content = str(resp.content)
+                
+        if response_content:
+            self.record_response(workflow_id, response_content)
+        
+        self.log_event(
+            model=modified_params.get("model", model),
+            prompt=user_prompt,
+            response=response_content,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            cache_write_tokens=cache_write_tokens,
+            reasoning_tokens=reasoning_tokens,
+            workflow_id=workflow_id,
+            system_prompt=system_prompt,
+            extra_metadata=params.get("metadata")
+        )
+        return resp
+
+    def mark_success(self, workflow_id: str, metadata: Optional[Dict[str, Any]] = None):
+        self.log_event(
+            model="aurex-outcome",
+            input_tokens=0,
+            output_tokens=0,
+            workflow_id=workflow_id,
+            outcome="success",
+            cost_type="outcome_signal",
+            extra_metadata=metadata
+        )
+
+    def mark_failure(self, workflow_id: str, reason: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+        extra_meta = dict(metadata) if metadata else {}
+        if reason:
+            extra_meta["reason"] = reason
+        self.log_event(
+            model="aurex-outcome",
+            input_tokens=0,
+            output_tokens=0,
+            workflow_id=workflow_id,
+            outcome="failure",
+            cost_type="outcome_signal",
+            extra_metadata=extra_meta
+        )
+
+    def get_health(self) -> Dict[str, Any]:
+        """Return SDK integration health status, sync errors, and connection metrics."""
+        with self._lock:
+            return {
+                "sync_error_count": self._sync_error_count,
+                "last_sync_error": self._last_sync_error,
+                "session_costs_tracked": len(self._session_costs),
+                "queue_size": self._queue.qsize()
+            }
+
+    def _extract_chunk_text(self, chunk) -> str:
+        # OpenAI style
+        if hasattr(chunk, "choices") and chunk.choices:
+            delta = chunk.choices[0].delta
+            if hasattr(delta, "content") and delta.content:
+                return delta.content
+        # Anthropic style
+        if hasattr(chunk, "type"):
+            if chunk.type == "content_block_delta" and hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                return chunk.delta.text
+        # Google Gemini style
+        if hasattr(chunk, "text"):
+            try:
+                return chunk.text
+            except:
+                pass
+        return ""
+
+    def _wrap_sync_stream(self, stream, kwargs, workflow_id, user_prompt, system_prompt):
+        accumulated_content = []
+        final_usage = None
+        
+        for chunk in stream:
+            text = self._extract_chunk_text(chunk)
+            if text:
+                accumulated_content.append(text)
+            if hasattr(chunk, "usage") and chunk.usage:
+                final_usage = chunk.usage
+            yield chunk
+            
+        full_content = "".join(accumulated_content)
+        self.record_response(workflow_id, full_content)
+        
+        input_tokens = 0
+        output_tokens = 0
+        cached_tokens = 0
+        reasoning_tokens = 0
+        
+        if final_usage:
+            input_tokens = getattr(final_usage, "prompt_tokens", 0) or getattr(final_usage, "input_tokens", 0) or 0
+            output_tokens = getattr(final_usage, "completion_tokens", 0) or getattr(final_usage, "output_tokens", 0) or 0
+            if hasattr(final_usage, "prompt_tokens_details") and final_usage.prompt_tokens_details:
+                cached_tokens = getattr(final_usage.prompt_tokens_details, "cached_tokens", 0) or 0
+            elif hasattr(final_usage, "cache_read_input_tokens"):
+                cached_tokens = getattr(final_usage, "cache_read_input_tokens", 0) or 0
+            if hasattr(final_usage, "completion_tokens_details") and final_usage.completion_tokens_details:
+                reasoning_tokens = getattr(final_usage.completion_tokens_details, "reasoning_tokens", 0) or 0
+        else:
+            input_tokens = self._estimate_tokens(user_prompt, kwargs.get("messages"))
+            output_tokens = max(1, len(full_content) // 4)
+            
+        self.log_event(
+            model=kwargs.get("model", "unknown"),
+            prompt=user_prompt,
+            response=full_content,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            reasoning_tokens=reasoning_tokens,
+            workflow_id=workflow_id,
+            system_prompt=system_prompt,
+            extra_metadata=kwargs.get("metadata")
+        )
+
+    async def _wrap_async_stream(self, stream, kwargs, workflow_id, user_prompt, system_prompt):
+        accumulated_content = []
+        final_usage = None
+        
+        async for chunk in stream:
+            text = self._extract_chunk_text(chunk)
+            if text:
+                accumulated_content.append(text)
+            if hasattr(chunk, "usage") and chunk.usage:
+                final_usage = chunk.usage
+            yield chunk
+            
+        full_content = "".join(accumulated_content)
+        self.record_response(workflow_id, full_content)
+        
+        input_tokens = 0
+        output_tokens = 0
+        cached_tokens = 0
+        reasoning_tokens = 0
+        
+        if final_usage:
+            input_tokens = getattr(final_usage, "prompt_tokens", 0) or getattr(final_usage, "input_tokens", 0) or 0
+            output_tokens = getattr(final_usage, "completion_tokens", 0) or getattr(final_usage, "output_tokens", 0) or 0
+            if hasattr(final_usage, "prompt_tokens_details") and final_usage.prompt_tokens_details:
+                cached_tokens = getattr(final_usage.prompt_tokens_details, "cached_tokens", 0) or 0
+            elif hasattr(final_usage, "cache_read_input_tokens"):
+                cached_tokens = getattr(final_usage, "cache_read_input_tokens", 0) or 0
+            if hasattr(final_usage, "completion_tokens_details") and final_usage.completion_tokens_details:
+                reasoning_tokens = getattr(final_usage.completion_tokens_details, "reasoning_tokens", 0) or 0
+        else:
+            input_tokens = self._estimate_tokens(user_prompt, kwargs.get("messages"))
+            output_tokens = max(1, len(full_content) // 4)
+            
+        self.log_event(
+            model=kwargs.get("model", "unknown"),
+            prompt=user_prompt,
+            response=full_content,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            reasoning_tokens=reasoning_tokens,
+            workflow_id=workflow_id,
+            system_prompt=system_prompt,
+            extra_metadata=kwargs.get("metadata")
+        )
+
     def pre_call_check(
         self,
         model: str,
         prompt: Optional[str] = None,
         system_prompt: Optional[str] = None,
         workflow_id: Optional[str] = None,
-        messages: Optional[List[Dict[str, Any]]] = None
-    ):
+        messages: Optional[List[Dict[str, Any]]] = None,
+        retry_count: Optional[int] = None
+    ) -> AurexDecision:
         """
         Perform real-time pre-call checks on the outgoing LLM request.
         Checks for:
@@ -395,13 +792,11 @@ class AurexAuditor:
         2. Agent Runaway Loop
         3. Over-provisioned Model Misuse
         4. Context Explosion
-        
-        If any issue is detected, prints a warning (default) or throws an exception (if configured to block).
+        5. Semantic Loops
         """
         now = time.time()
         workflow_id = workflow_id or os.environ.get("AUREX_WORKFLOW_ID") or "default_workflow"
         
-        # Estimate input size
         est_tokens = self._estimate_tokens(prompt, messages)
         prompt_hash = None
         if prompt:
@@ -410,7 +805,6 @@ class AurexAuditor:
         if system_prompt:
             sys_prompt_hash = hashlib.sha256(system_prompt.encode('utf-8')).hexdigest()
 
-        # Build current request metadata
         req_meta = {
             "timestamp": now,
             "model": model,
@@ -420,7 +814,6 @@ class AurexAuditor:
             "estimated_tokens": est_tokens
         }
 
-        # Keep thread-safe recent requests capped at 200
         with self._lock:
             self._recent_requests = [r for r in self._recent_requests if now - r["timestamp"] < 300]
             self._recent_requests.append(req_meta)
@@ -428,61 +821,139 @@ class AurexAuditor:
                 self._recent_requests.pop(0)
             workflow_requests = [r for r in self._recent_requests if r["workflow_id"] == workflow_id]
 
-        warnings = []
+        decision = AurexDecision(action="proceed", reason="ok", original_model=model)
 
-        # 1. System Prompt Waste Detector
-        if sys_prompt_hash and len(workflow_requests) >= 2:
-            # Check if this exact system prompt hash was already sent in the same workflow recently
-            previous_sends = [r for r in workflow_requests[:-1] if r["system_prompt_hash"] == sys_prompt_hash]
-            if previous_sends:
-                warnings.append(
-                    f"System Prompt Waste: Redundant system prompt sent again in workflow '{workflow_id}'. "
-                    f"Enable Prompt Caching to optimize token spend."
-                )
+        with self._lock:
+            if workflow_id in self._ignored_workflows:
+                return decision
 
-        # 2. Agent Runaway Loop Detector (exponential context size doubling)
-        if len(workflow_requests) >= 3:
-            recent_workflow_reqs = workflow_requests[-3:]
-            sizes = [r["estimated_tokens"] for r in recent_workflow_reqs]
-            if sizes[1] >= sizes[0] * 2.2 and sizes[2] >= sizes[1] * 2.2 and sizes[0] > 20:
-                warnings.append(
-                    f"Agent Runaway Loop: Prompt context size grew exponentially in workflow '{workflow_id}' "
-                    f"({sizes[0]} -> {sizes[1]} -> {sizes[2]} estimated tokens). Add pruning or stopping conditions."
-                )
+        input_price, output_price = get_model_pricing(model)
+        predicted_cost = (est_tokens / 1_000_000) * input_price
+        
+        budget_exceeded = False
+        reason = ""
+        
+        max_cost_ps = self._budget_config.get("max_cost_per_session")
+        if workflow_id and max_cost_ps is not None:
+            with self._lock:
+                current_session_cost = self._session_costs.get(workflow_id, 0.0)
+            if current_session_cost + predicted_cost > max_cost_ps:
+                budget_exceeded = True
+                reason += f"Predicted cost ${predicted_cost:.4f} plus session cost ${current_session_cost:.4f} exceeds session limit of ${max_cost_ps:.4f}. "
 
-        # 3. Over-Provisioned Model Misuse Detector
-        input_price, _ = get_model_pricing(model)
-        is_expensive = input_price > 2.00 # > $2.00 per 1M tokens
-        is_simple = est_tokens < 150
-        if is_expensive and is_simple:
-            recommended = "gpt-4o-mini" if "gpt" in model.lower() or "o1" in model.lower() else "claude-3-5-haiku"
-            warnings.append(
-                f"Over-Provisioned Model: Using expensive model '{model}' for simple task "
-                f"(avg ~{est_tokens} tokens). Recommend switching to '{recommended}'."
+        max_cost_pm = self._budget_config.get("max_cost_per_minute")
+        if max_cost_pm is not None:
+            with self._lock:
+                minute_cost = sum(e["cost"] for e in self._last_minute_events)
+            if minute_cost + predicted_cost > max_cost_pm:
+                budget_exceeded = True
+                reason += f"Predicted cost ${predicted_cost:.4f} plus minute cost ${minute_cost:.4f} exceeds minute limit of ${max_cost_pm:.4f}. "
+
+        max_reqs_pm = self._budget_config.get("max_requests_per_minute")
+        if max_reqs_pm is not None:
+            with self._lock:
+                minute_requests = len(self._last_minute_events)
+            if minute_requests + 1 > max_reqs_pm:
+                budget_exceeded = True
+                reason += f"Adding this request would exceed minute requests limit of {max_reqs_pm}. "
+
+        max_ctx_toks = self._budget_config.get("max_context_tokens")
+        if max_ctx_toks is not None and est_tokens > max_ctx_toks:
+            budget_exceeded = True
+            reason += f"Estimated input tokens {est_tokens} exceeds maximum context token limit of {max_ctx_toks}. "
+            
+        if budget_exceeded:
+            decision = AurexDecision(
+                action="block",
+                reason=reason.strip(),
+                original_model=model
             )
 
-        # 4. Context Explosion Detector
-        if len(workflow_requests) >= 2:
-            initial_size = workflow_requests[0]["estimated_tokens"]
-            current_size = est_tokens
-            if initial_size > 0 and current_size >= initial_size * 3.5:
-                warnings.append(
-                    f"Context Explosion: Context grew {current_size / initial_size:.1f}x in workflow '{workflow_id}' "
-                    f"({initial_size} -> {current_size} estimated tokens). Recommend sliding window windowing."
+        if decision.action != "block":
+            retry_count_val = retry_count if retry_count is not None else self._session_retry_counts.get(workflow_id, 0)
+            loop_score = self._compute_semantic_loop_score(workflow_id, prompt or "")
+
+            if sys_prompt_hash and len(workflow_requests) >= 2:
+                previous_sends = [r for r in workflow_requests[:-1] if r["system_prompt_hash"] == sys_prompt_hash]
+                if previous_sends and messages:
+                    decision = AurexDecision(
+                        action="compress",
+                        reason=f"System prompt waste in workflow '{workflow_id}'",
+                        compressed_messages=compress_messages(messages),
+                        original_model=model
+                    )
+
+            if len(workflow_requests) >= 3 and decision.action == "proceed":
+                recent_workflow_reqs = workflow_requests[-3:]
+                sizes = [r["estimated_tokens"] for r in recent_workflow_reqs]
+                if sizes[1] >= sizes[0] * 2.2 and sizes[2] >= sizes[1] * 2.2 and sizes[0] > 20:
+                    cheaper = suggest_cheaper_model(model)
+                    decision = AurexDecision(
+                        action="downgrade",
+                        reason=f"Runaway context growth in '{workflow_id}'",
+                        suggested_model=cheaper,
+                        inject_system_instruction="Summarize prior context briefly, then continue with a shorter answer.",
+                        original_model=model,
+                        loop_score=loop_score
+                    )
+                    with self._lock:
+                        self._session_retry_counts[workflow_id] = self._session_retry_counts.get(workflow_id, 0) + 1
+
+            is_simple = est_tokens < 150
+            with self._lock:
+                session_cost = self._session_costs.get(workflow_id, 0.0)
+            near_budget = (
+                self._budget_config.get("max_cost_per_session") is not None
+                and session_cost > (self._budget_config["max_cost_per_session"] * 0.8)
+            )
+            if ((is_expensive_model(model) and is_simple) or near_budget) and decision.action == "proceed":
+                recommended = suggest_cheaper_model(model)
+                if recommended:
+                    decision = AurexDecision(
+                        action="downgrade",
+                        reason=f"Budget threshold near for '{workflow_id}'" if near_budget else f"Over-provisioned model for simple task (~{est_tokens} tokens)",
+                        suggested_model=recommended,
+                        original_model=model
+                    )
+
+            if len(workflow_requests) >= 2 and messages and decision.action == "proceed":
+                initial_size = workflow_requests[0]["estimated_tokens"]
+                current_size = est_tokens
+                if initial_size > 0 and current_size >= initial_size * 3.5:
+                    decision = AurexDecision(
+                        action="compress",
+                        reason=f"Context explosion in '{workflow_id}' ({initial_size} -> {current_size} est. tokens)",
+                        compressed_messages=compress_messages(messages),
+                        original_model=model
+                    )
+
+            if loop_score >= 0.8:
+                decision = AurexDecision(
+                    action="compress",
+                    reason=f"Semantic loop detected (score {loop_score:.2f})",
+                    loop_score=loop_score,
+                    inject_system_instruction="You appear to be repeating yourself. Summarize your current state and try a different approach.",
+                    compressed_messages=compress_messages(messages) if messages else None,
+                    original_model=model
                 )
 
-        # Handle violations
-        if warnings:
+            if retry_count_val >= 3 and (loop_score >= 0.7 or decision.action != "proceed"):
+                with self._lock:
+                    session_cost = self._session_costs.get(workflow_id, 0.0)
+                self._maybe_escalate(workflow_id, session_cost, retry_count_val, loop_score, decision.reason)
+
+        if decision.action != "proceed":
             mode = self._budget_config.get("on_budget_exceeded", "warn")
             if os.getenv("AUREX_BLOCK_ON_WASTE") == "1":
                 mode = "throw"
                 
-            for msg in warnings:
-                full_msg = f"[Aurex SDK Real-Time Guard] {msg}"
-                if mode == "throw":
-                    raise Exception(full_msg)
-                else:
-                    print(full_msg, file=sys.stderr)
+            msg = f"[Aurex SDK] {decision.action}: {decision.reason}"
+            if mode == "throw" and decision.action == "block":
+                raise Exception(msg)
+            elif mode != "throw":
+                print(msg, file=sys.stderr)
+
+        return decision
 
     def _check_budget(self, new_event_cost: float, input_tokens: int, workflow_id: Optional[str] = None):
         with self._lock:
@@ -537,7 +1008,7 @@ class AurexAuditor:
                     payload = {
                         "event": "budget_exceeded",
                         "reason": reason,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
                         "details": {
                             "minuteCost": minute_cost,
                             "minuteRequests": minute_requests,
@@ -660,9 +1131,11 @@ class AurexAuditor:
             )
             with urllib.request.urlopen(req, timeout=3.0) as response:
                 response.read()
-        except Exception:
-            # Fail silently to never impact production app behavior.
-            pass
+        except Exception as e:
+            with self._lock:
+                self._sync_error_count += 1
+                self._last_sync_error = str(e)
+            self._debug_log(f"Cloud sync failed: {e}")
 
     def persist_pending_and_shutdown(self):
         """Persist outstanding queue events to pending.jsonl and terminate background worker thread"""
@@ -704,7 +1177,7 @@ class AurexAuditor:
     def patch_openai(self):
         """
         Locally auto-instrument standard openai completions.
-        Any LLM requests made via 'openai' will automatically be parsed & audited.
+        Any LLM requests made via 'openai' will automatically be parsed, audited, and redirected if needed.
         """
         try:
             import openai
@@ -713,6 +1186,8 @@ class AurexAuditor:
             original_create = openai.resources.chat.completions.Completions.create
             
             def patched_create(cls_self, *args, **kwargs):
+                workflow_id = kwargs.get("user") or (kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None) or "default_workflow"
+                decision = None
                 try:
                     messages = kwargs.get("messages", [])
                     system_prompt = None
@@ -722,23 +1197,34 @@ class AurexAuditor:
                             system_prompt = m.get("content")
                         elif m.get("role") == "user":
                             user_prompt = m.get("content")
-                    self.pre_call_check(
+                    decision = self.pre_call_check(
                         model=kwargs.get("model", "unknown"),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        workflow_id=workflow_id,
                         messages=messages
                     )
+                    if decision:
+                        kwargs = apply_decision_to_call_params(kwargs, decision)
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = original_create(cls_self, *args, **kwargs)
+                try:
+                    resp = original_create(cls_self, *args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                if kwargs.get("stream") is True:
+                    return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_openai_response(kwargs, resp)
                 except Exception as e:
-                    import sys
                     print(f"[Aurex SDK Patch Error] OpenAI patch failed: {e}", file=sys.stderr)
                 return resp
             
@@ -748,6 +1234,8 @@ class AurexAuditor:
             original_acreate = openai.resources.chat.completions.AsyncCompletions.create
             
             async def patched_acreate(cls_self, *args, **kwargs):
+                workflow_id = kwargs.get("user") or (kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None) or "default_workflow"
+                decision = None
                 try:
                     messages = kwargs.get("messages", [])
                     system_prompt = None
@@ -757,23 +1245,34 @@ class AurexAuditor:
                             system_prompt = m.get("content")
                         elif m.get("role") == "user":
                             user_prompt = m.get("content")
-                    self.pre_call_check(
+                    decision = self.pre_call_check(
                         model=kwargs.get("model", "unknown"),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        workflow_id=workflow_id,
                         messages=messages
                     )
+                    if decision:
+                        kwargs = apply_decision_to_call_params(kwargs, decision)
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = await original_acreate(cls_self, *args, **kwargs)
+                try:
+                    resp = await original_acreate(cls_self, *args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                if kwargs.get("stream") is True:
+                    return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_openai_response(kwargs, resp)
                 except Exception as e:
-                    import sys
                     print(f"[Aurex SDK Patch Error] OpenAI async patch failed: {e}", file=sys.stderr)
                 return resp
                 
@@ -785,7 +1284,6 @@ class AurexAuditor:
         """Parses OpenAI call metadata, extracts system/user prompt details, hashes them locally, and logs them"""
         model = kwargs.get("model", "unknown")
         
-        # Capture token usage including cache and reasoning breakdowns
         input_tokens = 0
         output_tokens = 0
         cached_tokens = 0
@@ -794,15 +1292,12 @@ class AurexAuditor:
             input_tokens = resp.usage.prompt_tokens or 0
             output_tokens = resp.usage.completion_tokens or 0
             
-            # Extract cached token details (OpenAI prompt_tokens_details.cached_tokens)
             if hasattr(resp.usage, "prompt_tokens_details") and resp.usage.prompt_tokens_details:
                 cached_tokens = getattr(resp.usage.prompt_tokens_details, "cached_tokens", 0) or 0
             
-            # Extract reasoning token details (o1/o3 series completion_tokens_details.reasoning_tokens)
             if hasattr(resp.usage, "completion_tokens_details") and resp.usage.completion_tokens_details:
                 reasoning_tokens = getattr(resp.usage.completion_tokens_details, "reasoning_tokens", 0) or 0
             
-        # Parse prompt & system prompt
         messages = kwargs.get("messages", [])
         system_prompt = None
         user_prompt = None
@@ -820,8 +1315,10 @@ class AurexAuditor:
             if hasattr(choice, "message") and choice.message and hasattr(choice.message, "content"):
                 response_content = choice.message.content
 
-        # Extracted session / workflow tag
-        workflow_id = kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id")
+        workflow_id = kwargs.get("user") or (kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None) or "default_workflow"
+        
+        if response_content:
+            self.record_response(workflow_id, response_content)
         
         self.log_event(
             model=model,
@@ -839,7 +1336,6 @@ class AurexAuditor:
     def patch_anthropic(self):
         """
         Locally auto-instrument standard Anthropic message creation.
-        Any LLM requests made via 'anthropic' will automatically be parsed & audited.
         """
         try:
             import anthropic
@@ -848,6 +1344,8 @@ class AurexAuditor:
             original_create = anthropic.resources.messages.Messages.create
             
             def patched_create(cls_self, *args, **kwargs):
+                workflow_id = (kwargs.get("metadata") or {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else kwargs.get("user") or "default_workflow"
+                decision = None
                 try:
                     system_prompt = kwargs.get("system")
                     if isinstance(system_prompt, list):
@@ -868,23 +1366,34 @@ class AurexAuditor:
                                     for item in content
                                 )
                             break
-                    self.pre_call_check(
+                    decision = self.pre_call_check(
                         model=kwargs.get("model", "unknown"),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("metadata", {}).get("workflow_id") or kwargs.get("user"),
+                        workflow_id=workflow_id,
                         messages=messages
                     )
+                    if decision:
+                        kwargs = apply_decision_to_call_params(kwargs, decision)
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = original_create(cls_self, *args, **kwargs)
+                try:
+                    resp = original_create(cls_self, *args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                if kwargs.get("stream") is True:
+                    return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_anthropic_response(kwargs, resp)
                 except Exception as e:
-                    import sys
                     print(f"[Aurex SDK Patch Error] Anthropic patch failed: {e}", file=sys.stderr)
                 return resp
             
@@ -894,6 +1403,8 @@ class AurexAuditor:
             original_acreate = anthropic.resources.messages.AsyncMessages.create
             
             async def patched_acreate(cls_self, *args, **kwargs):
+                workflow_id = (kwargs.get("metadata") or {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else kwargs.get("user") or "default_workflow"
+                decision = None
                 try:
                     system_prompt = kwargs.get("system")
                     if isinstance(system_prompt, list):
@@ -914,23 +1425,34 @@ class AurexAuditor:
                                     for item in content
                                 )
                             break
-                    self.pre_call_check(
+                    decision = self.pre_call_check(
                         model=kwargs.get("model", "unknown"),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("metadata", {}).get("workflow_id") or kwargs.get("user"),
+                        workflow_id=workflow_id,
                         messages=messages
                     )
+                    if decision:
+                        kwargs = apply_decision_to_call_params(kwargs, decision)
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = await original_acreate(cls_self, *args, **kwargs)
+                try:
+                    resp = await original_acreate(cls_self, *args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                if kwargs.get("stream") is True:
+                    return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_anthropic_response(kwargs, resp)
                 except Exception as e:
-                    import sys
                     print(f"[Aurex SDK Patch Error] Anthropic async patch failed: {e}", file=sys.stderr)
                 return resp
                 
@@ -983,7 +1505,10 @@ class AurexAuditor:
             elif isinstance(resp.content, str):
                 response_content = resp.content
 
-        workflow_id = kwargs.get("metadata", {}).get("workflow_id") or kwargs.get("user")
+        workflow_id = (kwargs.get("metadata") or {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else kwargs.get("user") or "default_workflow"
+        
+        if response_content:
+            self.record_response(workflow_id, response_content)
         
         self.log_event(
             model=model,
@@ -995,13 +1520,12 @@ class AurexAuditor:
             cache_write_tokens=cache_write_tokens,
             workflow_id=workflow_id,
             system_prompt=system_prompt,
-            extra_metadata=kwargs.get("metadata")
+            extra_metadata=kwargs.get("metadata") if isinstance(kwargs.get("metadata"), dict) else None
         )
 
     def patch_google(self):
         """
         Locally auto-instrument standard Google Gemini generation.
-        Any LLM requests made via 'google.generativeai' will automatically be parsed & audited.
         """
         try:
             import google.generativeai as genai
@@ -1010,6 +1534,8 @@ class AurexAuditor:
             original_generate = genai.GenerativeModel.generate_content
             
             def patched_generate(model_self, *args, **kwargs):
+                workflow_id = (kwargs.get("metadata") or {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else "default_workflow"
+                decision = None
                 try:
                     contents = kwargs.get("contents")
                     if not contents and len(args) > 0:
@@ -1028,23 +1554,45 @@ class AurexAuditor:
                             system_prompt = " ".join(getattr(p, "text", str(p)) for p in config.parts)
                         else:
                             system_prompt = str(config)
-                    self.pre_call_check(
+                    
+                    decision = self.pre_call_check(
                         model=normalize_model_name(getattr(model_self, "model_name", "gemini-1.5-flash")),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("metadata", {}).get("workflow_id"),
+                        workflow_id=workflow_id,
                         messages=None
                     )
+                    
+                    if decision:
+                        if decision.action == "downgrade" and decision.suggested_model:
+                            suggested = decision.suggested_model
+                            if not suggested.startswith("models/"):
+                                suggested = f"models/{suggested}"
+                            model_self.model_name = suggested
+                            if hasattr(model_self, "_model_name"):
+                                model_self._model_name = suggested
+                        if decision.inject_system_instruction:
+                            model_self._system_instruction = decision.inject_system_instruction
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = original_generate(model_self, *args, **kwargs)
+                try:
+                    resp = original_generate(model_self, *args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                is_stream = kwargs.get("stream") is True
+                if is_stream:
+                    return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_google_response(model_self, args, kwargs, resp)
                 except Exception as e:
-                    import sys
                     print(f"[Aurex SDK Patch Error] Google patch failed: {e}", file=sys.stderr)
                 return resp
             
@@ -1054,6 +1602,8 @@ class AurexAuditor:
             original_generate_async = genai.GenerativeModel.generate_content_async
             
             async def patched_generate_async(model_self, *args, **kwargs):
+                workflow_id = (kwargs.get("metadata") or {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else "default_workflow"
+                decision = None
                 try:
                     contents = kwargs.get("contents")
                     if not contents and len(args) > 0:
@@ -1072,23 +1622,45 @@ class AurexAuditor:
                             system_prompt = " ".join(getattr(p, "text", str(p)) for p in config.parts)
                         else:
                             system_prompt = str(config)
-                    self.pre_call_check(
+                    
+                    decision = self.pre_call_check(
                         model=normalize_model_name(getattr(model_self, "model_name", "gemini-1.5-flash")),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("metadata", {}).get("workflow_id"),
+                        workflow_id=workflow_id,
                         messages=None
                     )
+                    
+                    if decision:
+                        if decision.action == "downgrade" and decision.suggested_model:
+                            suggested = decision.suggested_model
+                            if not suggested.startswith("models/"):
+                                suggested = f"models/{suggested}"
+                            model_self.model_name = suggested
+                            if hasattr(model_self, "_model_name"):
+                                model_self._model_name = suggested
+                        if decision.inject_system_instruction:
+                            model_self._system_instruction = decision.inject_system_instruction
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = await original_generate_async(model_self, *args, **kwargs)
+                try:
+                    resp = await original_generate_async(model_self, *args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                is_stream = kwargs.get("stream") is True
+                if is_stream:
+                    return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_google_response(model_self, args, kwargs, resp)
                 except Exception as e:
-                    import sys
                     print(f"[Aurex SDK Patch Error] Google async patch failed: {e}", file=sys.stderr)
                 return resp
                 
@@ -1133,7 +1705,10 @@ class AurexAuditor:
         except Exception:
             pass
 
-        workflow_id = kwargs.get("metadata", {}).get("workflow_id")
+        workflow_id = (kwargs.get("metadata") or {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None
+        
+        if response_content:
+            self.record_response(workflow_id, response_content)
         
         self.log_event(
             model=model,
@@ -1143,16 +1718,11 @@ class AurexAuditor:
             output_tokens=output_tokens,
             workflow_id=workflow_id,
             system_prompt=system_prompt,
-            extra_metadata=kwargs.get("metadata")
+            extra_metadata=kwargs.get("metadata") if isinstance(kwargs.get("metadata"), dict) else None
         )
 
     def patch_litellm(self):
-        """Patch LiteLLM's `completion` (and async variant) to auto-log events.
-
-        LiteLLM normalizes responses across providers, so a single hook here
-        covers most users (and runs *before* the provider-specific patchers
-        when used together).
-        """
+        """Patch LiteLLM's `completion` (and async variant) to auto-log events."""
         try:
             import litellm  # type: ignore
         except ImportError:
@@ -1161,6 +1731,8 @@ class AurexAuditor:
         original = getattr(litellm, "completion", None)
         if original is not None and not getattr(original, "__aurex_patched__", False):
             def patched_completion(*args, **kwargs):
+                workflow_id = kwargs.get("user") or (kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None) or "default_workflow"
+                decision = None
                 try:
                     messages = kwargs.get("messages", [])
                     system_prompt = None
@@ -1170,19 +1742,31 @@ class AurexAuditor:
                             system_prompt = m.get("content")
                         elif m.get("role") == "user":
                             user_prompt = m.get("content")
-                    self.pre_call_check(
+                    decision = self.pre_call_check(
                         model=kwargs.get("model", "unknown"),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        workflow_id=workflow_id,
                         messages=messages
                     )
+                    if decision:
+                        kwargs = apply_decision_to_call_params(kwargs, decision)
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = original(*args, **kwargs)
+                try:
+                    resp = original(*args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                if kwargs.get("stream") is True:
+                    return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_litellm_response(kwargs, resp)
                 except Exception as e:
@@ -1194,6 +1778,8 @@ class AurexAuditor:
         original_a = getattr(litellm, "acompletion", None)
         if original_a is not None and not getattr(original_a, "__aurex_patched__", False):
             async def patched_acompletion(*args, **kwargs):
+                workflow_id = kwargs.get("user") or (kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None) or "default_workflow"
+                decision = None
                 try:
                     messages = kwargs.get("messages", [])
                     system_prompt = None
@@ -1203,19 +1789,31 @@ class AurexAuditor:
                             system_prompt = m.get("content")
                         elif m.get("role") == "user":
                             user_prompt = m.get("content")
-                    self.pre_call_check(
+                    decision = self.pre_call_check(
                         model=kwargs.get("model", "unknown"),
                         prompt=user_prompt,
                         system_prompt=system_prompt,
-                        workflow_id=kwargs.get("user") or kwargs.get("metadata", {}).get("workflow_id"),
+                        workflow_id=workflow_id,
                         messages=messages
                     )
+                    if decision:
+                        kwargs = apply_decision_to_call_params(kwargs, decision)
                 except Exception as e:
+                    if decision and decision.action == "block":
+                        raise e
                     if os.getenv("AUREX_BLOCK_ON_WASTE") == "1" or self._budget_config.get("on_budget_exceeded") == "throw":
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                resp = await original_a(*args, **kwargs)
+                try:
+                    resp = await original_a(*args, **kwargs)
+                except Exception as ex:
+                    self.mark_failure(workflow_id, str(ex))
+                    raise ex
+
+                if kwargs.get("stream") is True:
+                    return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
+
                 try:
                     self._log_litellm_response(kwargs, resp)
                 except Exception as e:
@@ -1260,11 +1858,26 @@ class AurexAuditor:
             if role == "user" and isinstance(content, str):
                 user_prompt = content
 
-        workflow_id = kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None
+        response_content = None
+        if hasattr(resp, "choices") and resp.choices:
+            choice = resp.choices[0]
+            if hasattr(choice, "message") and choice.message and hasattr(choice.message, "content"):
+                response_content = choice.message.content
+        elif isinstance(resp, dict) and "choices" in resp:
+            choices = resp["choices"]
+            if choices and isinstance(choices, list):
+                msg = choices[0].get("message", {})
+                response_content = msg.get("content")
+
+        workflow_id = kwargs.get("user") or (kwargs.get("metadata", {}).get("workflow_id") if isinstance(kwargs.get("metadata"), dict) else None) or "default_workflow"
+
+        if response_content:
+            self.record_response(workflow_id, response_content)
 
         self.log_event(
             model=model,
             prompt=user_prompt,
+            response=response_content,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cached_tokens=cached_tokens,
@@ -1275,11 +1888,7 @@ class AurexAuditor:
         )
 
     def patch_all(self):
-        """Auto-patch all supported provider libraries.
-
-        Order: LiteLLM first (it wraps everything else), then Anthropic,
-        OpenAI, Google. The patchers each guard against missing imports.
-        """
+        """Auto-patch all supported provider libraries."""
         self.patch_litellm()
         self.patch_anthropic()
         self.patch_openai()
