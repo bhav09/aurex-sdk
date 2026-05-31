@@ -63,6 +63,9 @@ class TestCloudSyncRetry(unittest.TestCase):
 
 
 class TestAuditorCloudIntegration(unittest.TestCase):
+    def setUp(self):
+        AurexAuditor.reset()
+
     def tearDown(self):
         AurexAuditor.reset()
 

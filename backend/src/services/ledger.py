@@ -83,6 +83,34 @@ def _parse_timestamp(value: Any) -> datetime:
     return datetime.utcnow()
 
 
+def _parse_outcome(value: Any):
+    from src.models.llm_event import OutcomeEnum
+
+    if value is None:
+        return OutcomeEnum.PENDING
+    s = str(value).lower().strip()
+    if s.startswith("outcomeenum."):
+        s = s.split(".")[-1]
+    try:
+        return OutcomeEnum(s)
+    except ValueError:
+        return OutcomeEnum.PENDING
+
+
+def _parse_cost_type(value: Any):
+    from src.models.llm_event import CostTypeEnum
+
+    if value is None:
+        return CostTypeEnum.INFERENCE
+    s = str(value).lower().strip()
+    if s.startswith("costtypeenum."):
+        s = s.split(".")[-1]
+    try:
+        return CostTypeEnum(s)
+    except ValueError:
+        return CostTypeEnum.INFERENCE
+
+
 async def ingest_events(
     db: AsyncSession,
     events: Iterable[Dict[str, Any]],
@@ -126,6 +154,13 @@ async def ingest_events(
                 metadata = {**metadata, "team": raw["team"]}
             if "environment" in raw and raw["environment"] is not None:
                 metadata = {**metadata, "environment": raw["environment"]}
+            if raw.get("projected_cost") is not None:
+                metadata = {**metadata, "projected_cost": raw.get("projected_cost")}
+            loss_avoided = raw.get("loss_avoided")
+            if loss_avoided is None and metadata.get("loss_avoided") is not None:
+                loss_avoided = metadata.get("loss_avoided")
+            if loss_avoided is not None:
+                metadata = {**metadata, "loss_avoided": loss_avoided}
 
             event_id = str(uuid.uuid4())
             event = LLMEvent(
@@ -148,12 +183,21 @@ async def ingest_events(
                 response=None,
                 system_prompt_hash=raw.get("system_prompt_hash"),
                 context_length=input_tokens,
-                retry_count=raw.get("retry_count", 0),
-                outcome=raw.get("outcome", "pending"),
-                cost_type=raw.get("cost_type", "inference"),
+                retry_count=int(raw.get("retry_count", 0) or 0),
+                outcome=_parse_outcome(raw.get("outcome")),
+                cost_type=_parse_cost_type(raw.get("cost_type")),
                 loop_score=raw.get("loop_score"),
                 team=raw.get("team"),
                 tenant_id=raw.get("tenant_id"),
+                status=raw.get("status"),
+                error_code=raw.get("error_code"),
+                latency_ms=raw.get("latency_ms"),
+                finish_reason=raw.get("finish_reason"),
+                reported_cost_usd=raw.get("reported_cost_usd"),
+                cost_source=raw.get("cost_source"),
+                projected_cost=raw.get("projected_cost"),
+                recovery_provider=raw.get("recovery_provider"),
+                attempt_index=raw.get("attempt_index"),
                 extra_metadata=metadata or None,
             )
             db.add(event)

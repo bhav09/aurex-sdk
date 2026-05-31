@@ -32,8 +32,18 @@ def _overview_from_events(events: list) -> dict:
             return ""
         return o.value if hasattr(o, "value") else str(o).lower().split(".")[-1]
 
+    def _cost_type_val(ct) -> str:
+        if ct is None:
+            return ""
+        return ct.value if hasattr(ct, "value") else str(ct).lower().split(".")[-1]
+
     success_events = [e for e in events if _outcome_val(e.outcome) == "success"]
+    recovered_events = [e for e in events if _outcome_val(e.outcome) == "recovered"]
     failure_events = [e for e in events if _outcome_val(e.outcome) == "failure"]
+    degraded_events = [e for e in events if _outcome_val(e.outcome) == "degraded"]
+    unfulfilled_events = [
+        e for e in events if _cost_type_val(getattr(e, "cost_type", None)) == "unfulfilled_spend"
+    ]
     outcome_signal_cost = sum(
         e.cost or 0 for e in events if getattr(e, "cost_type", None) == "outcome_signal"
     )
@@ -69,6 +79,23 @@ def _overview_from_events(events: list) -> dict:
         llm_cost / success_count if success_count else None
     )
 
+    billed_but_failed_cost = sum(e.cost or 0 for e in unfulfilled_events + degraded_events)
+    loss_avoided = sum(
+        (getattr(e, "projected_cost", None) or 0)
+        - (e.cost or 0)
+        for e in recovered_events
+        if getattr(e, "projected_cost", None) is not None
+    )
+    loss_avoided += sum(
+        (e.extra_metadata or {}).get("loss_avoided", 0) or 0
+        for e in events
+        if isinstance(getattr(e, "extra_metadata", None), dict)
+    )
+    recoverable_failures = len(failure_events) + len(degraded_events) + len(unfulfilled_events)
+    recovery_rate = (
+        (len(recovered_events) / recoverable_failures * 100) if recoverable_failures else 0.0
+    )
+
     return {
         "total_spend_7d": total_cost,
         "llm_spend_7d": llm_cost,
@@ -79,6 +106,9 @@ def _overview_from_events(events: list) -> dict:
         "retry_rate": (len(retry_events) / total_events * 100) if total_events else 0,
         "retry_event_count": len(retry_events),
         "cost_per_successful_outcome": cost_per_successful_outcome,
+        "billed_but_failed_cost": round(billed_but_failed_cost, 4),
+        "loss_avoided": round(loss_avoided, 4),
+        "recovery_rate": round(recovery_rate, 2),
         "health_score": min(100, max(0, int(100 - (len(retry_events) / max(total_events, 1) * 40)))),
         "model_breakdown": [
             {

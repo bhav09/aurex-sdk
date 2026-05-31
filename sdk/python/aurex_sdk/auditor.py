@@ -12,8 +12,15 @@ import urllib.error
 from aurex_sdk.decisions import AurexDecision, AurexAction, suggest_cheaper_model, is_expensive_model, compress_messages, apply_decision_to_call_params
 from aurex_sdk.semantic import jaccard_ngram_similarity
 from aurex_sdk.cloud_sync import sync_batch_with_retry
-from aurex_sdk.exceptions import AurexBlocked, AurexBudgetExceeded
+from aurex_sdk.exceptions import AurexBlocked, AurexBudgetExceeded, AurexResilienceExhausted
 from aurex_sdk.ledger_utils import emit_warning_once, prepare_ledger_storage
+from aurex_sdk.resilience import (
+    AttemptRecord,
+    ResiliencePolicy,
+    async_execute_with_resilience,
+    execute_with_resilience,
+    parse_resilience_config,
+)
 
 # In-memory database of pricing
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
@@ -269,6 +276,7 @@ class AurexConfig:
         sync_timeout_seconds: float = 10.0,
         sync_max_retries: int = 3,
         per_process_ledger: bool = True,
+        resilience: Optional[Dict[str, Any]] = None,
     ):
         self.api_key = api_key or os.getenv("AUREX_API_KEY")
         self.project = project
@@ -305,6 +313,7 @@ class AurexConfig:
         self.sync_timeout_seconds = sync_timeout_seconds
         self.sync_max_retries = sync_max_retries
         self.per_process_ledger = per_process_ledger
+        self.resilience = resilience or {}
 
 
 class AurexAuditor:
@@ -356,6 +365,8 @@ class AurexAuditor:
         self._events_dropped = 0
         self._patch_status: Dict[str, str] = {}
         self._budget_config = self.config.budget_guard or {}
+        self._resilience_policy = parse_resilience_config(getattr(self.config, "resilience", None))
+        self._registered_fallbacks: Dict[str, Any] = {}
         
         # Assign downgrade map and default pricing for reference
         self.downgrade_map = self.config.downgrade_map or {}
@@ -458,6 +469,130 @@ class AurexAuditor:
         """Allow runtime pricing overrides."""
         MODEL_PRICING[model] = {"input": input_cost, "output": output_cost}
 
+    def register_fallback(
+        self,
+        name: str,
+        call_fn: Any,
+        *,
+        provider: str,
+        model: str,
+    ) -> None:
+        """Register a named cross-provider fallback callable (customer-owned client/keys)."""
+        self._registered_fallbacks[name] = {
+            "call_fn": call_fn,
+            "provider": provider,
+            "model": model,
+        }
+
+    def _resilience_on_attempt(
+        self,
+        record: AttemptRecord,
+        workflow_id: str,
+        resp: Any,
+        exc: Optional[Exception],
+    ) -> None:
+        extra: Dict[str, Any] = {
+            "resilience_kind": record.classification.kind,
+            "loss_avoided": record.loss_avoided,
+        }
+        if exc is not None:
+            extra["error"] = str(exc)
+        self.log_event(
+            model=record.model,
+            workflow_id=workflow_id,
+            outcome=record.outcome,
+            cost_type=record.cost_type,
+            retry_count=record.attempt_index,
+            provider=record.provider,
+            attempt_index=record.attempt_index,
+            recovery_provider=record.recovery_provider,
+            projected_cost=record.projected_cost,
+            latency_ms=record.classification.latency_ms,
+            status=record.classification.status,
+            error_code=record.classification.error_code,
+            finish_reason=record.classification.finish_reason,
+            extra_metadata=extra,
+        )
+        if record.outcome == "failure" and exc is not None:
+            self.mark_failure(workflow_id, str(exc), metadata=extra)
+
+    def _call_with_resilience(
+        self,
+        call_fn: Any,
+        *,
+        provider: str,
+        workflow_id: str,
+        model: str,
+        idempotency_key: Optional[str] = None,
+    ) -> Any:
+        policy = self._resilience_policy
+
+        def on_attempt(record: AttemptRecord, resp: Any, exc: Optional[Exception]) -> None:
+            self._resilience_on_attempt(record, workflow_id, resp, exc)
+
+        if not policy.enabled:
+            try:
+                return call_fn()
+            except Exception as ex:
+                self.mark_failure(workflow_id, str(ex))
+                raise
+
+        registered = {
+            k: v["call_fn"] for k, v in self._registered_fallbacks.items()
+        }
+        resp, _meta = execute_with_resilience(
+            call_fn,
+            policy,
+            provider=provider,
+            model=model,
+            workflow_id=workflow_id,
+            on_attempt=on_attempt,
+            registered_fallbacks=registered,
+            idempotency_key=idempotency_key,
+            calculate_cost_fn=lambda m, i, o: calculate_cost(m, i, o),
+        )
+        return resp
+
+    async def _acall_with_resilience(
+        self,
+        call_fn: Any,
+        *,
+        provider: str,
+        workflow_id: str,
+        model: str,
+        idempotency_key: Optional[str] = None,
+    ) -> Any:
+        policy = self._resilience_policy
+
+        def on_attempt(record: AttemptRecord, resp: Any, exc: Optional[Exception]) -> None:
+            self._resilience_on_attempt(record, workflow_id, resp, exc)
+
+        if not policy.enabled:
+            try:
+                result = call_fn()
+                if hasattr(result, "__await__"):
+                    return await result
+                return result
+            except Exception as ex:
+                self.mark_failure(workflow_id, str(ex))
+                raise
+
+        registered = {
+            k: v["call_fn"] for k, v in self._registered_fallbacks.items()
+        }
+        resp, _meta = await async_execute_with_resilience(
+            call_fn,
+            policy,
+            provider=provider,
+            model=model,
+            workflow_id=workflow_id,
+            on_attempt=on_attempt,
+            registered_fallbacks=registered,
+            idempotency_key=idempotency_key,
+            calculate_cost_fn=lambda m, i, o: calculate_cost(m, i, o),
+        )
+        return resp
+
     def log_event(
         self,
         model: str,
@@ -480,6 +615,13 @@ class AurexAuditor:
         tags: Optional[Dict[str, str]] = None,
         quality_score: Optional[float] = None,
         provider: Optional[str] = None,
+        attempt_index: Optional[int] = None,
+        recovery_provider: Optional[str] = None,
+        projected_cost: Optional[float] = None,
+        latency_ms: Optional[int] = None,
+        status: Optional[str] = None,
+        error_code: Optional[str] = None,
+        finish_reason: Optional[str] = None,
     ):
         """
         Record an LLM call to the ledger completely asynchronously.
@@ -538,7 +680,14 @@ class AurexAuditor:
             "tool_calls_count": tool_calls_count,
             "tool_names": tool_names or [],
             "tags": tags or {},
-            "quality_score": quality_score
+            "quality_score": quality_score,
+            "attempt_index": attempt_index,
+            "recovery_provider": recovery_provider,
+            "projected_cost": projected_cost,
+            "latency_ms": latency_ms,
+            "status": status,
+            "error_code": error_code,
+            "finish_reason": finish_reason,
         }
 
         # Optional OpenTelemetry Export
@@ -729,11 +878,12 @@ class AurexAuditor:
             
             modified_params = apply_decision_to_call_params(params, decision)
             
-            try:
-                resp = call_fn(modified_params)
-            except Exception as ex:
-                self.mark_failure(workflow_id, str(ex))
-                raise ex
+            resp = self._call_with_resilience(
+                lambda: call_fn(modified_params),
+                provider=extract_provider(modified_params.get("model", model)),
+                workflow_id=workflow_id,
+                model=modified_params.get("model", model),
+            )
                 
             response_content = None
             input_tokens = 0
@@ -822,11 +972,12 @@ class AurexAuditor:
             
             modified_params = apply_decision_to_call_params(params, decision)
             
-            try:
-                resp = await call_fn(modified_params)
-            except Exception as ex:
-                self.mark_failure(workflow_id, str(ex))
-                raise ex
+            resp = await self._acall_with_resilience(
+                lambda: call_fn(modified_params),
+                provider=extract_provider(modified_params.get("model", model)),
+                workflow_id=workflow_id,
+                model=modified_params.get("model", model),
+            )
                 
             response_content = None
             input_tokens = 0
@@ -1589,11 +1740,12 @@ class AurexAuditor:
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
  
-                try:
-                    resp = original_create(cls_self, *args, **kwargs)
-                except Exception as ex:
-                    self.mark_failure(workflow_id, str(ex))
-                    raise ex
+                resp = self._call_with_resilience(
+                    lambda: original_create(cls_self, *args, **kwargs),
+                    provider="openai",
+                    workflow_id=workflow_id,
+                    model=kwargs.get("model", "unknown"),
+                )
  
                 if kwargs.get("stream") is True:
                     return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
@@ -1644,11 +1796,12 @@ class AurexAuditor:
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
  
-                try:
-                    resp = await original_acreate(cls_self, *args, **kwargs)
-                except Exception as ex:
-                    self.mark_failure(workflow_id, str(ex))
-                    raise ex
+                resp = await self._acall_with_resilience(
+                    lambda: original_acreate(cls_self, *args, **kwargs),
+                    provider="openai",
+                    workflow_id=workflow_id,
+                    model=kwargs.get("model", "unknown"),
+                )
  
                 if kwargs.get("stream") is True:
                     return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
@@ -1792,11 +1945,12 @@ class AurexAuditor:
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                try:
-                    resp = original_create(cls_self, *args, **kwargs)
-                except Exception as ex:
-                    self.mark_failure(workflow_id, str(ex))
-                    raise ex
+                resp = self._call_with_resilience(
+                    lambda: original_create(cls_self, *args, **kwargs),
+                    provider="openai",
+                    workflow_id=workflow_id,
+                    model=kwargs.get("model", "unknown"),
+                )
 
                 if kwargs.get("stream") is True:
                     return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
@@ -1859,11 +2013,12 @@ class AurexAuditor:
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                try:
-                    resp = await original_acreate(cls_self, *args, **kwargs)
-                except Exception as ex:
-                    self.mark_failure(workflow_id, str(ex))
-                    raise ex
+                resp = await self._acall_with_resilience(
+                    lambda: original_acreate(cls_self, *args, **kwargs),
+                    provider="openai",
+                    workflow_id=workflow_id,
+                    model=kwargs.get("model", "unknown"),
+                )
 
                 if kwargs.get("stream") is True:
                     return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
@@ -2042,11 +2197,12 @@ class AurexAuditor:
                                 raise e
                             print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
                             
-                        try:
-                            resp = original_generate(models_self, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = self._call_with_resilience(
+                            lambda: original_generate(models_self, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         try:
                             self._log_google_response(model or "gemini-2.5-flash", args, kwargs, resp)
@@ -2112,11 +2268,12 @@ class AurexAuditor:
                                 raise e
                             print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
                             
-                        try:
-                            resp = original_generate_stream(models_self, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = self._call_with_resilience(
+                            lambda: original_generate_stream(models_self, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         return self._wrap_sync_stream(resp, {"model": model or "gemini-2.5-flash"}, workflow_id, user_prompt, system_prompt)
                         
@@ -2178,11 +2335,12 @@ class AurexAuditor:
                                 raise e
                             print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
                             
-                        try:
-                            resp = await original_generate_async(models_self, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = await self._acall_with_resilience(
+                            lambda: original_generate_async(models_self, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         try:
                             self._log_google_response(model or "gemini-2.5-flash", args, kwargs, resp)
@@ -2248,11 +2406,12 @@ class AurexAuditor:
                                 raise e
                             print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
                             
-                        try:
-                            resp = await original_generate_stream_async(models_self, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = await self._acall_with_resilience(
+                            lambda: original_generate_stream_async(models_self, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         return self._wrap_async_stream(resp, {"model": model or "gemini-2.5-flash"}, workflow_id, user_prompt, system_prompt)
                         
@@ -2316,11 +2475,12 @@ class AurexAuditor:
                             raise e
                         print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                    try:
-                        resp = original_generate(model_self, *args, **kwargs)
-                    except Exception as ex:
-                        self.mark_failure(workflow_id, str(ex))
-                        raise ex
+                    resp = self._call_with_resilience(
+                        lambda: original_generate(model_self, *args, **kwargs),
+                        provider=extract_provider(kwargs.get('model', 'unknown')),
+                        workflow_id=workflow_id,
+                        model=kwargs.get('model', 'unknown'),
+                    )
 
                     is_stream = kwargs.get("stream") is True
                     if is_stream:
@@ -2385,11 +2545,12 @@ class AurexAuditor:
                             raise e
                         print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                    try:
-                        resp = await original_generate_async(model_self, *args, **kwargs)
-                    except Exception as ex:
-                        self.mark_failure(workflow_id, str(ex))
-                        raise ex
+                    resp = await self._acall_with_resilience(
+                        lambda: original_generate_async(model_self, *args, **kwargs),
+                        provider=extract_provider(kwargs.get('model', 'unknown')),
+                        workflow_id=workflow_id,
+                        model=kwargs.get('model', 'unknown'),
+                    )
 
                     is_stream = kwargs.get("stream") is True
                     if is_stream:
@@ -2511,11 +2672,12 @@ class AurexAuditor:
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                try:
-                    resp = original(*args, **kwargs)
-                except Exception as ex:
-                    self.mark_failure(workflow_id, str(ex))
-                    raise ex
+                resp = self._call_with_resilience(
+                    lambda: original(*args, **kwargs),
+                    provider=extract_provider(kwargs.get('model', 'unknown')),
+                    workflow_id=workflow_id,
+                    model=kwargs.get('model', 'unknown'),
+                )
 
                 if kwargs.get("stream") is True:
                     return self._wrap_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
@@ -2558,11 +2720,12 @@ class AurexAuditor:
                         raise e
                     print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
 
-                try:
-                    resp = await original_a(*args, **kwargs)
-                except Exception as ex:
-                    self.mark_failure(workflow_id, str(ex))
-                    raise ex
+                resp = await self._acall_with_resilience(
+                    lambda: original_a(*args, **kwargs),
+                    provider=extract_provider(kwargs.get('model', 'unknown')),
+                    workflow_id=workflow_id,
+                    model=kwargs.get('model', 'unknown'),
+                )
 
                 if kwargs.get("stream") is True:
                     return self._wrap_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt)
@@ -2847,11 +3010,12 @@ class AurexAuditor:
                                 raise e
                             print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
                             
-                        try:
-                            resp = await original_method(*args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = await self._acall_with_resilience(
+                            lambda: original_method(*args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         if kwargs.get("stream") is True:
                             return self._wrap_ollama_async_stream(resp, kwargs, workflow_id, user_prompt, system_prompt, model, is_chat)
@@ -2920,11 +3084,12 @@ class AurexAuditor:
                                 raise e
                             print(f"[Aurex SDK Real-Time Warning Check Error] {e}", file=sys.stderr)
                             
-                        try:
-                            resp = original_method(*args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = self._call_with_resilience(
+                            lambda: original_method(*args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         if kwargs.get("stream") is True:
                             return self._wrap_ollama_sync_stream(resp, kwargs, workflow_id, user_prompt, system_prompt, model, is_chat)
@@ -3010,11 +3175,12 @@ class AurexAuditor:
                         if decision.action == "downgrade" and decision.suggested_model:
                             kwargs["model"] = decision.suggested_model
                         
-                        try:
-                            resp = await original_chat(self_client, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = await self._acall_with_resilience(
+                            lambda: original_chat(self_client, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         if kwargs.get("stream") is True:
                             async def async_stream_generator():
@@ -3099,11 +3265,12 @@ class AurexAuditor:
                         if decision.action == "downgrade" and decision.suggested_model:
                             kwargs["model"] = decision.suggested_model
                             
-                        try:
-                            resp = original_chat(self_client, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = self._call_with_resilience(
+                            lambda: original_chat(self_client, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         if kwargs.get("stream") is True:
                             def sync_stream_generator():
@@ -3178,11 +3345,12 @@ class AurexAuditor:
                         if decision.action == "downgrade" and decision.suggested_model:
                             kwargs["model"] = decision.suggested_model
                             
-                        try:
-                            resp = await original_gen(self_client, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = await self._acall_with_resilience(
+                            lambda: original_gen(self_client, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         if kwargs.get("stream") is True:
                             async def async_stream_generator():
@@ -3250,11 +3418,12 @@ class AurexAuditor:
                         if decision.action == "downgrade" and decision.suggested_model:
                             kwargs["model"] = decision.suggested_model
                             
-                        try:
-                            resp = original_gen(self_client, *args, **kwargs)
-                        except Exception as ex:
-                            self.mark_failure(workflow_id, str(ex))
-                            raise ex
+                        resp = self._call_with_resilience(
+                            lambda: original_gen(self_client, *args, **kwargs),
+                            provider=extract_provider(kwargs.get('model', 'unknown')),
+                            workflow_id=workflow_id,
+                            model=kwargs.get('model', 'unknown'),
+                        )
                             
                         if kwargs.get("stream") is True:
                             def sync_stream_generator():

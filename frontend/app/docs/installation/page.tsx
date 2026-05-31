@@ -1,5 +1,5 @@
 import { DualCodeBlock } from "@/components/docs/dual-code-block";
-import { CodeBlock } from "@/components/docs/code-block";
+import { DocHashRedirect } from "@/components/docs/doc-hash-redirect";
 import { Terminal } from "lucide-react";
 
 export const metadata = {
@@ -49,6 +49,7 @@ auditor.flush();`;
 export default function DocsInstallationPage() {
   return (
     <div className="space-y-12">
+      <DocHashRedirect />
       <div>
         <h1 className="text-3xl font-display font-bold text-white flex items-center gap-2">
           <Terminal className="w-7 h-7 text-emerald-400" />
@@ -73,10 +74,14 @@ export default function DocsInstallationPage() {
         <h2 className="text-xl font-semibold text-white">Zero-code auto-hook</h2>
         <p className="text-white/50 text-sm">
           The install-hook command patches provider modules before your app imports them. See{" "}
-          <a href="/docs/reference#autohook" className="text-indigo-400">
+          <a href="/docs/reference/autohook" className="text-indigo-400">
             auto-hook reference
           </a>{" "}
-          for provider coverage.
+          for provider coverage. Environment variables are documented on{" "}
+          <a href="/docs/installation/env-vars" className="text-indigo-400">
+            /docs/installation/env-vars
+          </a>
+          .
         </p>
         <DualCodeBlock
           pythonCode={pythonHook}
@@ -96,16 +101,14 @@ export default function DocsInstallationPage() {
         />
       </section>
 
-      <section id="env-vars" className="scroll-mt-32 space-y-4">
+      <section className="scroll-mt-32 space-y-4">
         <h2 className="text-xl font-semibold text-white">Environment variables</h2>
-        <CodeBlock
-          id="env-vars-block"
-          language="bash"
-          code={`export AUREX_API_KEY=aux_dev_yourkey
-export AUREX_BASE_URL=https://your-aurex-host
-export AUREX_LEDGER_PATH=/tmp/.aurex/ledger.jsonl   # optional writable override
-export AUREX_WORKER_ID=worker-1                     # optional per-process ledger suffix`}
-        />
+        <p className="text-white/50 text-sm">
+          Full <code>AUREX_*</code> reference:{" "}
+          <a href="/docs/installation/env-vars" className="text-indigo-400">
+            /docs/installation/env-vars
+          </a>
+        </p>
       </section>
     </div>
   );

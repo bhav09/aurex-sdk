@@ -1383,7 +1383,8 @@ async def get_savings_realization(
         "runaway_loop": 0.0,
         "context_explosion": 0.0,
         "tool_bloat": 0.0,
-        "retry_cascades": 0.0
+        "retry_cascades": 0.0,
+        "reliability_savings": 0.0,
     }
     
     for idx, s in enumerate(sessions):
@@ -1405,7 +1406,13 @@ async def get_savings_realization(
             "wasted_cost": round(s.wasted_cost or 0.0, 2),
             "total_waste": round(s.wasted_cost or 0.0, 2),
             "realized_savings": round(savings, 2),
-            "cumulative_savings": round(cumulative_savings, 2)
+            "cumulative_savings": round(cumulative_savings, 2),
+            "loss_avoided": round(
+                (s.analysis_results or {}).get("reliability_summary", {}).get("loss_avoided", 0.0)
+                if isinstance(s.analysis_results, dict)
+                else 0.0,
+                2,
+            ),
         })
 
     # Annualized projection is based on the latest session's annual savings projection
@@ -1422,6 +1429,8 @@ async def get_savings_realization(
             weekly_cost = issue.get("weekly_cost", 0.0)
             if itype in category_savings:
                 category_savings[itype] += weekly_cost * 52.0
+            elif itype in ("reliability_savings", "unfulfilled_spend", "billed_but_failed"):
+                category_savings["reliability_savings"] += weekly_cost * 52.0
             elif itype == "system_prompt":
                 category_savings["expensive_model_misuse"] += weekly_cost * 52.0
 

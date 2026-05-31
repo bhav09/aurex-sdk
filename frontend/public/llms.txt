@@ -1,185 +1,107 @@
 # Aurex — LLM & Agent Reference
 
-> Local-first LLM cost tracking, real-time budget guards, and zero-PII telemetry sync. Prompts/responses are hashed locally; cloud sync sends metadata only unless `sync_prompt_hashes` is enabled.
+> Local-first LLM cost tracking, budget guards, provider-call resilience, and zero-PII telemetry sync.
 
-This file is the primary entry point for AI coding agents. Use the routing table below to open the correct doc page before writing integration code.
+This file is the primary entry point for AI coding agents.
+
+**Agent rule:** Read this routing table first. Fetch **one** doc URL per task. Do not load hub pages for implementation detail.
 
 ---
 
 ## Agent routing (task → doc URL)
 
-All paths are relative to the site origin (e.g. `https://your-host/docs/installation`).
+Paths are relative to the site origin (e.g. `https://your-host/docs/installation`).
 
 | If the user wants to… | Open this URL |
 | :--- | :--- |
 | Understand what Aurex does | `/docs` |
 | Install SDK, set API key, first event | `/docs/installation` |
-| Set env vars (`AUREX_API_KEY`, ledger path) | `/docs/installation#env-vars` |
-| Zero-code auto-hook (`install-hook`) | `/docs/reference#autohook` |
-| Manual init + `log_event` / `logEvent` | `/docs/reference#integration` |
-| Full `AurexConfig` / `getInstance` options | `/docs/reference#config-reference` |
-| Budget guard / circuit breaker setup | `/docs/reference#budget-guard-config` |
-| Supported providers (OpenAI, Anthropic, etc.) | `/docs/reference#provider-matrix` |
-| Pre-call guards (`pre_call_check`) | `/docs/reference#guards` |
-| Request-scoped `wrap()` / `awrap()` | `/docs/reference#context-wrappers` |
-| Success/failure outcome signals | `/docs/reference#outcomes` |
-| Health, crash recovery, `flush()` | `/docs/reference#health-monitoring` |
-| Deploy to Lambda, K8s, read-only FS | `/docs/deployment` |
-| Serverless flush before handler return | `/docs/deployment#serverless-flush` |
-| Writable ledger fallback (`/tmp`, memory) | `/docs/deployment#readonly-fs` |
-| Cloud sync retries, 429, queue drops | `/docs/deployment#network-resilience` |
-| Pick patch vs wrap vs manual logging | `/docs/harness` |
-| Avoid double-counting with existing wrapper | `/docs/harness#decision-matrix` |
-| Offline heuristics CLI | `/docs/reference#heuristics` |
-| CI policy gate | `/docs/reference#cicd` |
-
-### Doc site map
-
-**Top-level pages**
-- `/docs` — Overview and links to all sections
-- `/docs/installation` — Install, auto-hook intro, manual init, environment variables
-- `/docs/deployment` — Cloud/serverless, filesystem fallbacks, sync resilience, rate limits
-- `/docs/harness` — Integration depth matrix (none / partial / full harness)
-- `/docs/reference` — Full API reference (long page; use anchors below)
-
-**Reference anchors** (`/docs/reference#<id>`)
-- `#overview` — Architecture, zero-PII promise
-- `#quickstart` — Quick start code samples
-- `#autohook` — `aurex install-hook`, `AUREX_ENABLED`
-- `#integration` — Manual singleton init, `flush()`, `shutdown()`
-- `#config-reference` — All config fields
-- `#budget-guard-config` — BudgetGuard / circuit breaker
-- `#provider-matrix` — Provider patch coverage
-- `#guards` — `pre_call_check` / `preCallCheck`
-- `#context-wrappers` — `wrap()` with per-request options
-- `#outcomes` — `mark_success` / `mark_failure`
-- `#health-monitoring` — `get_health()`, pending recovery
-- `#heuristics` — `aurex audit` CLI
-- `#cicd` — CI policy commands
-
-**Installation anchors** (`/docs/installation#<id>`)
-- `#install` — pip / npm install
-- `#autohook` — install-hook commands
-- `#manual-init` — programmatic singleton setup
-- `#env-vars` — `AUREX_*` environment variables
-
-**Deployment anchors** (`/docs/deployment#<id>`)
-- `#serverless-flush` — `flush()` / `flushAndWait()` in Lambda
-- `#readonly-fs` — `AUREX_LEDGER_PATH`, `per_process_ledger`
-- `#network-resilience` — retries, health fields
-- `#rate-limits` — backend per-key ingest limits
-- `#environment-matrix` — Lambda / K8s / Edge / Docker checklist
-
-**Harness anchors** (`/docs/harness#<id>`)
-- `#decision-matrix` — when to patch vs wrap vs manual log
-- `#wrap` — full harness with `wrap()`
-- `#partial-harness` — manual `log_event` at wrapper boundary
-- `#patch-visibility` — `get_health().patch_status`, `reset()`
+| Set env vars (`AUREX_API_KEY`, ledger path) | `/docs/installation/env-vars` |
+| Zero-code auto-hook (`install-hook`) | `/docs/reference/autohook` |
+| Manual init, patch, flush, shutdown | `/docs/reference/integration` |
+| Full `AurexConfig` options | `/docs/reference/config` |
+| Budget guard / spend circuit breaker | `/docs/reference/budget-guard` |
+| Supported providers (OpenAI, Anthropic, etc.) | `/docs/reference/providers` |
+| Pre-call guards (`pre_call_check`) | `/docs/reference/guards` |
+| Request-scoped `wrap()` | `/docs/reference/wrap` |
+| Success/failure outcome signals | `/docs/reference/outcomes` |
+| Health, crash recovery, `flush()` | `/docs/reference/health` |
+| Offline heuristics CLI | `/docs/reference/heuristics` |
+| CI policy gate | `/docs/reference/ci` |
+| Deploy to Lambda, K8s, read-only FS (hub) | `/docs/deployment` |
+| Serverless flush before handler return | `/docs/deployment/serverless-flush` |
+| Writable ledger fallback (`/tmp`, memory) | `/docs/deployment/filesystem` |
+| Cloud sync retries, 429, queue drops | `/docs/deployment/cloud-sync` |
+| Backend ingest rate limits | `/docs/deployment/rate-limits` |
+| Pick patch vs wrap vs manual logging | `/docs/harness/decision-matrix` |
+| Provider-call resilience overview | `/docs/reliability/overview` |
+| `resilience` config / ResiliencePolicy | `/docs/reliability/policy` |
+| Observe vs enforce modes | `/docs/reliability/observe-enforce` |
+| `register_fallback` / fallbacks | `/docs/reliability/fallbacks` |
+| Failure classification / `retry_on` | `/docs/reliability/classification` |
+| `loss_avoided`, dashboard metrics, migration | `/docs/reliability/accounting` |
+| API reference hub (links only) | `/docs/reference` |
+| Reliability hub (links only) | `/docs/reliability` |
 
 ---
 
-## Environment variables
+## Page index (all doc routes)
 
-| Variable | Purpose |
-| :--- | :--- |
-| `AUREX_API_KEY` | Project API key (`aux_dev_*`, `aux_*`, `ax_live_*`) |
-| `AUREX_BASE_URL` | Backend base URL (default `http://localhost:8000/api/v1`) |
-| `AUREX_ENABLED` | Set `1` for auto-hook to activate |
-| `AUREX_LEDGER_PATH` | Override ledger file path (use `/tmp/...` in read-only/serverless) |
-| `AUREX_WORKER_ID` | Suffix for per-process ledger filenames in multi-worker setups |
-| `AUREX_SYNC_PROMPT_HASHES` | Set `1` to sync prompt/response hashes to cloud |
-| `AUREX_PRICING_PATH` | Path to custom model pricing JSON |
-| `AUREX_DEBUG` | Set `1` for verbose SDK debug logs (Python) |
+Synced manually with `frontend/components/docs/docs-nav.ts`.
+
+- `/docs` — Overview
+- `/docs/installation` — Installation
+- `/docs/installation/env-vars` — Environment variables
+- `/docs/deployment` — Cloud deployment hub
+- `/docs/deployment/serverless-flush` — Serverless flush
+- `/docs/deployment/filesystem` — Filesystem & ledger
+- `/docs/deployment/cloud-sync` — Cloud sync resilience
+- `/docs/deployment/rate-limits` — Backend rate limits
+- `/docs/harness` — Harness hub
+- `/docs/harness/decision-matrix` — Harness decision matrix
+- `/docs/reference` — API reference hub
+- `/docs/reference/autohook` — Auto-hook
+- `/docs/reference/integration` — Manual integration
+- `/docs/reference/config` — AurexConfig
+- `/docs/reference/budget-guard` — BudgetGuard
+- `/docs/reference/providers` — Supported providers
+- `/docs/reference/guards` — Real-time guards
+- `/docs/reference/wrap` — wrap()
+- `/docs/reference/outcomes` — Outcomes
+- `/docs/reference/health` — Health & recovery
+- `/docs/reference/heuristics` — Heuristics CLI
+- `/docs/reference/ci` — CI policy gate
+- `/docs/reliability` — Reliability hub
+- `/docs/reliability/overview` — Reliability overview
+- `/docs/reliability/policy` — ResiliencePolicy
+- `/docs/reliability/observe-enforce` — Observe vs enforce
+- `/docs/reliability/fallbacks` — Fallbacks
+- `/docs/reliability/classification` — Classification
+- `/docs/reliability/accounting` — Loss accounting
 
 ---
 
-## Public SDK API
+## Public SDK API (summary)
 
-Both SDKs use a **singleton**. Call `AurexAuditor.reset()` (Python class method) or `AurexAuditor.reset()` (Node static) in tests before re-configuring.
+Both SDKs use a **singleton**. Call `AurexAuditor.reset()` in tests before re-configuring.
 
-### Python (`aurex-sdk`)
+**Python import:** `from aurex_sdk import AurexAuditor, AurexConfig, AurexBudgetExceeded, AurexBlocked, AurexConfigError, AurexRecovered, AurexResilienceExhausted, ResiliencePolicy`
 
-- **Import**: `from aurex_sdk import AurexAuditor, AurexConfig, AurexDecision, AurexAction, AurexBudgetExceeded, AurexBlocked, AurexConfigError`
-- **Init**: `auditor = AurexAuditor(AurexConfig(...))`
-- **Reset (tests)**: `AurexAuditor.reset()`
-- **Patch** (guarded with `__aurex_patched__`): `patch_all()`, `patch_openai()`, `patch_anthropic()`, `patch_google()`, `patch_litellm()`, `patch_ollama()`, `patch_huggingface()`
-- **Guards**: `pre_call_check(...) -> AurexDecision`, `configure_circuit_breaker(dict)`
-- **Log**: `log_event(model, prompt, response, input_tokens, output_tokens, ...)`
-- **Outcomes**: `mark_success(workflow_id)`, `mark_failure(workflow_id, reason)`
-- **Flush**: `flush()`, `flush_async(timeout=30.0) -> bool`, `shutdown()`
-- **Health**: `get_health() -> dict` (includes `queue_size`, `events_dropped`, `sync_error_count`, `patch_status`, `storage_mode`, `ledger_path`)
-- **Wrap**: `wrap(call_fn, build_params, options)`, `awrap(...)`
+**Node import:** `import { AurexAuditor, AurexBudgetExceeded, AurexRecovered, AurexResilienceExhausted } from "aurex-sdk"`
 
-### Node.js (`aurex-sdk`)
+Core methods: `patch_all()` / `patchAll()`, `log_event()` / `logEvent()`, `pre_call_check()` / `preCallCheck()`, `wrap()`, `mark_success()` / `markSuccess()`, `flush()`, `flushAndWait()`, `get_health()` / `getHealth()`, `register_fallback()` / `registerFallback()`.
 
-- **Import**: `import { AurexAuditor, AurexBudgetExceeded } from "aurex-sdk"`
-- **Init**: `AurexAuditor.getInstance(config)`
-- **Reset (tests)**: `AurexAuditor.reset()`
-- **Patch**: `patchAll()`, `patchOpenAI()`, `patchAnthropic()`, `patchLiteLLM()`, `patchOllama()`, `patchHuggingFace()`, `patchGoogle()`
-- **Guards**: `preCallCheck({...})`, `configureCircuitBreaker(config)`
-- **Log**: `logEvent({ model, inputTokens, outputTokens, workflowId, ... })`
-- **Outcomes**: `markSuccess(workflowId)`, `markFailure(workflowId, reason)`
-- **Flush**: `flush()`, `flushAndWait(timeoutMs?) -> Promise<boolean>`, `shutdownAsync()`
-- **Health**: `getHealth()` (includes `eventsDropped`, `patchStatus`, `storageMode`)
-- **Wrap**: `auditor.wrap(callFn, buildParams, options)`
+Config details: see `/docs/reference/config`. Resilience: see `/docs/reliability/policy`. BudgetGuard: see `/docs/reference/budget-guard`.
 
-### Typed errors
+---
 
-- `AurexBudgetExceeded` — budget guard `on_budget_exceeded: "throw"` (fields: `workflowId`, `limit`, `current`)
+## Typed errors
+
+- `AurexBudgetExceeded` — budget guard `on_budget_exceeded: "throw"`
 - `AurexBlocked` — guard blocked the call
 - `AurexConfigError` — invalid configuration
-
----
-
-## Configuration reference
-
-### Core AurexConfig fields
-
-| Option | Python | Node.js | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| API key | `api_key` | `apiKey` | env / None | Project key (`aux_*`). Required for cloud sync. |
-| Project | `project` | `project` | `"default"` | Logical project name (legacy); key binds project server-side. |
-| Ledger path | `ledger_path` | `ledgerPath` | `.aurex/ledger.jsonl` | Local JSONL ledger. Overridable via `AUREX_LEDGER_PATH`. |
-| Per-process ledger | `per_process_ledger` | `perProcessLedger` | `True` | Append `.<worker_id>` to filename to avoid multi-worker contention. Set `False` in unit tests. |
-| Cloud sync | `cloud_sync` | `cloudSync` | `False` / auto if key | Async POST to `/api/v1/ledger/events`. Node defaults true when `apiKey` set. |
-| Cloud endpoint | `cloud_endpoint` | `cloudEndpoint` | derived from base URL | Ingest URL; usually `.../ledger/events`. |
-| Base URL | `base_url` | `baseUrl` | localhost API | Backend API root. |
-| Local only | `local_only` | `localOnly` | `True` | Skip cloud sync even if key present. |
-| Storage mode | `storage_mode` | `storageMode` | `"file"` | `"file"` or `"memory"`. Auto-fallback to memory if FS unwritable. |
-| Flush interval | `flush_interval_seconds` | `flushIntervalMs` | 30s / 30000ms | Background batch flush interval. |
-| Max batch size | `max_batch_size` | `maxBatchSize` | 100 | Events per flush batch. |
-| Max queue size | `max_queue_size` | `maxQueueSize` | 10000 | Bounded in-memory queue; overflow spills to disk or increments `events_dropped`. |
-| Sync timeout | `sync_timeout_seconds` | `syncTimeoutMs` | 10s / 10000ms | HTTP timeout per cloud sync attempt. |
-| Sync max retries | `sync_max_retries` | `syncMaxRetries` | 3 | Retries with backoff; respects HTTP 429 `Retry-After`. |
-| Sync hashes | `sync_prompt_hashes` | `syncPromptHashes` | False | Include prompt/response hashes in cloud payload. |
-| Pricing path | `pricing_path` | `pricingPath` | None | Custom model pricing JSON. |
-| Default pricing | `default_pricing` | `defaultPricing` | 1.50 / 6.00 | Fallback USD per 1M tokens for unknown models. |
-| Budget guard | `budget_guard` | `budgetGuard` | {} | See BudgetGuard below. |
-
-### BudgetGuard
-
-Under `budget_guard` (Python) / `budgetGuard` (Node):
-
-- `max_cost_per_minute` / `maxCostPerMinute` — USD per rolling minute
-- `max_cost_per_session` / `maxCostPerSession` — USD per `workflow_id`
-- `max_requests_per_minute` / `maxRequestsPerMinute` — request count cap
-- `max_context_tokens` / `maxContextTokens` — estimated input token cap
-- `on_budget_exceeded` / `onBudgetExceeded` — `"throw"` | `"warn"` | `"webhook"` (throws `AurexBudgetExceeded` when `"throw"`)
-- `webhook_url` / `webhookUrl` — POST target for webhook mode
-- `dry_run` / `dryRun` — evaluate but never block
-
-Per-request overrides: pass `budget_guard` inside `wrap()` / `awrap()` options.
-
----
-
-## Cloud integration checklist
-
-1. Set `AUREX_LEDGER_PATH=/tmp/.aurex/ledger.jsonl` when filesystem is read-only (Lambda).
-2. Enable `per_process_ledger` for multiple workers on shared storage.
-3. Call `flush()` (Python) or `await flushAndWait()` (Node) at end of short-lived handlers.
-4. Monitor `get_health()` / `getHealth()` for `sync_error_count`, `events_dropped`, `status: "degraded"`.
-5. Backend ingest is rate-limited per API key (~600 req/min); SDK retries on 429.
-6. Escalations endpoint accepts API keys (`POST /api/v1/escalations`) for SDK-triggered Slack alerts.
+- `AurexRecovered` — enforce mode recovered via retry/fallback (carries recovery metadata)
+- `AurexResilienceExhausted` — enforce mode exceeded attempts or `max_extra_cost_usd`
 
 ---
 
@@ -187,31 +109,29 @@ Per-request overrides: pass `budget_guard` inside `wrap()` / `awrap()` options.
 
 | Endpoint | Auth | Purpose |
 | :--- | :--- | :--- |
-| `POST /api/v1/ledger/events` | Bearer `aux_*` API key (`ledger:write` scope) | Batch telemetry ingest |
-| `POST /api/v1/escalations` | Bearer API key or JWT | Human-in-the-loop Slack escalation |
+| `POST /api/v1/ledger/events` | Bearer `aux_*` | Batch telemetry ingest |
+| `POST /api/v1/escalations` | Bearer API key or JWT | Slack escalation |
 
-Cloud sync payload for ledger ingest: `{ "events": [ { ...event fields, "cost_usd": <float> } ] }`
+Ingest payload: `{ "events": [ { ...fields, "cost_usd": <float> } ] }`. Reliability fields: see `/docs/reliability/accounting`.
 
 ---
 
 ## CLI
 
-**Python**
-- `aurex install-hook [--target TARGET]`
-- `aurex uninstall-hook [--target TARGET]`
-- `aurex audit [--ledger PATH] [--fail-under SCORE] [--max-waste-usd USD] [--mode warn|block]`
+**Python:** `aurex install-hook`, `aurex uninstall-hook`, `aurex audit [--mode warn|block]`
 
-**Node**
-- `npx aurex install-hook [target]`
-- `npx aurex uninstall-hook [target]`
-- `npx aurex ci [--mode=warn|block] [--github-comment]`
+**Node:** `npx aurex install-hook`, `npx aurex uninstall-hook`, `npx aurex ci [--mode=warn|block]`
+
+Details: `/docs/reference/heuristics`, `/docs/reference/ci`
 
 ---
 
 ## Agent integration tips
 
-1. Read `/llms.txt` (this file) first, then fetch only the doc URL from the routing table above.
-2. Prefer `/docs/reference#<anchor>` over scrolling the full reference page.
-3. In tests, always set `per_process_ledger=False` / `perProcessLedger: false` when asserting ledger file paths.
-4. Do not patch and wrap the same call path — check `patch_status` / `patchStatus` in health output.
-5. For serverless, never rely on background flush alone; flush explicitly before return.
+1. Read `/llms.txt` first, then fetch **one** URL from the routing table.
+2. Do not scroll monolithic pages — each topic has its own route.
+3. In tests, set `per_process_ledger=False` / `perProcessLedger: false` when asserting ledger paths.
+4. Do not patch and wrap the same call path — check `patch_status` in health output.
+5. For serverless, call `flush()` / `await flushAndWait()` before handler return.
+6. `resilience.enabled` defaults to **false** — opt in explicitly.
+7. Distinguish **cloud sync resilience** (`/docs/deployment/cloud-sync`) from **provider resilience** (`/docs/reliability/*`).

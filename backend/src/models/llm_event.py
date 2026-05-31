@@ -19,6 +19,8 @@ class OutcomeEnum(str, enum.Enum):
     FAILURE = "failure"
     TIMEOUT = "timeout"
     PENDING = "pending"
+    RECOVERED = "recovered"
+    DEGRADED = "degraded"
 
 
 class CostTypeEnum(str, enum.Enum):
@@ -29,6 +31,7 @@ class CostTypeEnum(str, enum.Enum):
     RETRY_OVERHEAD = "retry_overhead"
     MEMORY = "memory"
     OUTCOME_SIGNAL = "outcome_signal"
+    UNFULFILLED_SPEND = "unfulfilled_spend"
 
 
 class LLMEvent(Base):
@@ -84,6 +87,17 @@ class LLMEvent(Base):
     team = Column(String, nullable=True, index=True)
     tenant_id = Column(String, nullable=True, index=True)
 
+    # Reliability / provider telemetry (SDK resilience)
+    status = Column(String, nullable=True)
+    error_code = Column(String, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    finish_reason = Column(String, nullable=True)
+    reported_cost_usd = Column(Float, nullable=True)
+    cost_source = Column(String, nullable=True)
+    projected_cost = Column(Float, nullable=True)
+    recovery_provider = Column(String, nullable=True)
+    attempt_index = Column(Integer, nullable=True)
+
     # Additional metadata (renamed from 'metadata' to avoid SQLAlchemy conflict)
     extra_metadata = Column(JSON, nullable=True)
     
@@ -136,6 +150,13 @@ class LLMEventCreate(BaseModel):
     loop_score: Optional[float] = None
     team: Optional[str] = None
     tenant_id: Optional[str] = None
+    status: Optional[str] = None
+    error_code: Optional[str] = None
+    latency_ms: Optional[int] = None
+    finish_reason: Optional[str] = None
+    projected_cost: Optional[float] = None
+    recovery_provider: Optional[str] = None
+    attempt_index: Optional[int] = None
     extra_metadata: Optional[Dict[str, Any]] = None
 
 
@@ -166,6 +187,13 @@ class LLMEventResponse(BaseModel):
     loop_score: Optional[float]
     team: Optional[str]
     tenant_id: Optional[str]
+    status: Optional[str] = None
+    error_code: Optional[str] = None
+    latency_ms: Optional[int] = None
+    finish_reason: Optional[str] = None
+    projected_cost: Optional[float] = None
+    recovery_provider: Optional[str] = None
+    attempt_index: Optional[int] = None
     extra_metadata: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
