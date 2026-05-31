@@ -9,25 +9,38 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.auth import require_api_key_scope
 from src.database import get_db
 from src.services.ledger import ingest_events
+from src.utils.limiter import limiter
 from src.utils.logger import get_logger
 
 router = APIRouter(prefix="/ledger", tags=["ledger"])
 logger = get_logger(__name__)
 
 
+def _ledger_ingest_rate_limit_key(request: Request) -> str:
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+        if token.startswith(("aux_", "ax_live_", "aurex_")):
+            return f"apikey:{token[:12]}"
+    return get_remote_address(request)
+
+
 class LedgerEventBatch(BaseModel):
     events: List[Dict[str, Any]]
 
 
+@limiter.limit("600/minute", key_func=_ledger_ingest_rate_limit_key)
 @router.post("/events")
 async def post_ledger_events(
+    request: Request,
     body: LedgerEventBatch,
     db: AsyncSession = Depends(get_db),
     api_key=Depends(require_api_key_scope("ledger:write")),

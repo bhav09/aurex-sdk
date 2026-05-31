@@ -11,6 +11,9 @@ import urllib.request
 import urllib.error
 from aurex_sdk.decisions import AurexDecision, AurexAction, suggest_cheaper_model, is_expensive_model, compress_messages, apply_decision_to_call_params
 from aurex_sdk.semantic import jaccard_ngram_similarity
+from aurex_sdk.cloud_sync import sync_batch_with_retry
+from aurex_sdk.exceptions import AurexBlocked, AurexBudgetExceeded
+from aurex_sdk.ledger_utils import emit_warning_once, prepare_ledger_storage
 
 # In-memory database of pricing
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
@@ -261,7 +264,11 @@ class AurexConfig:
         simple_prompt_token_limit: int = 120,
         runaway_context_multiplier: float = 2.2,
         loop_similarity_threshold: float = 0.8,
-        downgrade_map: Optional[Dict[str, str]] = None
+        downgrade_map: Optional[Dict[str, str]] = None,
+        max_queue_size: int = 10000,
+        sync_timeout_seconds: float = 10.0,
+        sync_max_retries: int = 3,
+        per_process_ledger: bool = True,
     ):
         self.api_key = api_key or os.getenv("AUREX_API_KEY")
         self.project = project
@@ -294,6 +301,10 @@ class AurexConfig:
         self.runaway_context_multiplier = runaway_context_multiplier
         self.loop_similarity_threshold = loop_similarity_threshold
         self.downgrade_map = downgrade_map or {}
+        self.max_queue_size = max_queue_size
+        self.sync_timeout_seconds = sync_timeout_seconds
+        self.sync_max_retries = sync_max_retries
+        self.per_process_ledger = per_process_ledger
 
 
 class AurexAuditor:
@@ -309,9 +320,27 @@ class AurexAuditor:
 
     def __init__(self, config: Optional[AurexConfig] = None):
         if self._initialized:
+            if config is not None:
+                emit_warning_once(
+                    "[Aurex Warning] AurexAuditor already initialized; ignoring new config. "
+                    "Call AurexAuditor.reset() first to reconfigure.",
+                    "_config_ignored_warning_emitted",
+                    self,
+                )
             return
         self.config = config or AurexConfig()
-        self._queue = queue.Queue()
+        self._ledger_warning_emitted = False
+        resolved_path, resolved_storage, ledger_warning = prepare_ledger_storage(
+            self.config.ledger_path,
+            self.config.storage_mode,
+            self.config.per_process_ledger,
+        )
+        self.config.ledger_path = resolved_path
+        self.config.storage_mode = resolved_storage
+        if ledger_warning:
+            emit_warning_once(ledger_warning, "_ledger_warning_emitted", self)
+
+        self._queue = queue.Queue(maxsize=self.config.max_queue_size)
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._memory_events = []
@@ -323,6 +352,9 @@ class AurexAuditor:
         self._session_costs = {}
         self._sync_error_count = 0
         self._last_sync_error = None
+        self._events_logged = 0
+        self._events_dropped = 0
+        self._patch_status: Dict[str, str] = {}
         self._budget_config = self.config.budget_guard or {}
         
         # Assign downgrade map and default pricing for reference
@@ -349,8 +381,6 @@ class AurexAuditor:
                     os.makedirs(ledger_dir, exist_ok=True)
                 except Exception as e:
                     print(f"[Aurex Warning] Could not create ledger directory: {e}", file=sys.stderr)
-
-            # Queue crash recovery
             pending_path = os.path.join(ledger_dir or ".", "pending.jsonl")
             if os.path.exists(pending_path):
                 try:
@@ -390,7 +420,29 @@ class AurexAuditor:
 
         self._thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._thread.start()
+        self._register_fork_handler()
         self._initialized = True
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance (useful in tests and serverless cold starts)."""
+        with cls._lock:
+            if cls._instance is not None and getattr(cls._instance, "_initialized", False):
+                cls._instance.shutdown()
+            cls._instance = None
+
+    def _register_fork_handler(self) -> None:
+        try:
+            os.register_at_fork(after_in_child=self._reinit_worker_after_fork)
+        except (AttributeError, RuntimeError):
+            pass
+
+    def _reinit_worker_after_fork(self) -> None:
+        self._stop_event.set()
+        self._queue = queue.Queue(maxsize=self.config.max_queue_size)
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self._thread.start()
 
     def get_local_events(self) -> List[Dict[str, Any]]:
         """Return locally buffered events in memory"""
@@ -517,7 +569,10 @@ class AurexAuditor:
                 self._session_costs[workflow_id] = self._session_costs.get(workflow_id, 0) + cost
 
         # Push to async worker queue - returns immediately, taking < 0.1 ms
-        self._queue.put(event)
+        try:
+            self._queue.put_nowait(event)
+        except queue.Full:
+            self._handle_queue_overflow(event)
 
         # Trigger budget check & circuit breaker
         self._check_budget(cost, input_tokens, workflow_id)
@@ -851,13 +906,69 @@ class AurexAuditor:
 
     def get_health(self) -> Dict[str, Any]:
         """Return SDK integration health status, sync errors, and connection metrics."""
+        ledger_dir = os.path.dirname(self.config.ledger_path) or "."
+        pending_path = os.path.join(ledger_dir, "pending.jsonl")
         with self._lock:
+            status = "healthy"
+            if self._sync_error_count > 0 or self._events_dropped > 0:
+                status = "degraded"
             return {
+                "status": status,
                 "sync_error_count": self._sync_error_count,
                 "last_sync_error": self._last_sync_error,
                 "session_costs_tracked": len(self._session_costs),
-                "queue_size": self._queue.qsize()
+                "queue_size": self._queue.qsize(),
+                "events_logged": self._events_logged,
+                "events_dropped": self._events_dropped,
+                "thread_active": self._thread.is_alive() if hasattr(self, "_thread") else False,
+                "pending_file_exists": os.path.exists(pending_path),
+                "storage_mode": self.config.storage_mode,
+                "ledger_path": self.config.ledger_path,
+                "patch_status": dict(self._patch_status),
             }
+
+    def _handle_queue_overflow(self, event: Dict[str, Any]) -> None:
+        """Spill to recovery file when writable; otherwise drop with counter."""
+        if self.config.storage_mode == "file":
+            ledger_dir = os.path.dirname(self.config.ledger_path) or "."
+            recovery_path = os.path.join(ledger_dir, "queue_overflow.jsonl")
+            try:
+                with open(recovery_path, "a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(event) + "\n")
+                return
+            except OSError:
+                pass
+        with self._lock:
+            self._events_dropped += 1
+        emit_warning_once(
+            "[Aurex Warning] Event queue full; dropping telemetry event. "
+            "Increase max_queue_size or call flush() more frequently.",
+            "_queue_overflow_warning_emitted",
+            self,
+        )
+
+    def flush(self) -> None:
+        """Force-flush queued events to the local ledger and cloud sync."""
+        batch: List[Dict[str, Any]] = []
+        while True:
+            try:
+                batch.append(self._queue.get_nowait())
+            except queue.Empty:
+                break
+        if batch:
+            self._flush_batch(batch)
+
+    def flush_async(self, timeout: float = 30.0) -> bool:
+        """Flush queued events and return True if cloud sync did not record a new error."""
+        errors_before = self._sync_error_count
+        self.flush()
+        if not (
+            self.config.cloud_sync
+            and not self.config.local_only
+            and self.config.api_key
+        ):
+            return True
+        return self._sync_error_count == errors_before
 
     def _extract_chunk_text(self, chunk) -> str:
         # OpenAI style
@@ -1202,7 +1313,12 @@ class AurexAuditor:
                 
             msg = f"[Aurex SDK] {decision.action}: {decision.reason}"
             if mode == "throw" and decision.action == "block":
-                raise Exception(msg)
+                raise AurexBlocked(
+                    msg,
+                    workflow_id=workflow_id,
+                    reason=decision.reason,
+                    action=decision.action,
+                )
             elif mode != "throw":
                 print(msg, file=sys.stderr)
 
@@ -1288,7 +1404,12 @@ class AurexAuditor:
                     threading.Thread(target=fire_webhook, daemon=True).start()
 
                 elif mode == "throw":
-                    raise Exception(message)
+                    raise AurexBudgetExceeded(
+                        message,
+                        workflow_id=workflow_id,
+                        limit=reason.strip(),
+                        current=current_session_cost if workflow_id else minute_cost,
+                    )
 
     def _worker_loop(self):
         """Asynchronous worker that batches operations and writes to file / cloud sync"""
@@ -1324,6 +1445,8 @@ class AurexAuditor:
 
     def _flush_batch(self, batch: List[Dict[str, Any]]):
         """Append to the local JSONL ledger file or memory buffer"""
+        with self._lock:
+            self._events_logged += len(batch)
         if self.config.storage_mode == "file":
             with self._lock:
                 try:
@@ -1347,48 +1470,41 @@ class AurexAuditor:
         - `/ledger/events` (Phase 1): `{events: [...]}` with cost as `cost_usd`.
         - Anything else: legacy `{project, data: [...]}` payload.
         """
-        try:
-            # Metadata-only sync: strip out hashes if sync_prompt_hashes is False
-            cleaned_batch = []
-            for evt in batch:
-                c = evt.copy()
-                if not self.config.sync_prompt_hashes:
-                    c.pop("prompt_hash", None)
-                    c.pop("system_prompt_hash", None)
-                    c.pop("response_hash", None)
-                cleaned_batch.append(c)
+        cleaned_batch = []
+        for evt in batch:
+            c = evt.copy()
+            if not self.config.sync_prompt_hashes:
+                c.pop("prompt_hash", None)
+                c.pop("system_prompt_hash", None)
+                c.pop("response_hash", None)
+            cleaned_batch.append(c)
 
-            endpoint = self.config.cloud_endpoint
-            if endpoint.rstrip("/").endswith("/ledger/events"):
-                payload = {
-                    "events": [
-                        {**evt, "cost_usd": evt.get("cost", 0.0)}
-                        for evt in cleaned_batch
-                    ]
-                }
-            else:
-                payload = {
-                    "project": self.config.project,
-                    "data": cleaned_batch,
-                }
-            req_data = json.dumps(payload).encode("utf-8")
+        endpoint = self.config.cloud_endpoint
+        if endpoint.rstrip("/").endswith("/ledger/events"):
+            payload = {
+                "events": [
+                    {**evt, "cost_usd": evt.get("cost", 0.0)}
+                    for evt in cleaned_batch
+                ]
+            }
+        else:
+            payload = {
+                "project": self.config.project,
+                "data": cleaned_batch,
+            }
 
-            req = urllib.request.Request(
-                endpoint,
-                data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.config.api_key}",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=3.0) as response:
-                response.read()
-        except Exception as e:
+        ok, err = sync_batch_with_retry(
+            endpoint,
+            payload,
+            self.config.api_key,
+            timeout_seconds=self.config.sync_timeout_seconds,
+            max_retries=self.config.sync_max_retries,
+        )
+        if not ok:
             with self._lock:
                 self._sync_error_count += 1
-                self._last_sync_error = str(e)
-            self._debug_log(f"Cloud sync failed: {e}")
+                self._last_sync_error = err
+            self._debug_log(f"Cloud sync failed: {err}")
 
     def persist_pending_and_shutdown(self):
         """Persist outstanding queue events to pending.jsonl and terminate background worker thread"""
@@ -1437,6 +1553,9 @@ class AurexAuditor:
             
             # Patch sync completions
             original_create = openai.resources.chat.completions.Completions.create
+            if getattr(original_create, "__aurex_patched__", False):
+                self._patch_status["openai"] = "already_patched"
+                return
             
             def patched_create(cls_self, *args, **kwargs):
                 tags, quality_score, workflow_id = extract_aurex_extra_params(kwargs)
@@ -1485,10 +1604,13 @@ class AurexAuditor:
                     print(f"[Aurex SDK Patch Error] OpenAI patch failed: {e}", file=sys.stderr)
                 return resp
             
+            patched_create.__aurex_patched__ = True
             openai.resources.chat.completions.Completions.create = patched_create
  
             # Patch async completions
             original_acreate = openai.resources.chat.completions.AsyncCompletions.create
+            if getattr(original_acreate, "__aurex_patched__", False):
+                return
             
             async def patched_acreate(cls_self, *args, **kwargs):
                 tags, quality_score, workflow_id = extract_aurex_extra_params(kwargs)
@@ -1537,9 +1659,11 @@ class AurexAuditor:
                     print(f"[Aurex SDK Patch Error] OpenAI async patch failed: {e}", file=sys.stderr)
                 return resp
                 
+            patched_acreate.__aurex_patched__ = True
             openai.resources.chat.completions.AsyncCompletions.create = patched_acreate
+            self._patch_status["openai"] = "patched"
         except ImportError:
-            pass
+            self._patch_status["openai"] = "not_installed"
  
     def _log_openai_response(self, kwargs: Dict[str, Any], resp: Any, tags: Optional[Dict[str, Any]] = None, quality_score: Optional[float] = None):
         """Parses OpenAI call metadata, extracts system/user prompt details, hashes them locally, and logs them"""
@@ -1621,6 +1745,9 @@ class AurexAuditor:
             
             # Patch sync messages
             original_create = anthropic.resources.messages.Messages.create
+            if getattr(original_create, "__aurex_patched__", False):
+                self._patch_status["anthropic"] = "already_patched"
+                return
             
             def patched_create(cls_self, *args, **kwargs):
                 tags, quality_score, workflow_id = extract_aurex_extra_params(kwargs)
@@ -1680,10 +1807,14 @@ class AurexAuditor:
                     print(f"[Aurex SDK Patch Error] Anthropic patch failed: {e}", file=sys.stderr)
                 return resp
             
+            patched_create.__aurex_patched__ = True
             anthropic.resources.messages.Messages.create = patched_create
 
             # Patch async messages
             original_acreate = anthropic.resources.messages.AsyncMessages.create
+            if getattr(original_acreate, "__aurex_patched__", False):
+                self._patch_status["anthropic"] = "patched"
+                return
             
             async def patched_acreate(cls_self, *args, **kwargs):
                 tags, quality_score, workflow_id = extract_aurex_extra_params(kwargs)
@@ -1743,9 +1874,11 @@ class AurexAuditor:
                     print(f"[Aurex SDK Patch Error] Anthropic async patch failed: {e}", file=sys.stderr)
                 return resp
                 
+            patched_acreate.__aurex_patched__ = True
             anthropic.resources.messages.AsyncMessages.create = patched_acreate
+            self._patch_status["anthropic"] = "patched"
         except ImportError:
-            pass
+            self._patch_status["anthropic"] = "not_installed"
 
     def _log_anthropic_response(self, kwargs: Dict[str, Any], resp: Any, tags: Optional[Dict[str, Any]] = None, quality_score: Optional[float] = None):
         """Parses Anthropic call metadata, extracts system/user prompt details, hashes them locally, and logs them"""

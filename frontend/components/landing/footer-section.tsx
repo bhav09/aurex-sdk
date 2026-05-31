@@ -83,7 +83,7 @@ function AnimatedWaveCanvas() {
 
 export function FooterSection() {
   return (
-    <footer className="relative bg-black">
+    <footer className="relative bg-background">
       {/* Panoramic banner image */}
       {/* <div className="relative w-full h-[340px] md:h-[420px] overflow-hidden"> */}
         {/* <img

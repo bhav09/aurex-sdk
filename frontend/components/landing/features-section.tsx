@@ -202,11 +202,11 @@ export function FeaturesSection() {
             {features.map((feature, index) => (
               <div
                 key={feature.number}
-                className={`flex-none w-[85vw] sm:w-[75vw] lg:w-[calc(33.333%-16px)] relative bg-black border border-foreground/10 min-h-[380px] sm:min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                className={`flex-none w-[85vw] sm:w-[75vw] lg:w-[calc(33.333%-16px)] relative bg-background border border-foreground/10 min-h-[380px] sm:min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                   }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <div className="relative h-full p-6 sm:p-8 lg:p-10 bg-black">
+                <div className="relative h-full p-6 sm:p-8 lg:p-10 bg-background">
                   <ParticleVisualization />
                   <div className="relative z-10 flex flex-col h-full">
                     <span className="font-mono text-xs sm:text-sm text-muted-foreground">{feature.number}</span>

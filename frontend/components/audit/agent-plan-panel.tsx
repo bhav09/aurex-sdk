@@ -101,8 +101,8 @@ export function AgentPlanPanel({
                         className={cn(
                             "overflow-hidden rounded-xl border transition-all duration-200",
                             isOpen
-                                ? "border-violet-500/30 bg-[#0c0c0e]/85 shadow-lg shadow-violet-500/5 ring-1 ring-violet-500/10"
-                                : "border-white/[0.06] bg-[#0c0c0e]/50 hover:border-white/10 hover:bg-[#0c0c0e]/75"
+                                ? "border-violet-500/30 bg-surface-raised/85 shadow-lg shadow-violet-500/5 ring-1 ring-violet-500/10"
+                                : "border-white/[0.06] bg-surface-raised/50 hover:border-white/10 hover:bg-surface-raised/75"
                         )}
                     >
                         <button
@@ -154,7 +154,7 @@ export function AgentPlanPanel({
                                     animate={{ height: "auto", opacity: 1 }}
                                     exit={{ height: 0, opacity: 0 }}
                                     transition={{ duration: 0.25 }}
-                                    className="border-t border-white/[0.05] bg-[#09090b]/40"
+                                    className="border-t border-white/[0.05] bg-surface-sunken/40"
                                 >
                                     <div className="grid gap-6 p-5 md:grid-cols-2">
                                         <div className="space-y-4">

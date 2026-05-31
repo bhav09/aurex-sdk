@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     if (!ready) {
         return (
-            <div className="flex h-screen items-center justify-center text-sm text-muted-foreground bg-[#0A0A0A]">
+            <div className="flex h-screen items-center justify-center text-sm text-muted-foreground bg-surface">
                 <div className="flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     <span>Loading workspace…</span>
@@ -45,8 +45,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans bg-[#030303]">
-            <header className="border-b border-white/[0.08] bg-[#0A0A0A]/50 backdrop-blur-md sticky top-0 z-40">
+        <div className="min-h-screen bg-background text-foreground font-sans">
+            <header className="border-b border-white/[0.08] bg-surface/50 backdrop-blur-md sticky top-0 z-40">
                 <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
                     <div className="flex items-center gap-8">
                         <Link href="/" className="text-lg font-serif uppercase tracking-wider font-semibold text-white/90">

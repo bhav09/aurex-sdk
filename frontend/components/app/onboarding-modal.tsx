@@ -90,7 +90,7 @@ export function OnboardingModal({ isOpen, onSuccess }: OnboardingModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
-        className="sm:max-w-[480px] bg-[#0A0A0A]/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl"
+        className="sm:max-w-[480px] bg-surface/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -155,7 +155,7 @@ export function OnboardingModal({ isOpen, onSuccess }: OnboardingModalProps) {
                 <SelectTrigger className="h-11 bg-white/[0.02] border-white/[0.08] focus:border-white/[0.15] text-white rounded-xl">
                   <SelectValue placeholder="Select environment" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#0A0A0A] border-white/[0.08] text-white">
+                <SelectContent className="bg-surface border-white/[0.08] text-white">
                   <SelectItem value="dev">Development (dev)</SelectItem>
                   <SelectItem value="staging">Staging (staging)</SelectItem>
                   <SelectItem value="prod">Production (prod)</SelectItem>

@@ -74,6 +74,7 @@ describe("Node SDK - AurexAuditor", () => {
     const auditor = AurexAuditor.getInstance({
       ledgerPath,
       localOnly: true,
+      perProcessLedger: false,
       flushIntervalMs: 50,
     });
 
@@ -109,6 +110,7 @@ describe("Node SDK - AurexAuditor", () => {
     const auditor = AurexAuditor.getInstance({
       ledgerPath,
       localOnly: true,
+      perProcessLedger: false,
       budgetGuard: {
         maxCostPerMinute: 0.0001,
         onBudgetExceeded: "throw",
@@ -129,6 +131,7 @@ describe("Node SDK - AurexAuditor", () => {
     const auditor = AurexAuditor.getInstance({
       ledgerPath,
       localOnly: true,
+      perProcessLedger: false,
       budgetGuard: {
         maxCostPerMinute: 0.0001,
         onBudgetExceeded: "warn",
@@ -151,6 +154,7 @@ describe("Node SDK - AurexAuditor", () => {
     const auditor = AurexAuditor.getInstance({
       ledgerPath,
       localOnly: true,
+      perProcessLedger: false,
       budgetGuard: {
         maxCostPerMinute: 0.0001,
         onBudgetExceeded: "throw",
@@ -173,6 +177,7 @@ describe("Node SDK - AurexAuditor", () => {
     const auditor = AurexAuditor.getInstance({
       ledgerPath,
       localOnly: true,
+      perProcessLedger: false,
       budgetGuard: {
         maxCostPerMinute: 0.0001,
         onBudgetExceeded: "webhook",

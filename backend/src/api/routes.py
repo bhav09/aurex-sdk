@@ -1364,6 +1364,7 @@ async def get_savings_realization(
             "credit_score": s.credit_score or 100,
             "total_cost": round(current_total_cost, 2),
             "wasted_cost": round(s.wasted_cost or 0.0, 2),
+            "total_waste": round(s.wasted_cost or 0.0, 2),
             "realized_savings": round(savings, 2),
             "cumulative_savings": round(cumulative_savings, 2)
         })

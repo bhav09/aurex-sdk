@@ -281,7 +281,7 @@ export default function SettingsPage() {
     }, [projects]);
 
     return (
-        <div className="flex flex-col lg:flex-row gap-8 text-white min-h-[80vh] bg-[#030303]">
+        <div className="flex flex-col lg:flex-row gap-8 text-white min-h-[80vh] bg-background">
             {/* Sidebar Navigation */}
             <div className="w-full lg:w-60 shrink-0 space-y-1">
                 <div className="px-3 py-2">
@@ -332,7 +332,7 @@ export default function SettingsPage() {
                 {activeSection === "tenancy" && (
                     <div className="space-y-6">
                         {/* Org Config */}
-                        <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                        <Card className="bg-surface border-white/[0.06]">
                             <CardHeader>
                                 <CardTitle className="text-xs uppercase tracking-wider text-white/60">Organization Management</CardTitle>
                                 <CardDescription className="text-white/40 text-[10px]">Rename or update organization details.</CardDescription>
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                         </Card>
 
                         {/* Project Config */}
-                        <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                        <Card className="bg-surface border-white/[0.06]">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
                                     <CardTitle className="text-xs uppercase tracking-wider text-white/60">Project Settings</CardTitle>
@@ -375,7 +375,7 @@ export default function SettingsPage() {
                                             <Plus className="w-3.5 h-3.5" /> New Project
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="bg-[#0A0A0A]/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
+                                    <DialogContent className="bg-surface/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
                                         <DialogHeader>
                                             <DialogTitle className="text-lg font-serif uppercase tracking-wide">Create New Project</DialogTitle>
                                             <DialogDescription className="text-white/50 text-xs">Provision a new scoped environment for SDK usage metrics.</DialogDescription>
@@ -400,7 +400,7 @@ export default function SettingsPage() {
                                                     <SelectTrigger className="bg-white/[0.02] border-white/[0.08] text-white rounded-lg text-xs">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent className="bg-[#0A0A0A] border-white/[0.08] text-white">
+                                                    <SelectContent className="bg-surface border-white/[0.08] text-white">
                                                         <SelectItem value="dev">dev</SelectItem>
                                                         <SelectItem value="staging">staging</SelectItem>
                                                         <SelectItem value="prod">prod</SelectItem>
@@ -425,7 +425,7 @@ export default function SettingsPage() {
                                                 <SelectTrigger className="bg-white/[0.02] border-white/[0.08] text-white text-xs max-w-sm rounded-lg">
                                                     <SelectValue placeholder="Select a project" />
                                                 </SelectTrigger>
-                                                <SelectContent className="bg-[#0A0A0A] border-white/[0.08] text-white">
+                                                <SelectContent className="bg-surface border-white/[0.08] text-white">
                                                     {projects.map((p) => (
                                                         <SelectItem key={p.id} value={p.id}>
                                                             {p.name} ({p.environment})
@@ -455,7 +455,7 @@ export default function SettingsPage() {
                                                     <SelectTrigger className="bg-white/[0.02] border-white/[0.08] text-white rounded-lg text-xs">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent className="bg-[#0A0A0A] border-white/[0.08] text-white">
+                                                    <SelectContent className="bg-surface border-white/[0.08] text-white">
                                                         <SelectItem value="dev">dev</SelectItem>
                                                         <SelectItem value="staging">staging</SelectItem>
                                                         <SelectItem value="prod">prod</SelectItem>
@@ -481,7 +481,7 @@ export default function SettingsPage() {
 
                 {/* API KEY PANEL */}
                 {activeSection === "apikeys" && (
-                    <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                    <Card className="bg-surface border-white/[0.06]">
                         <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4 pb-4">
                             <div>
                                 <CardTitle className="text-xs uppercase tracking-wider text-white/60">API Keys</CardTitle>
@@ -493,7 +493,7 @@ export default function SettingsPage() {
                                         + Generate Key
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-[#0A0A0A]/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
+                                <DialogContent className="bg-surface/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
                                     <DialogHeader>
                                         <DialogTitle className="text-lg font-serif uppercase tracking-wide">Generate API key</DialogTitle>
                                         <DialogDescription className="text-white/50 text-xs">
@@ -517,7 +517,7 @@ export default function SettingsPage() {
                                                 <SelectTrigger className="bg-white/[0.02] border-white/[0.08] text-white text-xs rounded-lg">
                                                     <SelectValue placeholder="Select target project" />
                                                 </SelectTrigger>
-                                                <SelectContent className="bg-[#0A0A0A] border-white/[0.08] text-white">
+                                                <SelectContent className="bg-surface border-white/[0.08] text-white">
                                                     {projects.map((p) => (
                                                         <SelectItem key={p.id} value={p.id}>
                                                             {p.name} ({p.environment})
@@ -535,7 +535,7 @@ export default function SettingsPage() {
                                                 <SelectTrigger className="bg-white/[0.02] border-white/[0.08] text-white rounded-lg text-xs">
                                                     <SelectValue />
                                                 </SelectTrigger>
-                                                <SelectContent className="bg-[#0A0A0A] border-white/[0.08] text-white">
+                                                <SelectContent className="bg-surface border-white/[0.08] text-white">
                                                     <SelectItem value="dev">dev</SelectItem>
                                                     <SelectItem value="staging">staging</SelectItem>
                                                     <SelectItem value="prod">prod</SelectItem>
@@ -631,7 +631,7 @@ export default function SettingsPage() {
                                                                             <RefreshCw className="w-3.5 h-3.5" />
                                                                         </Button>
                                                                     </AlertDialogTrigger>
-                                                                    <AlertDialogContent className="bg-[#0A0A0A] border-white/10 text-white rounded-2xl">
+                                                                    <AlertDialogContent className="bg-surface border-white/10 text-white rounded-2xl">
                                                                         <AlertDialogHeader>
                                                                             <AlertDialogTitle className="font-serif">Rotate API Key?</AlertDialogTitle>
                                                                             <AlertDialogDescription className="text-white/50 text-xs">
@@ -653,7 +653,7 @@ export default function SettingsPage() {
                                                                             <Trash2 className="w-3.5 h-3.5" />
                                                                         </Button>
                                                                     </AlertDialogTrigger>
-                                                                    <AlertDialogContent className="bg-[#0A0A0A] border-white/10 text-white rounded-2xl">
+                                                                    <AlertDialogContent className="bg-surface border-white/10 text-white rounded-2xl">
                                                                         <AlertDialogHeader>
                                                                             <AlertDialogTitle className="font-serif">Revoke API Key?</AlertDialogTitle>
                                                                             <AlertDialogDescription className="text-white/50 text-xs">
@@ -690,7 +690,7 @@ export default function SettingsPage() {
                     if (!open && confirmedSafe) setReveal(null);
                 }}
             >
-                <DialogContent className="sm:max-w-lg bg-[#0A0A0A]/95 border-white/10 text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
+                <DialogContent className="sm:max-w-lg bg-surface/95 border-white/10 text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-serif uppercase tracking-wide">Copy API Key Secret</DialogTitle>
                         <DialogDescription className="text-white/50 text-xs">

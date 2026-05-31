@@ -10,6 +10,9 @@ import {
   suggestCheaperModel,
 } from "./decisions";
 import { jaccardNGramSimilarity } from "./semantic";
+import { syncBatchWithRetry } from "./cloud_sync";
+import { emitWarningOnce, prepareLedgerStorage } from "./ledger_utils";
+import { AurexBudgetExceeded } from "./exceptions";
 
 export const aurexContext = new AsyncLocalStorage<Record<string, any>>();
 
@@ -45,6 +48,11 @@ export interface AurexConfig {
   runawayContextMultiplier?: number;
   loopSimilarityThreshold?: number;
   downgradeMap?: Record<string, string>;
+  maxQueueSize?: number;
+  syncTimeoutMs?: number;
+  syncMaxRetries?: number;
+  perProcessLedger?: boolean;
+  storageMode?: "file" | "memory";
 }
 
 function resolveCloudEndpoint(config?: AurexConfig): string {
@@ -271,6 +279,10 @@ export class AurexAuditor {
   private sessionRetryCounts: Record<string, number> = {};
   private syncErrorCount = 0;
   private lastSyncError: string | null = null;
+  private eventsLogged = 0;
+  private eventsDropped = 0;
+  private patchStatus: Record<string, string> = {};
+  private readonly warningFlag = { emitted: false };
 
   public downgradeMap: Record<string, string> = {};
   public defaultPricing?: { input: number; output: number };
@@ -299,7 +311,23 @@ export class AurexAuditor {
       runawayContextMultiplier: config?.runawayContextMultiplier ?? 2.2,
       loopSimilarityThreshold: config?.loopSimilarityThreshold ?? 0.8,
       downgradeMap: config?.downgradeMap || {},
+      maxQueueSize: config?.maxQueueSize ?? 10000,
+      syncTimeoutMs: config?.syncTimeoutMs ?? 10000,
+      syncMaxRetries: config?.syncMaxRetries ?? 3,
+      perProcessLedger: config?.perProcessLedger ?? true,
+      storageMode: config?.storageMode ?? "file",
     };
+
+    const prepared = prepareLedgerStorage(
+      this.config.ledgerPath,
+      this.config.storageMode,
+      this.config.perProcessLedger,
+    );
+    this.config.ledgerPath = prepared.ledgerPath;
+    this.config.storageMode = prepared.storageMode;
+    if (prepared.warning) {
+      emitWarningOnce(prepared.warning, this.warningFlag);
+    }
 
     this.downgradeMap = this.config.downgradeMap || {};
     this.defaultPricing = this.config.defaultPricing;
@@ -395,6 +423,11 @@ export class AurexAuditor {
   public static getInstance(config?: AurexConfig): AurexAuditor {
     if (!AurexAuditor.instance) {
       AurexAuditor.instance = new AurexAuditor(config);
+    } else if (config) {
+      emitWarningOnce(
+        "[Aurex Warning] AurexAuditor already initialized; ignoring new config. Call AurexAuditor.reset() first.",
+        AurexAuditor.instance.warningFlag,
+      );
     }
     return AurexAuditor.instance;
   }
@@ -508,7 +541,11 @@ export class AurexAuditor {
       this.sessionCosts[params.workflowId] = (this.sessionCosts[params.workflowId] || 0) + cost;
     }
 
-    this.queue.push(event);
+    if (this.queue.length >= this.config.maxQueueSize) {
+      this.handleQueueOverflow(event);
+    } else {
+      this.queue.push(event);
+    }
 
     if (this.queue.length >= this.config.maxBatchSize) {
       this.flush();
@@ -973,9 +1010,44 @@ export class AurexAuditor {
           body: JSON.stringify(payload)
         }).catch(err => console.error("[Aurex SDK Budget Guard] Webhook failed:", err));
       } else if (mode === "throw") {
-        throw new Error(message);
+        throw new AurexBudgetExceeded(message, {
+          workflowId,
+          limit: reason.trim(),
+          current: workflowId ? currentSessionCost : minuteCost,
+        });
       }
     }
+  }
+
+  private writeBatchToStorage(batch: AurexEvent[]): void {
+    this.eventsLogged += batch.length;
+    if (this.config.storageMode !== "file") {
+      return;
+    }
+    try {
+      const dataStr = batch.map((e) => JSON.stringify(e)).join("\n") + "\n";
+      fs.appendFileSync(this.config.ledgerPath, dataStr, "utf-8");
+    } catch (err) {
+      console.error(`[Aurex SDK Ledger Error] Failed to write events to ledger:`, err);
+    }
+  }
+
+  private handleQueueOverflow(event: AurexEvent): void {
+    if (this.config.storageMode === "file") {
+      const ledgerDir = path.dirname(this.config.ledgerPath);
+      const recoveryPath = path.join(ledgerDir || ".", "queue_overflow.jsonl");
+      try {
+        fs.appendFileSync(recoveryPath, JSON.stringify(event) + "\n", "utf-8");
+        return;
+      } catch {
+        /* fall through to drop counter */
+      }
+    }
+    this.eventsDropped += 1;
+    emitWarningOnce(
+      "[Aurex Warning] Event queue full; dropping telemetry event. Increase maxQueueSize or call flush() more frequently.",
+      this.warningFlag,
+    );
   }
 
   /** Force flush the in-memory queue to disk/cloud sync */
@@ -984,57 +1056,62 @@ export class AurexAuditor {
 
     const batch = [...this.queue];
     this.queue = [];
+    this.writeBatchToStorage(batch);
 
-    // Local-first ledger file appending
-    try {
-      const dataStr = batch.map(e => JSON.stringify(e)).join("\n") + "\n";
-      fs.appendFileSync(this.config.ledgerPath, dataStr, "utf-8");
-    } catch (err) {
-      console.error(`[Aurex SDK Ledger Error] Failed to write events to ledger:`, err);
-    }
-
-    // Sync metadata to Cloud if allowed
     if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
       this.syncToCloud(batch).catch(() => {
-        // Fail silently
+        /* tracked via syncErrorCount */
       });
     }
   }
 
+  /** Flush queued events and await cloud sync completion */
+  public async flushAndWait(timeoutMs = 30000): Promise<boolean> {
+    const errorsBefore = this.syncErrorCount;
+    if (this.queue.length === 0) {
+      return true;
+    }
+    const batch = [...this.queue];
+    this.queue = [];
+    this.writeBatchToStorage(batch);
+    if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
+      await this.syncToCloud(batch);
+    }
+    void timeoutMs;
+    return this.syncErrorCount === errorsBefore;
+  }
+
   private async syncToCloud(batch: AurexEvent[]): Promise<void> {
-    try {
-      const cleaned = batch.map(e => {
-        const copy = { ...e };
-        if (!this.config.syncPromptHashes) {
-          delete copy.prompt_hash;
-          delete copy.system_prompt_hash;
-          delete copy.response_hash;
-        }
-        return copy;
-      });
-
-      const isLedgerEndpoint = /\/ledger\/events\/?$/.test(this.config.cloudEndpoint);
-      const payload = isLedgerEndpoint
-        ? { events: cleaned.map(e => ({ ...e, cost_usd: e.cost })) }
-        : { project: this.config.project, data: cleaned };
-
-      const response = await fetch(this.config.cloudEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Cloud sync response status ${response.status}`);
+    const cleaned = batch.map((e) => {
+      const copy = { ...e };
+      if (!this.config.syncPromptHashes) {
+        delete copy.prompt_hash;
+        delete copy.system_prompt_hash;
+        delete copy.response_hash;
       }
-    } catch (err: any) {
+      return copy;
+    });
+
+    const isLedgerEndpoint = /\/ledger\/events\/?$/.test(this.config.cloudEndpoint);
+    const payload = isLedgerEndpoint
+      ? { events: cleaned.map((e) => ({ ...e, cost_usd: e.cost })) }
+      : { project: this.config.project, data: cleaned };
+
+    const result = await syncBatchWithRetry(
+      this.config.cloudEndpoint,
+      payload,
+      this.config.apiKey,
+      {
+        timeoutMs: this.config.syncTimeoutMs,
+        maxRetries: this.config.syncMaxRetries,
+      },
+    );
+
+    if (!result.ok) {
       this.syncErrorCount++;
-      this.lastSyncError = err.message || String(err);
+      this.lastSyncError = result.error || "Cloud sync failed";
       if (process.env.AUREX_DEBUG === "1") {
-        console.warn("[Aurex Debug] Cloud sync failed:", err);
+        console.warn("[Aurex Debug] Cloud sync failed:", result.error);
       }
     }
   }
@@ -1045,15 +1122,21 @@ export class AurexAuditor {
       this.flushIntervalId = null;
     }
     if (this.queue.length > 0) {
-      const ledgerDir = path.dirname(this.config.ledgerPath);
-      const pendingPath = path.join(ledgerDir || ".", "pending.jsonl");
-      try {
-        const dataStr = this.queue.map(e => JSON.stringify(e)).join("\n") + "\n";
-        fs.appendFileSync(pendingPath, dataStr, "utf-8");
-        this.queue = [];
-      } catch (err) {
-        console.error(`[Aurex Warning] Failed to persist pending events:`, err);
+      const batch = [...this.queue];
+      this.queue = [];
+      this.writeBatchToStorage(batch);
+      if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
+        void this.syncToCloud(batch);
       }
+    }
+  }
+
+  /** Async shutdown that waits for cloud flush */
+  public async shutdownAsync(): Promise<void> {
+    await this.flushAndWait();
+    if (this.flushIntervalId) {
+      clearInterval(this.flushIntervalId);
+      this.flushIntervalId = null;
     }
   }
 
@@ -1063,11 +1146,23 @@ export class AurexAuditor {
   }
 
   public getHealth(): Record<string, any> {
+    const ledgerDir = path.dirname(this.config.ledgerPath) || ".";
+    const pendingPath = path.join(ledgerDir, "pending.jsonl");
+    const status =
+      this.syncErrorCount > 0 || this.eventsDropped > 0 ? "degraded" : "healthy";
     return {
+      status,
       syncErrorCount: this.syncErrorCount,
       lastSyncError: this.lastSyncError,
       sessionCostsTracked: Object.keys(this.sessionCosts).length,
       queueSize: this.queue.length,
+      eventsLogged: this.eventsLogged,
+      eventsDropped: this.eventsDropped,
+      threadActive: true,
+      pendingFileExists: fs.existsSync(pendingPath),
+      storageMode: this.config.storageMode,
+      ledgerPath: this.config.ledgerPath,
+      patchStatus: { ...this.patchStatus },
     };
   }
 

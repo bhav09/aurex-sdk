@@ -80,7 +80,7 @@ function ElegantShape({
 
 export function HeroSection() {
   return (
-    <div className="relative min-h-[100dvh] w-full flex items-center justify-center overflow-hidden bg-[#030303]">
+    <div className="relative min-h-[100dvh] w-full flex items-center justify-center overflow-hidden bg-background">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
       {/* Fewer shapes on mobile, more on desktop */}
@@ -221,7 +221,7 @@ export function HeroSection() {
         </div>
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/80 pointer-events-none" />
     </div>
   )
 }

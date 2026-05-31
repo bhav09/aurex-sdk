@@ -30,7 +30,7 @@ export function HowItWorksSection() {
     <section
       id="how-it-works"
       ref={sectionRef}
-      className="relative py-24 lg:py-32 bg-[oklch(0.09_0.01_260)] text-white overflow-hidden"
+      className="relative py-24 lg:py-32 bg-background text-white overflow-hidden"
     >
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-white/[0.02] blur-[100px] pointer-events-none" />
 
@@ -47,10 +47,18 @@ export function HowItWorksSection() {
             </div>
 
             <h2 className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.85] transition-all duration-1000 delay-100 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-16 opacity-0"}`}>
-              <span className="block">Upload.</span>
-              <span className="block text-white/30">Analyze.</span>
-              <span className="block text-white/10">Optimize.</span>
+              <span className="block text-white/20">Upload.</span>
+              <span className="block text-white/45">Analyze.</span>
+              <span className="block text-white drop-shadow-[0_0_48px_rgba(255,255,255,0.12)]">Optimize.</span>
             </h2>
+
+            <p className={`mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-mono transition-all duration-1000 delay-200 ${isVisible ? "opacity-100" : "opacity-0"}`}>
+              <span className="text-white/25">Upload</span>
+              <span className="text-white/15" aria-hidden="true">→</span>
+              <span className="text-white/45">Analyze</span>
+              <span className="text-white/15" aria-hidden="true">→</span>
+              <span className="text-white font-medium">Optimize</span>
+            </p>
 
             <div className={`mt-12 transition-all duration-1000 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
               <p className="text-xl text-white/60 mb-8 max-w-2xl mx-auto">

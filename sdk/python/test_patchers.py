@@ -309,7 +309,8 @@ class TestAurexPatchersAndMemory(unittest.TestCase):
         config = AurexConfig(
             storage_mode="file",
             ledger_path=ledger_path,
-            local_only=True
+            local_only=True,
+            per_process_ledger=False,
         )
         
         # 1. Start auditor, simulate thread crash/exit, log event, shutdown to persist pending
@@ -335,7 +336,7 @@ class TestAurexPatchersAndMemory(unittest.TestCase):
             self.assertEqual(event["input_tokens"], 100)
             
         # 3. Instantiate a new auditor with the same config - should recover the pending events
-        AurexAuditor._instance = None  # reset singleton
+        AurexAuditor.reset()
         auditor2 = AurexAuditor(config)
         
         # 4. Verify pending.jsonl was cleaned up and events appended to ledger

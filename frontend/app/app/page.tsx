@@ -237,7 +237,7 @@ export default function DashboardPage() {
   }, [events, searchQuery]);
 
   return (
-    <div className="flex flex-col gap-6 text-white min-h-screen bg-[#030303]">
+    <div className="flex flex-col gap-6 text-white min-h-screen bg-background">
       {/* Header Panel */}
       <div className="flex justify-between items-center flex-wrap gap-4 border-b border-white/[0.06] pb-5">
         <div className="space-y-1">
@@ -266,10 +266,10 @@ export default function DashboardPage() {
           )}
           {projects.length > 0 ? (
             <Select value={projectId || ""} onValueChange={handleProjectChange}>
-              <SelectTrigger className="w-[180px] bg-[#0A0A0A] border-white/10 text-white font-sans text-xs">
+              <SelectTrigger className="w-[180px] bg-surface border-white/10 text-white font-sans text-xs">
                 <SelectValue placeholder="Select Project" />
               </SelectTrigger>
-              <SelectContent className="bg-[#0A0A0A] border-white/10 text-white font-sans">
+              <SelectContent className="bg-surface border-white/10 text-white font-sans">
                 {projects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
@@ -324,7 +324,7 @@ export default function DashboardPage() {
                 {/* KPI Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {/* Total Cost */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06] hover:border-white/10 transition-all duration-300">
+                  <Card className="bg-surface border-white/[0.06] hover:border-white/10 transition-all duration-300">
                     <CardHeader className="pb-2 space-y-1">
                       <CardTitle className="text-[10px] font-semibold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5 text-white/30" /> Weekly Cost
@@ -342,7 +342,7 @@ export default function DashboardPage() {
                   </Card>
 
                   {/* Cost Saved */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06] hover:border-white/10 transition-all duration-300">
+                  <Card className="bg-surface border-white/[0.06] hover:border-white/10 transition-all duration-300">
                     <CardHeader className="pb-2 space-y-1">
                       <CardTitle className="text-[10px] font-semibold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                         <TrendingDown className="w-3.5 h-3.5 text-emerald-400/70" /> Weekly Cost Saved
@@ -360,7 +360,7 @@ export default function DashboardPage() {
                   </Card>
 
                   {/* Tokens Processed */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06] hover:border-white/10 transition-all duration-300">
+                  <Card className="bg-surface border-white/[0.06] hover:border-white/10 transition-all duration-300">
                     <CardHeader className="pb-2 space-y-1">
                       <CardTitle className="text-[10px] font-semibold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                         <Cpu className="w-3.5 h-3.5 text-white/30" /> Total Tokens
@@ -377,7 +377,7 @@ export default function DashboardPage() {
                   </Card>
 
                   {/* Tokens Saved */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06] hover:border-white/10 transition-all duration-300">
+                  <Card className="bg-surface border-white/[0.06] hover:border-white/10 transition-all duration-300">
                     <CardHeader className="pb-2 space-y-1">
                       <CardTitle className="text-[10px] font-semibold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                         <Zap className="w-3.5 h-3.5 text-indigo-400/70" /> Cached Tokens
@@ -396,7 +396,7 @@ export default function DashboardPage() {
                   </Card>
 
                   {/* Success Rate */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06] hover:border-white/10 transition-all duration-300">
+                  <Card className="bg-surface border-white/[0.06] hover:border-white/10 transition-all duration-300">
                     <CardHeader className="pb-2 space-y-1">
                       <CardTitle className="text-[10px] font-semibold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                         <CheckCircle className="w-3.5 h-3.5 text-white/30" /> Success Rate
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                 {/* Charts Area */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Token Volume Area Chart */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                  <Card className="bg-surface border-white/[0.06]">
                     <CardHeader className="pb-4">
                       <CardTitle className="text-xs uppercase tracking-wider text-white/60">Token Savings & Volume</CardTitle>
                       <CardDescription className="text-white/40 text-[10px]">Tally of total tokens vs tokens served from cache.</CardDescription>
@@ -435,10 +435,10 @@ export default function DashboardPage() {
                                 <stop offset="95%" stopColor="#818CF8" stopOpacity={0}/>
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#2e2e34" />
                             <XAxis dataKey="date" stroke="#666" fontSize={10} />
                             <YAxis stroke="#666" fontSize={10} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                            <Tooltip contentStyle={{ backgroundColor: "#0A0A0A", borderColor: "#333", color: "#FFF" }} />
+                            <Tooltip contentStyle={{ backgroundColor: "surface", borderColor: "#404048", color: "#FFF" }} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
                             <Area type="monotone" name="Total Volume" dataKey="totalTokens" stroke="#FFFFFF" fillOpacity={1} fill="url(#totalTokensColor)" strokeWidth={1.5} />
                             <Area type="monotone" name="Cached Savings" dataKey="cachedTokens" stroke="#818CF8" fillOpacity={1} fill="url(#cachedTokensColor)" strokeWidth={1.5} />
@@ -451,7 +451,7 @@ export default function DashboardPage() {
                   </Card>
 
                   {/* Spend Bar Chart */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                  <Card className="bg-surface border-white/[0.06]">
                     <CardHeader className="pb-4">
                       <CardTitle className="text-xs uppercase tracking-wider text-white/60">LLM Spend Timeline</CardTitle>
                       <CardDescription className="text-white/40 text-[10px]">Daily cost associated with prompt requests.</CardDescription>
@@ -460,10 +460,10 @@ export default function DashboardPage() {
                       {timelineData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={timelineData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#2e2e34" />
                             <XAxis dataKey="date" stroke="#666" fontSize={10} />
                             <YAxis stroke="#666" fontSize={10} tickFormatter={(v) => `$${v.toFixed(2)}`} />
-                            <Tooltip contentStyle={{ backgroundColor: "#0A0A0A", borderColor: "#333", color: "#FFF" }} formatter={(v: number) => [`$${v.toFixed(4)}`, "Daily Spend"]} />
+                            <Tooltip contentStyle={{ backgroundColor: "surface", borderColor: "#404048", color: "#FFF" }} formatter={(v: number) => [`$${v.toFixed(4)}`, "Daily Spend"]} />
                             <Bar name="Spend" dataKey="cost" fill="#FFFFFF" opacity={0.8} radius={[4, 4, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                 {/* Bottom Row - verified savings and warnings */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Verified savings */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06] lg:col-span-2">
+                  <Card className="bg-surface border-white/[0.06] lg:col-span-2">
                     <CardHeader>
                       <CardTitle className="text-xs uppercase tracking-wider text-white/60">Savings Baselines by Workflow</CardTitle>
                     </CardHeader>
@@ -510,7 +510,7 @@ export default function DashboardPage() {
                   </Card>
 
                   {/* Top Issues / Alert Rules */}
-                  <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                  <Card className="bg-surface border-white/[0.06]">
                     <CardHeader>
                       <CardTitle className="text-xs uppercase tracking-wider text-white/60">Anomalies & Issues</CardTitle>
                     </CardHeader>
@@ -540,7 +540,7 @@ export default function DashboardPage() {
 
             {/* Traces / Ledger Tab */}
             {activeTab === "traces" && (
-              <Card className="bg-[#0A0A0A] border-white/[0.06]">
+              <Card className="bg-surface border-white/[0.06]">
                 <CardHeader className="flex flex-row justify-between items-center flex-wrap gap-4 pb-4">
                   <div>
                     <CardTitle className="text-xs uppercase tracking-wider text-white/60">Trace Events & Ledger Records</CardTitle>
@@ -634,7 +634,7 @@ export default function DashboardPage() {
 
             {/* Workflows Tab */}
             {activeTab === "workflows" && (
-              <Card className="bg-[#0A0A0A] border-white/[0.06]">
+              <Card className="bg-surface border-white/[0.06]">
                 <CardHeader>
                   <CardTitle className="text-xs uppercase tracking-wider text-white/60">Active Workflows & Features</CardTitle>
                 </CardHeader>
@@ -673,7 +673,7 @@ export default function DashboardPage() {
 
             {/* Models Tab */}
             {activeTab === "models" && (
-              <Card className="bg-[#0A0A0A] border-white/[0.06]">
+              <Card className="bg-surface border-white/[0.06]">
                 <CardHeader>
                   <CardTitle className="text-xs uppercase tracking-wider text-white/60">LLM Model Distribution</CardTitle>
                 </CardHeader>
@@ -717,7 +717,7 @@ export default function DashboardPage() {
 
           {/* Trace Inspector Sidebar/Panel */}
           {selectedEvent && (
-            <Card className="w-[380px] bg-[#0A0A0A]/95 border-white/10 shrink-0 sticky top-24 self-start max-h-[80vh] overflow-y-auto z-30 shadow-2xl rounded-2xl animate-in slide-in-from-right duration-200">
+            <Card className="w-[380px] bg-surface/95 border-white/10 shrink-0 sticky top-24 self-start max-h-[80vh] overflow-y-auto z-30 shadow-2xl rounded-2xl animate-in slide-in-from-right duration-200">
               <CardHeader className="pb-3 border-b border-white/[0.06] flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-xs font-serif uppercase tracking-wider">Trace Details</CardTitle>

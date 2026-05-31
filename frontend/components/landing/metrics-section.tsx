@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { FALLBACK_SHOWCASE_MODELS } from "@/lib/showcase-models-fallback";
 
 const metrics = [
   {
@@ -25,6 +26,20 @@ const metrics = [
     sublabel: "supported out of the box",
   },
 ];
+
+function MarqueeModels({ models }: { models: string[] }) {
+  const items = [...models, ...models];
+  return (
+    <>
+      {items.map((model, index) => (
+        <span key={`${model}-${index}`} className="inline-flex items-center gap-8">
+          <span>{model}</span>
+          <span>•</span>
+        </span>
+      ))}
+    </>
+  );
+}
 
 function AnimatedNumber({ end, suffix = "", prefix = "" }: { end: number; suffix?: string; prefix?: string }) {
   const [count, setCount] = useState(0);
@@ -231,7 +246,25 @@ function DotGraph({
 export function MetricsSection() {
   const [time, setTime] = useState<Date | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [showcaseModels, setShowcaseModels] = useState<string[]>(FALLBACK_SHOWCASE_MODELS);
   const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/showcase-models")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.models) && data.models.length > 0) {
+          setShowcaseModels(data.models);
+        }
+      })
+      .catch(() => {
+        /* keep fallback list */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setTime(new Date());
@@ -327,37 +360,7 @@ export function MetricsSection() {
           }`}>
           <div className="relative h-8 flex items-center">
             <div className="animate-marquee whitespace-nowrap flex items-center gap-8 text-sm font-mono text-muted-foreground">
-              <span>OpenAI GPT-4</span>
-              <span>•</span>
-              <span>OpenAI GPT-3.5</span>
-              <span>•</span>
-              <span>Anthropic Claude 3</span>
-              <span>•</span>
-              <span>Anthropic Claude 2</span>
-              <span>•</span>
-              <span>Google Gemini Pro</span>
-              <span>•</span>
-              <span>Google Gemini Ultra</span>
-              <span>•</span>
-              <span>Cohere Command</span>
-              <span>•</span>
-              <span>Meta Llama</span>
-              <span>•</span>
-              <span>OpenAI GPT-4</span>
-              <span>•</span>
-              <span>OpenAI GPT-3.5</span>
-              <span>•</span>
-              <span>Anthropic Claude 3</span>
-              <span>•</span>
-              <span>Anthropic Claude 2</span>
-              <span>•</span>
-              <span>Google Gemini Pro</span>
-              <span>•</span>
-              <span>Google Gemini Ultra</span>
-              <span>•</span>
-              <span>Cohere Command</span>
-              <span>•</span>
-              <span>Meta Llama</span>
+              <MarqueeModels models={showcaseModels} />
             </div>
           </div>
         </div>

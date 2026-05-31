@@ -5,7 +5,7 @@ import { ImageComparison } from "./ImageComparison";
 
 export function AuditSlider() {
     return (
-        <div className="w-full py-16 bg-black text-white">
+        <div className="w-full py-16 bg-background text-white">
 
             {/* Title */}
             <div className="text-center mb-10">

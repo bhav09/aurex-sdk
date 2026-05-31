@@ -85,12 +85,12 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Identity Card */}
-                <Card className="bg-[#0A0A0A] border-white/[0.06] md:col-span-1 flex flex-col items-center p-6 justify-center text-center space-y-4">
+                <Card className="bg-surface border-white/[0.06] md:col-span-1 flex flex-col items-center p-6 justify-center text-center space-y-4">
                     <div className="relative">
                         <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-3xl font-serif text-white border border-white/20 shadow-inner">
                             {initial}
                         </div>
-                        <span className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#0A0A0A] flex items-center justify-center">
+                        <span className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-500 border-2 border-surface flex items-center justify-center">
                             <CheckCircle2 className="w-3.5 h-3.5 text-black" />
                         </span>
                     </div>
@@ -114,7 +114,7 @@ export default function ProfilePage() {
 
                 {/* Account Details & Context */}
                 <div className="md:col-span-2 space-y-6">
-                    <Card className="bg-[#0A0A0A] border-white/[0.06]">
+                    <Card className="bg-surface border-white/[0.06]">
                         <CardHeader>
                             <CardTitle className="text-xs uppercase tracking-wider text-white/60">Security & Session</CardTitle>
                             <CardDescription className="text-white/40 text-[10px]">Active session properties and platform authorization settings.</CardDescription>
@@ -191,7 +191,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Audit History Section */}
-            <Card className="bg-[#0A0A0A] border-white/[0.06] mt-8">
+            <Card className="bg-surface border-white/[0.06] mt-8">
                 <CardHeader>
                     <CardTitle className="text-xs uppercase tracking-wider text-white/60">Past Audit Runs</CardTitle>
                     <CardDescription className="text-white/40 text-[10px]">

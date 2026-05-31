@@ -143,7 +143,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-[420px] bg-[#0A0A0A]/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
+      <DialogContent className="sm:max-w-[420px] bg-surface/95 border-white/[0.08] text-white backdrop-blur-2xl rounded-2xl shadow-2xl">
         <DialogHeader className="space-y-2 text-center">
           <DialogTitle className="text-2xl font-serif tracking-wide uppercase text-white/90">
             {step === "email" ? "Sign In to Aurex" : "Verify Code"}
@@ -187,7 +187,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
             <div className="relative flex items-center justify-center py-2">
               <span className="absolute w-full h-[1px] bg-white/[0.06]"></span>
-              <span className="relative px-3 text-xs text-white/40 uppercase bg-[#0A0A0A] font-medium tracking-widest">
+              <span className="relative px-3 text-xs text-white/40 uppercase bg-surface font-medium tracking-widest">
                 or sign in with otp
               </span>
             </div>
