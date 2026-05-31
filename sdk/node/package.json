@@ -28,7 +28,10 @@
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": { "optional": true },
-    "litellm": { "optional": true }
+    "litellm": { "optional": true },
+    "@google/genai": { "optional": true },
+    "ollama": { "optional": true },
+    "@huggingface/inference": { "optional": true }
   },
   "engines": {
     "node": ">=18"

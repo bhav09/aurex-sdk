@@ -1,187 +1,83 @@
-# Aurex SDK Reference (Agent & Developer Guide)
+# Aurex LLM & Developer API Reference
 
-Aurex is a local-first, zero-trust AI FinOps and auditing SDK. It runs asynchronously to log token usage and costs offline into a JSONL ledger, and uses client-side heuristics to calculate a Token Credit Score and locate leakage (agent loops, over-provisioned models, redundant system prompts).
+Aurex is a local-first, zero-PII AI cost-optimization and budget circuit-breaking platform. It tracks LLM usage, surfaces inefficiencies, computes Token Credit Scores, and blocks runtime waste.
 
-## Core Philosophy
-- **Zero PII Promise**: Prompt, system prompt, and response bodies are cryptographically hashed (SHA-256) locally *before* being written to disk or synchronized. Sensitive prompt content never leaves the host.
-- **Asynchronous Queueing**: Main execution thread is never blocked. Logs are queued and written via background worker threads (<0.1ms overhead).
-- **Offline Audits**: The heuristics engine runs offline directly against the JSONL ledger file.
+## Public SDK API Reference
 
----
+Both SDKs are singletons.
 
-## Python SDK (`aurex_sdk`)
+### Python SDK (`aurex-sdk`)
+- **Import**: `from aurex_sdk import AurexAuditor, AurexConfig, AurexDecision, AurexAction`
+- **Instantiation**: `auditor = AurexAuditor(config: Optional[AurexConfig])` (singleton)
+- **Patching**: `auditor.patch_all()`, `auditor.patch_openai()`, `auditor.patch_anthropic()`, `auditor.patch_google()`, `auditor.patch_litellm()`, `auditor.patch_ollama()`, `auditor.patch_huggingface()`
+- **Pre-Call Check**: `auditor.pre_call_check(model, prompt, system_prompt, workflow_id, messages, retry_count) -> AurexDecision`
+- **Budget Guard**: `auditor.configure_circuit_breaker(config: dict)`
+- **Event Logging**: `auditor.log_event(model, prompt, response, input_tokens, output_tokens, cached_tokens, reasoning_tokens, workflow_id, system_prompt, extra_metadata)`
+- **Outcomes**: `auditor.mark_success(workflow_id)`, `auditor.mark_failure(workflow_id, error_msg)`
+- **Health check**: `auditor.get_health() -> dict`
+- **Wrapping with context options**: `auditor.wrap(call_fn, build_params, options: Optional[dict])`, `auditor.awrap(call_fn, build_params, options: Optional[dict])`
 
-### Installation & Configuration
-```bash
-# Install package (simulated or from private repository)
-pip install aurex-sdk
-```
-
-Configure via `AurexConfig` class or system environment variables:
-- `AUREX_API_KEY`: API authorization key (defaults to environment variable).
-- `AurexConfig` parameters:
-  - `api_key` (str): Optional.
-  - `project` (str): Project identifier. Default: `"default"`.
-  - `ledger_path` (str): Local ledger directory. Default: `".aurex/ledger.jsonl"`.
-  - `cloud_sync` (bool): Send metadata to cloud. Default: `False`.
-  - `cloud_endpoint` (str): Target REST URL. Default: `"http://localhost:8000/api/v1/upload/csv"`.
-  - `flush_interval_seconds` (float): Queue write frequency. Default: `1.0`.
-  - `max_batch_size` (int): Event count to force flush. Default: `50`.
-  - `local_only` (bool): Restrict data locally. Default: `True`.
-  - `budget_guard` (dict): Optional circuit breaker config. Default: `{}`.
-    - `max_cost_per_minute` (float): Cost limit per sliding minute.
-    - `max_cost_per_session` (float): Cost limit per unique `workflow_id`.
-    - `max_requests_per_minute` (int): Request rate limit.
-    - `max_context_tokens` (int): Input token threshold.
-    - `on_budget_exceeded` (str): `'throw'`, `'warn'`, or `'webhook'`. Default: `'warn'`.
-    - `webhook_url` (str): Webhook target for alert notifications.
-    - `dry_run` (bool): If true, evaluate but don't block/throw.
-
-### Basic Usage
-```python
-from aurex_sdk import AurexAuditor, AurexConfig
-
-config = AurexConfig(
-    project="my-ai-app", 
-    ledger_path=".aurex/ledger.jsonl",
-    budget_guard={
-        "max_cost_per_minute": 1.50,
-        "on_budget_exceeded": "throw"
-    }
-)
-auditor = AurexAuditor(config)
-
-# Dynamically configure/update at runtime:
-auditor.configure_circuit_breaker({
-    "max_cost_per_session": 10.0,
-    "on_budget_exceeded": "warn"
-})
-
-# Log event asynchronously (hashes prompt/response/system_prompt locally)
-auditor.log_event(
-    model="gpt-4o",
-    prompt="Translate hello to Spanish",
-    response="Hola",
-    input_tokens=15,
-    output_tokens=2,
-    workflow_id="workflow_session_99",
-    system_prompt="You are a helpful translator.",
-    extra_metadata={"custom_tag": "test"}
-)
-
-# Shutdown cleanly before exit to flush the queue
-auditor.shutdown()
-```
-
-### Context Manager Usage
-```python
-with AurexAuditor() as auditor:
-    auditor.log_event(model="gpt-4o-mini", input_tokens=100, output_tokens=50)
-```
-
-### Auto-Patching OpenAI
-```python
-from aurex_sdk import AurexAuditor
-import openai
-
-auditor = AurexAuditor()
-# Patches both sync and async completions in `openai` automatically
-auditor.patch_openai()
-
-# standard completions are now auto-logged:
-openai.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-```
+### Node.js SDK (`aurex-sdk`)
+- **Import**: `import { AurexAuditor } from "aurex-sdk";`
+- **Instantiation**: `const auditor = AurexAuditor.getInstance(config: AurexConfig);`
+- **Patching**: `auditor.patchAll()`, `auditor.patchOpenAI()`, `auditor.patchAnthropic()`, `auditor.patchLiteLLM()`, `auditor.patchOllama()`, `auditor.patchHuggingFace()`
+- **Pre-Call Check**: `auditor.preCallCheck({ model, prompt, systemPrompt, workflowId, messages, retryCount }) -> AurexDecision`
+- **Budget Guard**: `auditor.configureCircuitBreaker(config: BudgetGuardConfig)`
+- **Event Logging**: `auditor.logEvent(params)`
+- **Outcomes**: `auditor.markSuccess(workflowId)`, `auditor.markFailure(workflowId, errorMsg)`
+- **Health check**: `auditor.getHealth() -> object`
+- **Wrapping with context options**: `auditor.wrap(callFn, buildParams, options?: Record<string, any>)`
 
 ---
 
-## Node.js SDK (`@aurex/sdk`)
+## Configuration Reference
 
-### Installation & Configuration
-```bash
-npm install @aurex/sdk
-```
+### AurexConfig Parameters
 
-Configure via `AurexConfig` object passed to the singleton getter:
-- `apiKey`: Optional string. Defaults to `process.env.AUREX_API_KEY`.
-- `project`: Defaults to `"default"`.
-- `ledgerPath`: Defaults to `".aurex/ledger.jsonl"`.
-- `cloudSync`: Defaults to `false`.
-- `cloudEndpoint`: Defaults to `"http://localhost:8000/api/v1/upload/csv"`.
-- `flushIntervalMs`: Defaults to `1000`.
-- `maxBatchSize`: Defaults to `50`.
-- `localOnly`: Defaults to `true`.
-- `budgetGuard`: Optional object. Default: `{}`.
-  - `maxCostPerMinute`: Cost limit per sliding minute.
-  - `maxCostPerSession`: Cost limit per unique `workflowId`.
-  - `maxRequestsPerMinute`: Request rate limit.
-  - `maxContextTokens`: Input token threshold.
-  - `onBudgetExceeded`: `'throw'`, `'warn'`, or `'webhook'`. Default: `'warn'`.
-  - `webhookUrl`: Webhook target for JSON alert POSTs.
-  - `dryRun`: Evaluate constraints without throwing/blocking.
+| Option | Python | Node.js | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **API Key** | `api_key` | `apiKey` | `None` | Your project-specific API key (e.g. `aux_dev_...`). |
+| **Project Name** | `project` | `project` | `"default"` | Logical project identifier. |
+| **Ledger Path** | `ledger_path` | `ledgerPath` | `".aurex/ledger.jsonl"` | Path to write the local telemetry ledger to. |
+| **Cloud Sync** | `cloud_sync` | `cloudSync` | `False` | Sync telemetry events asynchronously to the cloud backend. |
+| **Base URL** | `base_url` | `baseUrl` | `None` | Backend API base URL (defaults to `http://localhost:8000/api/v1`). |
+| **Flush Interval** | `flush_interval_seconds` | `flushIntervalMs` | `30.0`s / `30000`ms | Telemetry sync flush interval. |
+| **Max Batch Size** | `max_batch_size` | `maxBatchSize` | `100` | Maximum batch size of synced events. |
+| **Local Only** | `local_only` | `localOnly` | `True` | Runs locally without cloud sync. |
+| **Storage Mode** | `storage_mode` | N/A (always file) | `"file"` | `"file"` to write disk ledger, or `"memory"` for in-memory store (Python only). |
+| **Sync Hashes** | `sync_prompt_hashes` | `syncPromptHashes` | `False` | Sync prompt/response hashes to cloud dashboard. |
+| **Pricing Path** | `pricing_path` | `pricingPath` | `None` | Path to a custom JSON pricing configuration. |
+| **Default Pricing** | `default_pricing` | `defaultPricing` | `None` | Fallback cost dict with keys `input` and `output` (USD per 1M tokens) for unknown models. |
+| **Simple Prompt Limit** | `simple_prompt_token_limit` | `simplePromptTokenLimit` | `120` | Threshold token count below which prompts are classified as simple. |
+| **Runaway Context Multiplier** | `runaway_context_multiplier` | `runawayContextMultiplier` | `2.2` | Scaling multiplier representing runaway context growth checks. |
+| **Loop Similarity Threshold** | `loop_similarity_threshold` | `loopSimilarityThreshold` | `0.8` | Jaccard similarity threshold for semantic loop checks. |
+| **Downgrade Map** | `downgrade_map` | `downgradeMap` | `None` | Custom model mappings representing downgrade paths. |
 
-### Usage
-```typescript
-import { AurexAuditor } from "@aurex/sdk";
+### Budget Guard Parameters
 
-// AurexAuditor is a singleton
-const auditor = AurexAuditor.getInstance({
-  project: "my-nodejs-app",
-  ledgerPath: ".aurex/ledger.jsonl",
-  budgetGuard: {
-    maxCostPerMinute: 2.00,
-    onBudgetExceeded: "throw"
-  }
-});
-
-// Configure circuit breaker dynamically
-auditor.configureCircuitBreaker({
-  maxCostPerSession: 5.0,
-  onBudgetExceeded: "warn"
-});
-
-// Log event
-auditor.logEvent({
-  model: "gpt-4o-mini",
-  prompt: "Write a haiku",
-  response: "Code runs fast and free,\nLocal audit saves money,\nTokens in control.",
-  inputTokens: 10,
-  outputTokens: 25,
-  workflowId: "session_abc",
-  systemPrompt: "You are a poet."
-});
-
-// Shutdown on exit
-process.on("SIGINT", () => {
-  auditor.shutdown();
-  process.exit(0);
-});
-```
+Configure runtime limits under `budget_guard` (Python) / `budgetGuard` (Node):
+- `max_cost_per_minute` / `maxCostPerMinute` (`float`): Limit cost ($) per minute.
+- `max_cost_per_session` / `maxCostPerSession` (`float`): Limit cost ($) per session/workflow.
+- `max_requests_per_minute` / `maxRequestsPerMinute` (`int`): Limit request count per minute.
+- `max_context_tokens` / `maxContextTokens` (`int`): Limit max estimated input tokens per request.
+- `on_budget_exceeded` / `onBudgetExceeded` (`str`): Action when limit hit: `"throw"`, `"warn"`, or `"webhook"`.
+- `webhook_url` / `webhookUrl` (`str`): Target URL if action is `"webhook"`.
+- `dry_run` / `dryRun` (`bool`): If `True`, evaluates guards but never blocks or throws.
+- `simple_prompt_token_limit` / `simplePromptTokenLimit` (`int`): Override simple prompt limit for context.
+- `runaway_context_multiplier` / `runawayContextMultiplier` (`float`): Override runaway context multiplier for context.
+- `loop_similarity_threshold` / `loopSimilarityThreshold` (`float`): Override loop similarity threshold for context.
+- `downgrade_map` / `downgradeMap` (`dict`): Override model downgrade map for context.
 
 ---
 
-## CLI & CI/CD Build Breaker
+## CLI & CI/CD Policies
 
-Analyze ledger logs offline to evaluate performance policies:
-```bash
-python -m aurex_sdk.cli --ledger .aurex/ledger.jsonl --fail-under 80
-```
+### Python CLI
+- **Install Hook**: `aurex install-hook [--target TARGET]`
+- **Uninstall Hook**: `aurex uninstall-hook [--target TARGET]`
+- **Heuristics Audit**: `aurex audit [--ledger LEDGER] [--fail-under SCORE] [--max-waste-usd USD] [--mode warn|block]`
 
-### CLI Arguments
-- `--ledger <path>`: Path to ledger JSONL file (default: `.aurex/ledger.jsonl`).
-- `--fail-under <score>`: Fail the build if the Credit Score drops below this integer.
-- `--max-waste-usd <amount>`: Fail the build if total wasted spend exceeds this dollar value.
-- `--max-spend-usd <amount>`: Fail the build if total API spend exceeds this dollar value.
-
----
-
-## Heuristics Engine
-
-The `LocalHeuristicsEngine` evaluates the ledger using four main algorithms:
-
-1. **System Prompt Waste (CRITICAL)**: Detects repeated transmission of identical system prompts (based on hashes) within workflow streams. Recommend prompt caching.
-2. **Agent Runaway Loops (CRITICAL)**: Triggered if context size (input tokens) increases by >= 1.8x recursively for 3+ consecutive queries within a 5-minute session window.
-3. **Expensive Model Misuse (HIGH)**: Flagged when high-tier models (e.g., GPT-4, Claude Opus) are utilized to handle trivial prompts (<500 input and <100 output tokens). Recommend switching to cheaper alternatives (e.g., GPT-4o-Mini, Claude Haiku).
-4. **Context Explosion (HIGH)**: Detects scenarios where context sizes increase >= 2x from the session baseline. Recommend sliding context windows.
+### Node.js CLI
+- **Install Hook**: `npx aurex install-hook [target]`
+- **Uninstall Hook**: `npx aurex uninstall-hook [target]`
+- **CI Policy**: `npx aurex ci [--mode=warn|block] [--github-comment]`

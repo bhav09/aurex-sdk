@@ -49,6 +49,33 @@ if 'google' not in sys.modules:
     sys.modules['google'] = google_mock
     sys.modules['google.generativeai'] = google_mock.generativeai
 
+if 'huggingface_hub' not in sys.modules:
+    huggingface_mock = types.ModuleType('huggingface_hub')
+    
+    class MockInferenceClient:
+        def __init__(self, model=None, token=None, **kwargs):
+            self.model = model
+            
+        def chat_completion(self, messages, model=None, stream=False, **kwargs):
+            pass
+            
+        def text_generation(self, prompt, model=None, stream=False, **kwargs):
+            pass
+            
+    class MockAsyncInferenceClient:
+        def __init__(self, model=None, token=None, **kwargs):
+            self.model = model
+            
+        async def chat_completion(self, messages, model=None, stream=False, **kwargs):
+            pass
+            
+        async def text_generation(self, prompt, model=None, stream=False, **kwargs):
+            pass
+            
+    huggingface_mock.InferenceClient = MockInferenceClient
+    huggingface_mock.AsyncInferenceClient = MockAsyncInferenceClient
+    sys.modules['huggingface_hub'] = huggingface_mock
+
 from aurex_sdk.auditor import AurexAuditor, AurexConfig
 from aurex_sdk.heuristics import LocalHeuristicsEngine
 from aurex_sdk.cli import run_cli
@@ -325,6 +352,172 @@ class TestAurexPatchersAndMemory(unittest.TestCase):
         auditor2.shutdown()
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
+
+    def test_openrouter_normalization(self):
+        from aurex_sdk.auditor import normalize_model_name
+        self.assertEqual(normalize_model_name("google/gemini-2.5-flash"), "gemini-2.5-flash")
+        self.assertEqual(normalize_model_name("openrouter/auto"), "auto")
+        self.assertEqual(normalize_model_name("deepseek/deepseek-r1"), "deepseek-r1")
+        self.assertEqual(normalize_model_name("meta-llama/llama-4-scout"), "llama-4-scout")
+
+    def test_new_pricing_entries(self):
+        from aurex_sdk.auditor import get_model_pricing
+        in_p, out_p = get_model_pricing("deepseek-r1")
+        self.assertEqual(in_p, 0.55)
+        self.assertEqual(out_p, 2.19)
+        in_p, out_p = get_model_pricing("claude-opus-4")
+        self.assertEqual(in_p, 15.00)
+        self.assertEqual(out_p, 75.00)
+
+    def test_tool_call_and_metadata_tracking(self):
+        config = AurexConfig(storage_mode="memory", local_only=True, flush_interval_seconds=0.1)
+        auditor = AurexAuditor(config)
+        auditor.clear_local_events()
+        
+        auditor.log_event(
+            model="gpt-4o",
+            prompt="Hello",
+            response="Hi",
+            input_tokens=10,
+            output_tokens=5,
+            tool_calls_count=2,
+            tool_names=["get_weather", "get_time"],
+            tags={"env": "test", "user_tier": "premium"},
+            quality_score=0.95
+        )
+        
+        # Wait for worker thread to flush queue
+        time.sleep(1.2)
+        
+        events = auditor.get_local_events()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["tool_calls_count"], 2)
+        self.assertEqual(events[0]["tool_names"], ["get_weather", "get_time"])
+        self.assertEqual(events[0]["tags"], {"env": "test", "user_tier": "premium"})
+        self.assertEqual(events[0]["quality_score"], 0.95)
+
+    def test_semantic_cache_hit_bypass(self):
+        cache_hit_called = False
+        cache_miss_called = False
+        
+        def on_hit(workflow_id, prompt):
+            nonlocal cache_hit_called
+            cache_hit_called = True
+            return "Cached response content"
+            
+        def on_miss(workflow_id, prompt):
+            nonlocal cache_miss_called
+            cache_miss_called = True
+            
+        config = AurexConfig(
+            storage_mode="memory", 
+            local_only=True,
+            on_cache_hit=on_hit,
+            on_cache_miss=on_miss
+        )
+        auditor = AurexAuditor(config)
+        auditor.clear_local_events()
+        
+        # First call: should be a miss
+        dec1 = auditor.pre_call_check(model="gpt-4o", prompt="What is the weather today?", workflow_id="session1")
+        self.assertEqual(dec1.action, "proceed")
+        self.assertTrue(cache_miss_called)
+        
+        # Log the first call so it's in history
+        auditor.log_event(model="gpt-4o", prompt="What is the weather today?", response="Sunny", workflow_id="session1")
+        
+        # Second call with high similarity: should be a hit and return "Cached response content"
+        dec2 = auditor.pre_call_check(model="gpt-4o", prompt="What is the weather today?", workflow_id="session1")
+        self.assertEqual(dec2.action, "cache_suggest")
+        self.assertEqual(dec2.response, "Cached response content")
+        self.assertTrue(cache_hit_called)
+
+
+    def test_dynamic_pricing_wildcards(self):
+        # Create a temp pricing JSON file
+        pricing_file = "test_custom_pricing.json"
+        custom_data = {
+            "custom-model": {"input": 12.34, "output": 56.78},
+            "custom-wildcard-*": {"input": 1.11, "output": 2.22}
+        }
+        with open(pricing_file, "w") as f:
+            json.dump(custom_data, f)
+            
+        try:
+            config = AurexConfig(storage_mode="memory", local_only=True, pricing_path=pricing_file)
+            auditor = AurexAuditor(config)
+            
+            # 1. Exact match custom pricing
+            from aurex_sdk.auditor import get_model_pricing
+            in_cost, out_cost = get_model_pricing("custom-model")
+            self.assertEqual(in_cost, 12.34)
+            self.assertEqual(out_cost, 56.78)
+            
+            # 2. Wildcard match custom pricing
+            in_cost_wc, out_cost_wc = get_model_pricing("custom-wildcard-test-model")
+            self.assertEqual(in_cost_wc, 1.11)
+            self.assertEqual(out_cost_wc, 2.22)
+            
+            # 3. Programmatic registration
+            auditor.register_model_pricing("custom-prog", 9.99, 8.88)
+            in_cost_p, out_cost_p = get_model_pricing("custom-prog")
+            self.assertEqual(in_cost_p, 9.99)
+            self.assertEqual(out_cost_p, 8.88)
+            
+        finally:
+            if os.path.exists(pricing_file):
+                os.remove(pricing_file)
+
+    def test_context_overrides(self):
+        config = AurexConfig(storage_mode="memory", local_only=True, simple_prompt_token_limit=120)
+        auditor = AurexAuditor(config)
+        
+        # Test override simple prompt limit via context overrides in wrap
+        # If limit is overridden to 10, then prompt with 25 tokens is NOT simple (should not auto-downgrade)
+        # Or if auto-downgrade simple prompts is on:
+        config.auto_downgrade_simple_prompts = True
+        
+        # Check defaults: prompt size 15 is < 120, so simple -> should suggest downgrade
+        dec_def = auditor.pre_call_check(model="gpt-4o", prompt="Hello, how do I write python?", messages=[{"role": "user", "content": "Hello, how do I write python?"}])
+        self.assertEqual(dec_def.action, "downgrade")
+        
+        # Now override simple_prompt_token_limit to 5 (prompt size is ~7 tokens, so still > 5 -> NOT simple)
+        from aurex_sdk.auditor import aurex_context
+        tok = aurex_context.set({"simple_prompt_token_limit": 5})
+        try:
+            dec_override = auditor.pre_call_check(model="gpt-4o", prompt="Hello, how do I write python?", messages=[{"role": "user", "content": "Hello, how do I write python?"}])
+            self.assertEqual(dec_override.action, "proceed")
+        finally:
+            aurex_context.reset(tok)
+
+    def test_huggingface_patching_sync(self):
+        import huggingface_hub
+        
+        # Mock response
+        mock_resp = MagicMock()
+        mock_resp.choices = [MagicMock(message=MagicMock(content="Hello from patched HF"))]
+        mock_resp.usage = MagicMock(prompt_tokens=5, completion_tokens=3)
+        
+        original_chat = MagicMock(return_value=mock_resp)
+        huggingface_hub.InferenceClient.chat_completion = original_chat
+        
+        config = AurexConfig(storage_mode="memory", local_only=True, flush_interval_seconds=0.1)
+        auditor = AurexAuditor(config)
+        auditor.clear_local_events()
+        auditor.patch_huggingface()
+        
+        client = huggingface_hub.InferenceClient(model="meta-llama/Llama-3-8b-Instruct")
+        resp = client.chat_completion(messages=[{"role": "user", "content": "Hi"}])
+        
+        self.assertEqual(resp, mock_resp)
+        time.sleep(1.2)
+        
+        events = auditor.get_local_events()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["model"], "meta-llama/Llama-3-8b-Instruct")
+        self.assertEqual(events[0]["provider"], "huggingface")
+        # HF serverless pricing defaults to 0.0
+        self.assertEqual(events[0]["cost"], 0.0)
 
 
 if __name__ == "__main__":

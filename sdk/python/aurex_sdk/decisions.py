@@ -3,16 +3,21 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 
 def normalize_model_name(m: str) -> str:
-    model = m.strip().lower()
-    ft_match = re.match(r"^ft:([^:]+)", model)
+    m = m.strip().lower()
+    # 1. Strip fine-tuned model prefix
+    ft_match = re.match(r"^ft:([^:]+)", m)
     if ft_match:
-        model = ft_match.group(1)
-    # Remove prefix namespaces
-    model = re.sub(r"^(models\/|publishers\/google\/models\/|anthropic\.|amazon\.|bedrock\/)", "", model)
-    # Normalize spacing/underscores to hyphens
-    return re.sub(r"[\s_]+", "-", model)
+        m = ft_match.group(1)
+    # 2. Split by colon to strip Ollama tags (e.g. llama3.1:8b -> llama3.1)
+    m = m.split(':')[0]
+    # 3. Split by slash to strip vendor/org prefixes (e.g. openrouter/google/gemini-2.5-flash -> gemini-2.5-flash)
+    m = m.split('/')[-1]
+    # 4. Strip Anthropic date suffixes (e.g. claude-3-5-sonnet-20241022 -> claude-3-5-sonnet)
+    m = re.sub(r'-\d{8}$', '', m)
+    # 5. Clean spacing/underscores to hyphens
+    return re.sub(r"[\s_]+", "-", m)
 
-AurexAction = Literal["proceed", "downgrade", "compress", "block"]
+AurexAction = Literal["proceed", "downgrade", "compress", "block", "cache_suggest"]
 
 @dataclass
 class AurexDecision:
@@ -23,6 +28,7 @@ class AurexDecision:
     loop_score: Optional[float] = None
     inject_system_instruction: Optional[str] = None
     original_model: Optional[str] = None
+    response: Optional[str] = None
 
 MODEL_DOWNGRADE_MAP: Dict[str, str] = {
     "gpt-4o": "gpt-4o-mini",
@@ -30,20 +36,37 @@ MODEL_DOWNGRADE_MAP: Dict[str, str] = {
     "gpt-4": "gpt-4o-mini",
     "gpt-5": "gpt-4o-mini",
     "gpt-5.1": "gpt-4o-mini",
+    "gpt-4.1-mini": "gpt-4.1-nano",
     "o1": "o3-mini",
+    "o3": "o4-mini",
+    "o4-mini": "gpt-4o-mini",
     "claude-opus-4-20250514": "claude-3-5-haiku",
     "claude-3-opus": "claude-3-5-haiku",
+    "claude-opus-4": "claude-3-5-haiku",
+    "claude-sonnet-4": "claude-3-5-haiku",
     "claude-3-5-sonnet": "claude-3-5-haiku",
     "claude-sonnet-4-5-20250929": "claude-3-5-haiku",
     "gemini-2.5-pro": "gemini-2.5-flash",
     "gemini-1.5-pro": "gemini-1.5-flash",
+    "deepseek-r1": "deepseek-v3",
 }
 
 def suggest_cheaper_model(model: str) -> Optional[str]:
     norm = normalize_model_name(model)
+    
+    # Check custom downgrade target first dynamically from singleton auditor config
+    try:
+        from aurex_sdk.auditor import AurexAuditor
+        if AurexAuditor._instance and getattr(AurexAuditor._instance, "downgrade_map", None):
+            dm = AurexAuditor._instance.downgrade_map
+            if norm in dm:
+                return dm[norm]
+    except Exception:
+        pass
+        
     if norm in MODEL_DOWNGRADE_MAP:
         return MODEL_DOWNGRADE_MAP[norm]
-    if "gpt" in norm or norm.startswith("o1") or norm.startswith("o3"):
+    if "gpt" in norm or norm.startswith("o1") or norm.startswith("o3") or norm.startswith("o4"):
         return "gpt-4o-mini"
     if "claude" in norm:
         return "claude-3-5-haiku"
@@ -55,7 +78,7 @@ EXPENSIVE_HINTS = ["opus", "gpt-4-turbo", "gpt-4o", "gpt-5", "o1", "sonnet-4", "
 
 def is_expensive_model(model: str) -> bool:
     norm = normalize_model_name(model)
-    if "mini" in norm or "haiku" in norm or "flash" in norm:
+    if "mini" in norm or "haiku" in norm or "flash" in norm or "nano" in norm:
         return False
     return any(h in norm for h in EXPENSIVE_HINTS)
 
@@ -77,11 +100,11 @@ def extract_provider(model: str) -> str:
     model_lower = model.lower()
     if "claude" in model_lower:
         return "anthropic"
-    elif "gpt" in model_lower or model_lower.startswith("o1") or model_lower.startswith("o3"):
+    elif "gpt" in model_lower or model_lower.startswith("o1") or model_lower.startswith("o3") or model_lower.startswith("o4"):
         return "openai"
     elif "gemini" in model_lower:
         return "google"
-    elif any(x in model_lower for x in ["llama", "mistral", "qwen"]):
+    elif any(x in model_lower for x in ["llama", "mistral", "qwen", "deepseek"]):
         return "ollama"
     return "unknown"
 
