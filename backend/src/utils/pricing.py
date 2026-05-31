@@ -199,7 +199,12 @@ def get_model_pricing(model: str, pricing_overrides: Optional[Dict[str, Tuple[fl
         if pricing:
             return pricing
 
-    # 3. Try synced catalog (substring match, longest key first)
+    # 3. Try built-in table (exact match)
+    pricing = BUILTIN_PRICING.get(query_norm)
+    if pricing:
+        return pricing["input"], pricing["output"]
+
+    # 4. Try synced catalog (substring match, longest key first)
     if _synced_catalog:
         sorted_keys = sorted(_synced_catalog.keys(), key=len, reverse=True)
         for key in sorted_keys:
@@ -208,11 +213,6 @@ def get_model_pricing(model: str, pricing_overrides: Optional[Dict[str, Tuple[fl
                 pricing = _extract_pricing_from_entry(entry)
                 if pricing:
                     return pricing
-
-    # 4. Try built-in table (exact match)
-    pricing = BUILTIN_PRICING.get(query_norm)
-    if pricing:
-        return pricing["input"], pricing["output"]
 
     # 5. Try built-in table (substring match)
     sorted_builtin = sorted(BUILTIN_PRICING.keys(), key=len, reverse=True)

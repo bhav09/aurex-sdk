@@ -1,6 +1,4 @@
-#!/bin/sh
-'''exec' "/Users/bhavishya/VSC Projects/tbank/backend/.venv/bin/python3.12" "$0" "$@"
-' '''
+#!/Users/aakritiaggarwal/Documents/lumina-token/backend/.venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

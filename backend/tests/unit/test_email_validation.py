@@ -45,7 +45,9 @@ async def test_email_validation_real_domain(monkeypatch):
     import resend
     monkeypatch.setattr(resend.Emails, "send", lambda *args, **kwargs: {})
     
-    response = await request_otp(data)
+    from fastapi import Request
+    mock_req = Request({"type": "http", "client": ("127.0.0.1", 8000), "path": "/api/v1/auth/request-otp"})
+    response = await request_otp(mock_req, data)
     assert response["status"] == "success"
 
 @pytest.mark.asyncio
@@ -58,8 +60,10 @@ async def test_email_validation_dummy_domain(monkeypatch):
     
     data = OTPRequest(email="user@example.com")
     
+    from fastapi import Request
+    mock_req = Request({"type": "http", "client": ("127.0.0.1", 8000), "path": "/api/v1/auth/request-otp"})
     with pytest.raises(HTTPException) as exc:
-        await request_otp(data)
+        await request_otp(mock_req, data)
         
     assert exc.value.status_code == 400
     assert "Fictitious or dummy-generated email domains are not allowed" in exc.value.detail
@@ -87,8 +91,10 @@ async def test_email_validation_fake_domain(monkeypatch):
     # A completely non-existent domain
     data = OTPRequest(email="user@nonexistentasdfasdffg12345.com")
     
+    from fastapi import Request
+    mock_req = Request({"type": "http", "client": ("127.0.0.1", 8000), "path": "/api/v1/auth/request-otp"})
     with pytest.raises(HTTPException) as exc:
-        await request_otp(data)
+        await request_otp(mock_req, data)
         
     assert exc.value.status_code == 400
     assert "does not exist or has no active mail servers configured" in exc.value.detail

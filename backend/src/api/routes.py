@@ -336,6 +336,45 @@ async def get_stats(
     }
 
 
+from src.models import FeedbackCreate, FeedbackResponse
+
+@router.post("/feedback", response_model=FeedbackResponse)
+async def create_feedback(
+    data: FeedbackCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[str] = Depends(get_current_user_optional)
+):
+    """
+    Submit user feedback.
+    Saves feedback in database and outputs structured logs for GCP Cloud Logging ingestion.
+    """
+    from src.models import Feedback
+    
+    email = data.email or current_user
+    
+    # Create database entry
+    feedback = Feedback(
+        rating=data.rating,
+        comment=data.comment,
+        email=email
+    )
+    db.add(feedback)
+    await db.commit()
+    await db.refresh(feedback)
+    
+    # Log structured event for GCP Cloud Logging (Stackdriver) automatic ingestion
+    logger.info(
+        "User Feedback Received",
+        feedback_id=feedback.id,
+        rating=feedback.rating,
+        comment=feedback.comment,
+        user_email=email,
+        timestamp=feedback.created_at.isoformat() + "Z"
+    )
+    
+    return feedback
+
+
 
 
 @router.post("/upload/csv")

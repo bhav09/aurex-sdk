@@ -69,7 +69,7 @@ export function UserDropdown() {
 
     const handleSignOut = () => {
         aurexAPI.clearSession();
-        router.replace("/");
+        window.location.href = "/";
     };
 
     return (
@@ -102,7 +102,7 @@ export function UserDropdown() {
                 <DropdownMenuSeparator className="bg-white/[0.06] my-1" />
                 
                 <DropdownMenuItem 
-                    onClick={() => router.push("/app/profile")}
+                    onSelect={() => router.push("/app/profile")}
                     className="flex items-center gap-2.5 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors cursor-pointer"
                 >
                     <User className="w-4 h-4 text-white/40" />
@@ -110,7 +110,7 @@ export function UserDropdown() {
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem 
-                    onClick={() => router.push("/app/settings?tab=apikeys")}
+                    onSelect={() => router.push("/app/settings?tab=apikeys")}
                     className="flex items-center gap-2.5 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors cursor-pointer"
                 >
                     <Key className="w-4 h-4 text-white/40" />
@@ -118,7 +118,7 @@ export function UserDropdown() {
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem 
-                    onClick={() => router.push("/app/settings")}
+                    onSelect={() => router.push("/app/settings")}
                     className="flex items-center gap-2.5 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors cursor-pointer"
                 >
                     <Settings className="w-4 h-4 text-white/40" />
@@ -128,7 +128,7 @@ export function UserDropdown() {
                 <DropdownMenuSeparator className="bg-white/[0.06] my-1" />
                 
                 <DropdownMenuItem 
-                    onClick={handleSignOut}
+                    onSelect={handleSignOut}
                     variant="destructive"
                     className="flex items-center gap-2.5 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer focus:bg-rose-500/10 dark:focus:bg-rose-500/10 focus:text-rose-300"
                 >

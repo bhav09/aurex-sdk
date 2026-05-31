@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { UploadZone } from "@/components/audit/upload-zone";
@@ -8,6 +8,7 @@ import { AgentPlanPanel } from "@/components/audit/agent-plan-panel";
 import { SettingsPanel } from "@/components/audit/settings-panel";
 import { SavingsPanel } from "@/components/audit/savings-panel";
 import { AuditCopilotDock } from "@/components/audit/audit-copilot-dock";
+import { FeedbackDialog } from "@/components/audit/feedback-dialog";
 import { aurexAPI, ExecutiveSummary, Issue, LLMEvent } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -451,13 +452,41 @@ export default function AuditPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isReportView, setIsReportView] = useState(false);
+    const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+    const [feedbackLabel, setFeedbackLabel] = useState("We really need your feedback!");
+    const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const checkFeedbackPrompt = async (email: string) => {
+        try {
+            const history = await aurexAPI.getAuditHistory(email, 0, 1);
+            const total = history.total || 0;
+            if (total >= 5 && (total - 5) % 4 === 0) {
+                const shownStr = localStorage.getItem("aurex_feedback_shown_sessions") || "[]";
+                const shown: number[] = JSON.parse(shownStr);
+                if (!shown.includes(total)) {
+                    setFeedbackLabel("We are constantly improving Aurex to deliver top-tier cost savings and we really need your feedback!");
+                    setShowFeedbackDialog(true);
+                    shown.push(total);
+                    localStorage.setItem("aurex_feedback_shown_sessions", JSON.stringify(shown));
+                }
+            }
+        } catch (err) {
+            console.error("Error checking feedback prompt history:", err);
+        }
+    };
 
     useEffect(() => {
         const userInfo = aurexAPI.getUserInfo();
         if (userInfo) {
             setCompanyName(userInfo.company_name);
             setUserEmail(userInfo.email);
+            checkFeedbackPrompt(userInfo.email);
         }
+        return () => {
+            if (feedbackTimeoutRef.current) {
+                clearTimeout(feedbackTimeoutRef.current);
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -599,6 +628,12 @@ export default function AuditPage() {
             await new Promise(r => setTimeout(r, 500));
             setData(summary);
             setPendingFile(null); setPendingUserInfo(null); setAuthRequired(false); setAuthRequiredMessage(null);
+            
+            // Show the feedback dialog with a 3-minute delay (180,000 ms) to give the user time to inspect the dashboard
+            feedbackTimeoutRef.current = setTimeout(() => {
+                setFeedbackLabel("Analysis completed successfully!");
+                setShowFeedbackDialog(true);
+            }, 3 * 60 * 1000);
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Upload failed";
             clearInterval(iv);
@@ -731,7 +766,7 @@ export default function AuditPage() {
             <div className="min-h-screen bg-[#18181c] flex flex-col">
                 {/* Top bar */}
                 <div className="h-12 border-b border-[#2e2e34] bg-[#18181c] flex items-center px-5 gap-4 shrink-0">
-                    <span className="font-display font-bold text-sm tracking-wider text-white">AUREX</span>
+                    <a href="/" className="font-serif uppercase tracking-[0.2em] font-medium text-white">AUREX</a>
                     <span className="text-[#52525a] text-sm">|</span>
                     <span className="text-[11px] text-[#666]">LLM Audit · Cost Intelligence</span>
                     <div className="ml-auto flex items-center gap-3">
@@ -1183,6 +1218,13 @@ export default function AuditPage() {
                 issue={copilotIssue}
                 userEmail={userEmail}
                 onClose={() => { setCopilotOpen(false); setCopilotIssue(null); }}
+            />
+
+            <FeedbackDialog
+                isOpen={showFeedbackDialog}
+                onClose={() => setShowFeedbackDialog(false)}
+                label={feedbackLabel}
+                userEmail={userEmail}
             />
         </div>
     );

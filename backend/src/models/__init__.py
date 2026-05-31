@@ -37,8 +37,12 @@ from .tenancy import (
     UserResponse,
     OrganizationResponse,
     ProjectResponse,
-    MembershipResponse,
     OnboardingResponse,
+)
+from .feedback import (
+    Feedback,
+    FeedbackCreate,
+    FeedbackResponse
 )
 
 __all__ = [
@@ -74,4 +78,7 @@ __all__ = [
     "ProjectResponse",
     "MembershipResponse",
     "OnboardingResponse",
+    "Feedback",
+    "FeedbackCreate",
+    "FeedbackResponse",
 ]
