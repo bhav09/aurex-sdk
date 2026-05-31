@@ -39,6 +39,12 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # Startup
+    # VULN-06 Defense: Enforce strong JWT secret in production mode
+    is_prod = not settings.debug and os.getenv("PYTEST_CURRENT_TEST") is None
+    if is_prod and settings.jwt_secret == "dev-secret-key-change-in-prod":
+        logger.error("FATAL: Production mode detected but using default JWT secret key.")
+        raise ValueError("Cannot start in production mode with default JWT secret.")
+
     print("Initializing database...")
     await init_db()
     
@@ -68,7 +74,7 @@ app = FastAPI(
 FastAPIInstrumentor.instrument_app(app)
 
 # Configure rate limiter with in-memory storage to avoid Redis connection issues locally
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+from src.utils.limiter import limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)

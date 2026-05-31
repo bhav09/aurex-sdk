@@ -10,6 +10,8 @@ export interface ExecutiveSummary {
         annual_savings_projection: number;
         period_days: number;
         severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+        cost_per_outcome_current?: number;
+        cost_per_outcome_optimized?: number;
     };
     top_issues: Issue[];
     workflow_breakdown: WorkflowBreakdown[];
@@ -60,6 +62,7 @@ export interface LLMEvent {
     response: string | null;
     system_prompt_hash: string | null;
     context_length: number;
+    outcome: string | null;
     extra_metadata: Record<string, any>;
 }
 
@@ -186,6 +189,64 @@ export class AurexAPI {
     clearSession() {
         this.setToken('');
         this.setUserInfo(null);
+        if (typeof window !== 'undefined') {
+            try {
+                sessionStorage.removeItem('aurex_org_id');
+                sessionStorage.removeItem('aurex_project_id');
+            } catch (e) {
+                console.warn('Failed to clear session storage tenancy items', e);
+            }
+        }
+    }
+
+    getOrgId(): string | null {
+        if (typeof window !== 'undefined') {
+            try {
+                return sessionStorage.getItem('aurex_org_id');
+            } catch (e) {
+                console.warn('Failed to read sessionStorage org_id', e);
+            }
+        }
+        return null;
+    }
+
+    getProjectId(): string | null {
+        if (typeof window !== 'undefined') {
+            try {
+                return sessionStorage.getItem('aurex_project_id');
+            } catch (e) {
+                console.warn('Failed to read sessionStorage project_id', e);
+            }
+        }
+        return null;
+    }
+
+    setOrgId(orgId: string) {
+        if (typeof window !== 'undefined') {
+            try {
+                if (orgId) {
+                    sessionStorage.setItem('aurex_org_id', orgId);
+                } else {
+                    sessionStorage.removeItem('aurex_org_id');
+                }
+            } catch (e) {
+                console.warn('Failed to write sessionStorage org_id', e);
+            }
+        }
+    }
+
+    setProjectId(projectId: string) {
+        if (typeof window !== 'undefined') {
+            try {
+                if (projectId) {
+                    sessionStorage.setItem('aurex_project_id', projectId);
+                } else {
+                    sessionStorage.removeItem('aurex_project_id');
+                }
+            } catch (e) {
+                console.warn('Failed to write sessionStorage project_id', e);
+            }
+        }
     }
 
     private getHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
@@ -368,6 +429,45 @@ export class AurexAPI {
         return response.json();
     }
 
+    async createProject(name: string, environment: string): Promise<{ id: string; org_id: string; name: string; environment: string }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/projects`, {
+            method: 'POST',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, environment }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to create project');
+        }
+        return response.json();
+    }
+
+    async updateProject(projectId: string, data: { name?: string; environment?: string; slack_webhook_url?: string }): Promise<{ id: string; org_id: string; name: string; environment: string; slack_webhook_url?: string }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/projects/${projectId}`, {
+            method: 'PATCH',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to update project');
+        }
+        return response.json();
+    }
+
+    async updateOrganization(orgId: string, name: string): Promise<{ status: string; id: string; name: string }> {
+        const response = await this.fetchWithRetry(`${this.baseUrl}/organizations/${orgId}`, {
+            method: 'PATCH',
+            headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to update organization');
+        }
+        return response.json();
+    }
+
     async listKeysV1(projectId?: string): Promise<Array<ApiKeyMetadata>> {
         const url = projectId
             ? `${this.baseUrl}/keys?project_id=${encodeURIComponent(projectId)}`
@@ -433,6 +533,7 @@ export class AurexAPI {
         provider?: string;
         model?: string;
         project_id?: string;
+        session_id?: string;
     }): Promise<LLMEvent[]> {
         const queryParams = new URLSearchParams();
         if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
@@ -441,6 +542,7 @@ export class AurexAPI {
         if (params?.provider) queryParams.append('provider', params.provider);
         if (params?.model) queryParams.append('model', params.model);
         if (params?.project_id) queryParams.append('project_id', params.project_id);
+        if (params?.session_id) queryParams.append('session_id', params.session_id);
 
         const url = `${this.baseUrl}/events${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
         const response = await this.fetchWithRetry(url, { headers: this.getHeaders() });
@@ -520,7 +622,7 @@ export class AurexAPI {
         return response.json();
     }
 
-    async verifyOTP(email: string, otp: string): Promise<{ status: string; message: string; access_token?: string; token_type?: string }> {
+    async verifyOTP(email: string, otp: string): Promise<{ status: string; message: string; access_token?: string; token_type?: string; org_id?: string; default_project_id?: string; user_info?: any }> {
         const response = await this.fetchWithRetry(`${this.baseUrl}/auth/verify-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -536,6 +638,15 @@ export class AurexAPI {
         
         if (data.access_token) {
             this.setToken(data.access_token);
+        }
+        if (data.user_info) {
+            this.setUserInfo(data.user_info);
+        }
+        if (data.org_id) {
+            this.setOrgId(data.org_id);
+        }
+        if (data.default_project_id) {
+            this.setProjectId(data.default_project_id);
         }
         
         return data;
@@ -580,6 +691,8 @@ export class AurexAPI {
         access_token: string;
         token_type: string;
         user_info: { user_name: string; email: string; company_name: string };
+        org_id?: string;
+        default_project_id?: string;
     }> {
         const response = await this.fetchWithRetry(`${this.baseUrl}/auth/google-login`, {
             method: 'POST',
@@ -599,6 +712,12 @@ export class AurexAPI {
         }
         if (data.user_info) {
             this.setUserInfo(data.user_info);
+        }
+        if (data.org_id) {
+            this.setOrgId(data.org_id);
+        }
+        if (data.default_project_id) {
+            this.setProjectId(data.default_project_id);
         }
 
         return data;

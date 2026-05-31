@@ -85,6 +85,7 @@ class AuditSessionResponse(BaseModel):
     total_events: Optional[int]
     total_workflows: Optional[int]
     issues_found: Optional[int]
+    analysis_results: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
     

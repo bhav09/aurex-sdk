@@ -323,10 +323,10 @@ class TestApiRoutes:
     @pytest.mark.asyncio
     async def test_alert_rules_endpoints(self, client: AsyncClient):
         from src.api.auth import create_access_token
-        email = "rules-tester@example.com"
+        email = "rules-tester@rules-corp.com"
         token = create_access_token(data={"sub": email})
         headers = {"Authorization": f"Bearer {token}"}
-        company = "Rules Corp"
+        company = "rules-corp"
 
         # 1. Configure the alert rule
         rule_payload = {
@@ -357,10 +357,10 @@ class TestApiRoutes:
     @pytest.mark.asyncio
     async def test_alert_and_crm_triggers_on_patch(self, client: AsyncClient, monkeypatch):
         from src.api.auth import create_access_token
-        email = "alert-tester@example.com"
+        email = "alert-tester@alert-corp.com"
         token = create_access_token(data={"sub": email})
         headers = {"Authorization": f"Bearer {token}"}
-        company = "Alert Corp"
+        company = "alert-corp"
 
         # 1. Configure the alert rule first
         rule_payload = {
@@ -610,6 +610,94 @@ class TestApiRoutes:
         list_resp2 = await client.get("/api/v1/auth/api-keys", headers=headers)
         assert list_resp2.status_code == 200
         assert len(list_resp2.json()) == 0
+
+    @pytest.mark.asyncio
+    async def test_sso_login_disabled_in_production(self, client: AsyncClient, monkeypatch):
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.setenv("AUREX_ALLOW_LEGACY_SSO", "false")
+        from app.config import settings
+        monkeypatch.setattr(settings, "debug", False)
+        
+        payload = {
+            "email": "integration.sso@heyaurex.com",
+            "user_name": "Integration Tester",
+            "company_name": "Integration Org",
+            "provider": "google"
+        }
+        response = await client.post("/api/v1/auth/sso-login", json=payload)
+        assert response.status_code == 403
+        assert "Disabled in production for security" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_pricing_overrides_bola_blocked(self, client: AsyncClient):
+        from src.api.auth import create_access_token
+        email_a = "usera@company-a.com"
+        token_a = create_access_token(data={"sub": email_a})
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        
+        response = await client.get(
+            "/api/v1/pricing/overrides?company_name=company-b",
+            headers=headers_a
+        )
+        assert response.status_code == 403
+        assert "Not authorized to access company data" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_alert_rules_bola_blocked(self, client: AsyncClient):
+        from src.api.auth import create_access_token
+        email_a = "usera@company-a.com"
+        token_a = create_access_token(data={"sub": email_a})
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        
+        response = await client.get(
+            "/api/v1/alerts/rules?company_name=company-b",
+            headers=headers_a
+        )
+        assert response.status_code == 403
+        assert "Not authorized to access company data" in response.json()["detail"]
+        
+        payload = {
+            "company_name": "company-b",
+            "trigger_type": "waste_percentage",
+            "threshold": 10.0,
+            "channel": "slack",
+            "channel_config": {"webhook_url": "https://hooks.slack.com/services/leak"}
+        }
+        response = await client.post(
+            "/api/v1/alerts/configure",
+            json=payload,
+            headers=headers_a
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_substring_match_domain_bypass_blocked(self, client: AsyncClient):
+        from src.api.auth import create_access_token
+        email = "attacker@competitor.com"
+        token = create_access_token(data={"sub": email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = await client.get(
+            "/api/v1/audit/company/competitor-long-name",
+            headers=headers
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_lifespan_default_jwt_secret_crash_in_prod(self, monkeypatch):
+        from app.config import settings
+        monkeypatch.setattr(settings, "debug", False)
+        monkeypatch.setattr(settings, "jwt_secret", "dev-secret-key-change-in-prod")
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        
+        from main import lifespan
+        from fastapi import FastAPI
+        app_mock = FastAPI()
+        
+        with pytest.raises(ValueError) as excinfo:
+            async with lifespan(app_mock):
+                pass
+        assert "Cannot start in production mode with default JWT secret" in str(excinfo.value)
 
 
 

@@ -9,7 +9,7 @@ import hashlib
 import redis.asyncio as redis
 from datetime import datetime, timedelta
 from typing import Dict, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from email_validator import validate_email, EmailNotValidError
@@ -19,6 +19,7 @@ from src.utils.logger import get_logger
 
 from app.config import settings
 from src.database import get_db
+from src.utils.limiter import limiter
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -471,7 +472,8 @@ class OTPVerify(BaseModel):
     otp: str
 
 @router.post("/request-otp")
-async def request_otp(data: OTPRequest):
+@limiter.limit("5/minute")
+async def request_otp(request: Request, data: OTPRequest):
     email = data.email.lower()
     domain = email.split('@')[-1]
     
@@ -565,7 +567,8 @@ async def request_otp(data: OTPRequest):
     return {"status": "success", "message": "OTP sent successfully"}
 
 @router.post("/verify-otp")
-async def verify_otp(data: OTPVerify):
+@limiter.limit("10/minute")
+async def verify_otp(request: Request, data: OTPVerify):
     email = data.email.lower()
     
     otp_raw = await redis_client.get(f"otp:{email}")
@@ -636,6 +639,18 @@ class SSOLoginRequest(BaseModel):
 async def sso_login(data: SSOLoginRequest):
     """Legacy SSO login endpoint - kept for backward compatibility.
     For new integrations, use /google-login instead."""
+    # VULN-01 Defense: Disable unauthenticated login endpoint in production
+    allow_sso = (
+        settings.debug or 
+        os.getenv("AUREX_ALLOW_LEGACY_SSO") == "true" or 
+        os.getenv("PYTEST_CURRENT_TEST") is not None
+    )
+    if not allow_sso:
+        raise HTTPException(
+            status_code=403,
+            detail="Disabled in production for security. Use /google-login instead."
+        )
+
     email = data.email.lower()
     access_token = create_access_token(data={"sub": email})
     

@@ -191,14 +191,16 @@ export class AurexAuditor {
   private static instance: AurexAuditor | null = null;
   private config: Required<AurexConfig>;
   private queue: AurexEvent[] = [];
-  private flushIntervalId: NodeJS.Timeout | null = null;
   private lastMinuteEvents: { timestamp: number; cost: number }[] = [];
   private sessionCosts: Record<string, number> = {};
-  private budgetConfig: BudgetGuardConfig | null = null;
-  private recentRequests: { timestamp: number; model: string; workflowId: string; systemPromptHash?: string; promptHash?: string; estimatedTokens: number }[] = [];
-  private recentResponses: { workflowId: string; responseHash?: string; responseText?: string; timestamp: number }[] = [];
+  private budgetConfig?: Record<string, any>;
+  private flushIntervalId: any = null;
+  private recentRequests: any[] = [];
+  private recentResponses: any[] = [];
   private ignoredWorkflows = new Set<string>();
   private sessionRetryCounts: Record<string, number> = {};
+  private syncErrorCount = 0;
+  private lastSyncError: string | null = null;
 
   private constructor(config?: AurexConfig) {
     const defaultLedger = ".aurex/ledger.jsonl";
@@ -289,6 +291,13 @@ export class AurexAuditor {
       AurexAuditor.instance = new AurexAuditor(config);
     }
     return AurexAuditor.instance;
+  }
+
+  public static reset(): void {
+    if (AurexAuditor.instance) {
+      AurexAuditor.instance.shutdown();
+      AurexAuditor.instance = null;
+    }
   }
 
   private hashText(text?: string): string | undefined {
@@ -451,89 +460,136 @@ export class AurexAuditor {
       return decision;
     }
 
-    const retryCount = params.retryCount ?? this.sessionRetryCounts[workflowId] ?? 0;
-    const loopScore = this.computeSemanticLoopScore(workflowId, params.prompt || "");
+    // Pre-emptive budget check
+    const [inputPrice] = getModelPricing(params.model);
+    const predictedCost = (estTokens / 1000000) * inputPrice;
+    let budgetExceeded = false;
+    let budgetReason = "";
 
-    // 1. System Prompt Waste Detector
-    if (sysPromptHash && workflowRequests.length >= 2) {
-      const duplicates = workflowRequests.slice(0, -1).filter(r => r.systemPromptHash === sysPromptHash);
-      if (duplicates.length > 0 && params.messages) {
-        decision = {
-          action: "compress",
-          reason: `System prompt waste in workflow '${workflowId}'`,
-          compressedMessages: compressMessages(params.messages),
-          originalModel: params.model,
-        };
+    if (this.budgetConfig) {
+      if (this.budgetConfig.maxCostPerSession !== undefined) {
+        const currentSessionCost = this.sessionCosts[workflowId] || 0;
+        if (currentSessionCost + predictedCost > this.budgetConfig.maxCostPerSession) {
+          budgetExceeded = true;
+          budgetReason += `Predicted cost $${predictedCost.toFixed(4)} plus session cost $${currentSessionCost.toFixed(4)} exceeds session limit of $${this.budgetConfig.maxCostPerSession.toFixed(4)}. `;
+        }
+      }
+
+      if (this.budgetConfig.maxCostPerMinute !== undefined) {
+        const minuteCost = this.lastMinuteEvents.reduce((acc, e) => acc + e.cost, 0);
+        if (minuteCost + predictedCost > this.budgetConfig.maxCostPerMinute) {
+          budgetExceeded = true;
+          budgetReason += `Predicted cost $${predictedCost.toFixed(4)} plus minute cost $${minuteCost.toFixed(4)} exceeds minute limit of $${this.budgetConfig.maxCostPerMinute.toFixed(4)}. `;
+        }
+      }
+
+      if (this.budgetConfig.maxRequestsPerMinute !== undefined) {
+        const minuteRequests = this.lastMinuteEvents.length;
+        if (minuteRequests + 1 > this.budgetConfig.maxRequestsPerMinute) {
+          budgetExceeded = true;
+          budgetReason += `Adding this request would exceed minute requests limit of ${this.budgetConfig.maxRequestsPerMinute}. `;
+        }
+      }
+
+      if (this.budgetConfig.maxContextTokens !== undefined && estTokens > this.budgetConfig.maxContextTokens) {
+        budgetExceeded = true;
+        budgetReason += `Estimated input tokens ${estTokens} exceeds maximum context token limit of ${this.budgetConfig.maxContextTokens}. `;
       }
     }
 
-    // 2. Agent Runaway Loop Detector (exponential context growth)
-    if (workflowRequests.length >= 3) {
-      const recent = workflowRequests.slice(-3);
-      const sizes = recent.map(r => r.estimatedTokens);
-      if (sizes[1] >= sizes[0] * 2.2 && sizes[2] >= sizes[1] * 2.2 && sizes[0] > 20) {
-        const cheaper = suggestCheaperModel(params.model);
-        decision = {
-          action: "downgrade",
-          reason: `Runaway context growth in '${workflowId}'`,
-          suggestedModel: cheaper,
-          injectSystemInstruction:
-            "Summarize prior context briefly, then continue with a shorter answer.",
-          originalModel: params.model,
-          loopScore,
-        };
-        this.sessionRetryCounts[workflowId] = (this.sessionRetryCounts[workflowId] || 0) + 1;
-      }
-    }
-
-    // 3. Expensive Model Misuse + adaptive downgrade near budget
-    const isSimple = estTokens < 150;
-    const nearBudget =
-      this.budgetConfig?.maxCostPerSession !== undefined &&
-      (this.sessionCosts[workflowId] || 0) > (this.budgetConfig.maxCostPerSession * 0.8);
-    if ((isExpensiveModel(params.model) && isSimple) || nearBudget) {
-      const recommended = suggestCheaperModel(params.model);
-      if (recommended) {
-        decision = {
-          action: "downgrade",
-          reason: nearBudget
-            ? `Budget threshold near for '${workflowId}'`
-            : `Over-provisioned model for simple task (~${estTokens} tokens)`,
-          suggestedModel: recommended,
-          originalModel: params.model,
-        };
-      }
-    }
-
-    // 4. Context Explosion Detector
-    if (workflowRequests.length >= 2 && params.messages) {
-      const initial = workflowRequests[0].estimatedTokens;
-      const current = estTokens;
-      if (initial > 0 && current >= initial * 3.5) {
-        decision = {
-          action: "compress",
-          reason: `Context explosion in '${workflowId}' (${initial} -> ${current} est. tokens)`,
-          compressedMessages: compressMessages(params.messages),
-          originalModel: params.model,
-        };
-      }
-    }
-
-    // 5. Semantic loop detection
-    if (loopScore >= 0.8) {
+    if (budgetExceeded) {
       decision = {
-        action: "compress",
-        reason: `Semantic loop detected (score ${loopScore.toFixed(2)})`,
-        loopScore,
-        injectSystemInstruction:
-          "You appear to be repeating yourself. Summarize your current state and try a different approach.",
-        compressedMessages: params.messages ? compressMessages(params.messages) : undefined,
+        action: "block",
+        reason: budgetReason.trim(),
         originalModel: params.model,
       };
     }
 
-    if (retryCount >= 3 && (loopScore >= 0.7 || decision.action !== "proceed")) {
-      void this.maybeEscalate(workflowId, this.sessionCosts[workflowId] || 0, retryCount, loopScore, decision.reason);
+    if (decision.action !== "block") {
+      const retryCount = params.retryCount ?? this.sessionRetryCounts[workflowId] ?? 0;
+      const loopScore = this.computeSemanticLoopScore(workflowId, params.prompt || "");
+
+      // 1. System Prompt Waste Detector
+      if (sysPromptHash && workflowRequests.length >= 2) {
+        const duplicates = workflowRequests.slice(0, -1).filter(r => r.systemPromptHash === sysPromptHash);
+        if (duplicates.length > 0 && params.messages) {
+          decision = {
+            action: "compress",
+            reason: `System prompt waste in workflow '${workflowId}'`,
+            compressedMessages: compressMessages(params.messages),
+            originalModel: params.model,
+          };
+        }
+      }
+
+      // 2. Agent Runaway Loop Detector (exponential context growth)
+      if (workflowRequests.length >= 3 && decision.action === "proceed") {
+        const recent = workflowRequests.slice(-3);
+        const sizes = recent.map(r => r.estimatedTokens);
+        if (sizes[1] >= sizes[0] * 2.2 && sizes[2] >= sizes[1] * 2.2 && sizes[0] > 20) {
+          const cheaper = suggestCheaperModel(params.model);
+          decision = {
+            action: "downgrade",
+            reason: `Runaway context growth in '${workflowId}'`,
+            suggestedModel: cheaper,
+            injectSystemInstruction:
+              "Summarize prior context briefly, then continue with a shorter answer.",
+            originalModel: params.model,
+            loopScore,
+          };
+          this.sessionRetryCounts[workflowId] = (this.sessionRetryCounts[workflowId] || 0) + 1;
+        }
+      }
+
+      // 3. Expensive Model Misuse + adaptive downgrade near budget
+      const isSimple = estTokens < 150;
+      const nearBudget =
+        this.budgetConfig?.maxCostPerSession !== undefined &&
+        (this.sessionCosts[workflowId] || 0) > (this.budgetConfig.maxCostPerSession * 0.8);
+      if (((isExpensiveModel(params.model) && isSimple) || nearBudget) && decision.action === "proceed") {
+        const recommended = suggestCheaperModel(params.model);
+        if (recommended) {
+          decision = {
+            action: "downgrade",
+            reason: nearBudget
+              ? `Budget threshold near for '${workflowId}'`
+              : `Over-provisioned model for simple task (~${estTokens} tokens)`,
+            suggestedModel: recommended,
+            originalModel: params.model,
+          };
+        }
+      }
+
+      // 4. Context Explosion Detector
+      if (workflowRequests.length >= 2 && params.messages && decision.action === "proceed") {
+        const initial = workflowRequests[0].estimatedTokens;
+        const current = estTokens;
+        if (initial > 0 && current >= initial * 3.5) {
+          decision = {
+            action: "compress",
+            reason: `Context explosion in '${workflowId}' (${initial} -> ${current} est. tokens)`,
+            compressedMessages: compressMessages(params.messages),
+            originalModel: params.model,
+          };
+        }
+      }
+
+      // 5. Semantic loop detection
+      if (loopScore >= 0.8) {
+        decision = {
+          action: "compress",
+          reason: `Semantic loop detected (score ${loopScore.toFixed(2)})`,
+          loopScore,
+          injectSystemInstruction:
+            "You appear to be repeating yourself. Summarize your current state and try a different approach.",
+          compressedMessages: params.messages ? compressMessages(params.messages) : undefined,
+          originalModel: params.model,
+        };
+      }
+
+      if (retryCount >= 3 && (loopScore >= 0.7 || decision.action !== "proceed")) {
+        void this.maybeEscalate(workflowId, this.sessionCosts[workflowId] || 0, retryCount, loopScore, decision.reason);
+      }
     }
 
     if (decision.action !== "proceed") {
@@ -758,10 +814,14 @@ export class AurexAuditor {
       });
 
       if (!response.ok) {
-        // Fail silently
+        throw new Error(`Cloud sync response status ${response.status}`);
       }
-    } catch (err) {
-      // Fail silently
+    } catch (err: any) {
+      this.syncErrorCount++;
+      this.lastSyncError = err.message || String(err);
+      if (process.env.AUREX_DEBUG === "1") {
+        console.warn("[Aurex Debug] Cloud sync failed:", err);
+      }
     }
   }
 
@@ -788,6 +848,65 @@ export class AurexAuditor {
     this.persistPendingAndShutdown();
   }
 
+  public getHealth(): Record<string, any> {
+    return {
+      syncErrorCount: this.syncErrorCount,
+      lastSyncError: this.lastSyncError,
+      sessionCostsTracked: Object.keys(this.sessionCosts).length,
+      queueSize: this.queue.length,
+    };
+  }
+
+  private async *wrapStream(
+    stream: any,
+    params: any,
+    workflowId: string,
+    userPrompt: string,
+    systemPrompt: string,
+    isAnthropic = false
+  ): AsyncGenerator<any, void, unknown> {
+    let accumulatedContent = "";
+    let finalUsage: any = null;
+
+    for await (const chunk of stream) {
+      let text = "";
+      if (isAnthropic) {
+        if (chunk.type === "content_block_delta" && chunk.delta?.text) {
+          text = chunk.delta.text;
+        }
+      } else {
+        if (chunk.choices?.[0]?.delta?.content) {
+          text = chunk.choices[0].delta.content;
+        }
+      }
+      accumulatedContent += text;
+      if (chunk.usage) {
+        finalUsage = chunk.usage;
+      }
+      yield chunk;
+    }
+
+    this.recordResponse(workflowId, accumulatedContent);
+
+    const inputTokens = finalUsage?.prompt_tokens || finalUsage?.input_tokens || this.estimateTokens(userPrompt, params.messages);
+    const outputTokens = finalUsage?.completion_tokens || finalUsage?.output_tokens || Math.max(1, Math.floor(accumulatedContent.length / 4));
+    const cachedTokens = finalUsage?.prompt_tokens_details?.cached_tokens || finalUsage?.cache_read_input_tokens || 0;
+    const reasoningTokens = finalUsage?.completion_tokens_details?.reasoning_tokens || 0;
+
+    this.logEvent({
+      model: params.model || "unknown",
+      prompt: userPrompt,
+      response: accumulatedContent,
+      inputTokens,
+      outputTokens,
+      cachedTokens,
+      reasoningTokens,
+      systemPrompt,
+      extraMetadata: params.metadata,
+      workflowId,
+    });
+  }
+
   // ==========================================================================
   // Auto-instrumentation
   // ==========================================================================
@@ -807,10 +926,10 @@ export class AurexAuditor {
     const self = this;
     const patched: any = async function (...args: any[]) {
       const params = args[0] || {};
+      let systemPrompt = "";
+      let userPrompt = "";
       try {
         const messages = params.messages || [];
-        let systemPrompt = "";
-        let userPrompt = "";
         for (const m of messages) {
           if (m.role === "system" && typeof m.content === "string") systemPrompt = m.content;
           else if (m.role === "user" && typeof m.content === "string") userPrompt = m.content;
@@ -830,20 +949,36 @@ export class AurexAuditor {
         console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
       }
 
-      const resp = await original(...args);
+      const workflowId = params.user || params.metadata?.workflow_id || "default_workflow";
+      let resp;
+      try {
+        resp = await original(...args);
+      } catch (ex: any) {
+        self.markFailure(workflowId, ex.message || String(ex));
+        throw ex;
+      }
+
+      if (params.stream) {
+        return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false);
+      }
+
       try {
         const content = resp?.choices?.[0]?.message?.content;
-        self.recordResponse(params.user || params.metadata?.workflow_id || "default_workflow", content);
+        self.recordResponse(workflowId, content);
       } catch {}
       try {
         const usage = resp?.usage || {};
         self.logEvent({
           model: params.model || "unknown",
+          prompt: userPrompt,
+          response: resp?.choices?.[0]?.message?.content,
           inputTokens: usage.prompt_tokens || usage.input_tokens || 0,
           outputTokens: usage.completion_tokens || usage.output_tokens || 0,
           cachedTokens: usage.cache_read_input_tokens || 0,
           cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+          systemPrompt,
           extraMetadata: params.metadata,
+          workflowId,
         });
       } catch (e) {
         // never break the app
@@ -875,14 +1010,14 @@ export class AurexAuditor {
         const origCreate = messages.create.bind(messages);
         const patched: any = async function (...args: any[]) {
           const params = args[0] || {};
+          let systemPrompt = "";
+          let userPrompt = "";
           try {
-            let systemPrompt = "";
             if (typeof params.system === "string") systemPrompt = params.system;
             else if (Array.isArray(params.system)) {
               systemPrompt = params.system.map((b: any) => typeof b === "string" ? b : (b.text || "")).join("");
             }
             const messages = params.messages || [];
-            let userPrompt = "";
             for (let i = messages.length - 1; i >= 0; i--) {
               const m = messages[i];
               if (m.role === "user") {
@@ -909,19 +1044,36 @@ export class AurexAuditor {
             console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
           }
 
-          const resp = await origCreate(...args);
+          const workflowId = params.metadata?.workflow_id || params.user || "default_workflow";
+          let resp;
+          try {
+            resp = await origCreate(...args);
+          } catch (ex: any) {
+            self.markFailure(workflowId, ex.message || String(ex));
+            throw ex;
+          }
+
+          if (params.stream) {
+            return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, true);
+          }
+
           try {
             const text = resp?.content?.[0]?.text;
-            self.recordResponse(params.metadata?.workflow_id || params.user || "default_workflow", text);
+            self.recordResponse(workflowId, text);
           } catch {}
           try {
             const usage = resp?.usage || {};
             self.logEvent({
               model: params.model || "unknown",
+              prompt: userPrompt,
+              response: resp?.content?.[0]?.text,
               inputTokens: usage.input_tokens || 0,
               outputTokens: usage.output_tokens || 0,
               cachedTokens: usage.cache_read_input_tokens || 0,
               cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+              systemPrompt,
+              extraMetadata: params.metadata,
+              workflowId,
             });
           } catch {}
           return resp;
@@ -985,10 +1137,22 @@ export class AurexAuditor {
             console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
           }
 
-          const resp = await origCreate(...args);
+          const workflowId = params.user || params.metadata?.workflow_id || "default_workflow";
+          let resp;
+          try {
+            resp = await origCreate(...args);
+          } catch (ex: any) {
+            self.markFailure(workflowId, ex.message || String(ex));
+            throw ex;
+          }
+
+          if (params.stream) {
+            return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false);
+          }
+
           try {
             self.recordResponse(
-              params.user || params.metadata?.workflow_id || "default_workflow",
+              workflowId,
               resp?.choices?.[0]?.message?.content,
             );
             const usage = resp?.usage || {};
@@ -1002,7 +1166,7 @@ export class AurexAuditor {
               reasoningTokens: usage.completion_tokens_details?.reasoning_tokens || 0,
               systemPrompt,
               extraMetadata: params.metadata,
-              workflowId: params.user || params.metadata?.workflow_id,
+              workflowId,
             });
           } catch {}
           return resp;

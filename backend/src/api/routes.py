@@ -60,6 +60,7 @@ async def get_events(
     provider: Optional[str] = None,
     model: Optional[str] = None,
     project_id: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user)
 ):
@@ -72,6 +73,17 @@ async def get_events(
     if project_id:
         await _require_project_access(db, current_user, project_id)
         query = select(LLMEvent).where(LLMEvent.project_id == project_id)
+    elif session_id:
+        # Enforce that the session belongs to the user
+        session_check = await db.execute(
+            select(AuditSession.id).where(
+                AuditSession.id == session_id,
+                func.lower(AuditSession.email) == func.lower(current_user)
+            )
+        )
+        if not session_check.scalar():
+            raise HTTPException(status_code=403, detail="Not authorized to access this session's events")
+        query = select(LLMEvent).where(LLMEvent.upload_session_id == session_id)
     else:
         sessions_query = select(AuditSession.id).where(func.lower(AuditSession.email) == func.lower(current_user))
         result = await db.execute(sessions_query)
@@ -231,7 +243,7 @@ async def get_workflow_insights(
     return {"insights": []}
 
 
-@router.delete("/clear-data", status_code=403, response_class=None, response_model=None)
+@router.delete("/clear-data", status_code=403)
 async def clear_data(
     confirm: bool = Query(False, description="Must be true to confirm deletion"),
     db: AsyncSession = Depends(get_db)
@@ -1074,6 +1086,20 @@ async def get_audit_session(
     if session.email.lower() != current_user.lower():
         raise HTTPException(status_code=403, detail="Not authorized to access this session")
     
+    # Compute analysis results dynamically if not present
+    if not session.analysis_results:
+        from src.detection.engine import EnhancedDetectionEngine
+        try:
+            engine = EnhancedDetectionEngine(db, session_id=session.id)
+            analysis = await engine.analyze_complete()
+            session.analysis_results = analysis
+            session.credit_score = analysis.get("credit_score", 100)
+            await db.commit()
+            await db.refresh(session)
+        except Exception as e:
+            logger.exception("Failed to dynamically compute analysis results for session", session_id=session.id, error=str(e))
+            # Continue and return session even if analysis calculation fails
+            
     return session
 
 
@@ -1172,6 +1198,41 @@ async def get_audit_history(
         raise HTTPException(status_code=500, detail=f"Error fetching audit history: {str(e)}")
 
 
+async def verify_company_access(db: AsyncSession, current_user: str, company_name: str):
+    """
+    VULN-02/03/04 Defense: Verify that the current user has access to the specified company.
+    Raises HTTPException 403 if unauthorized.
+    """
+    if not company_name:
+        raise HTTPException(status_code=400, detail="Company name is required")
+        
+    domain = current_user.split("@")[1].lower() if "@" in current_user else ""
+    generic_domains = {
+        "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", 
+        "aol.com", "zoho.com", "protonmail.com", "proton.me", "mail.com", 
+        "yandex.com", "live.com", "gmx.com"
+    }
+    
+    # 1. Check if they have an active session with this company
+    from src.models import AuditSession
+    user_sessions_query = select(func.count(AuditSession.id)).where(
+        func.lower(AuditSession.email) == func.lower(current_user),
+        func.lower(AuditSession.company_name) == func.lower(company_name)
+    )
+    user_sessions = (await db.execute(user_sessions_query)).scalar()
+    
+    # 2. Check domain alignment (exclude generic domains) using exact matching (Fixes VULN-04)
+    domain_allowed = False
+    if domain and domain not in generic_domains:
+        domain_name = domain.split(".")[0]
+        if (company_name.lower() == domain or 
+            company_name.lower() == domain_name):
+            domain_allowed = True
+            
+    if not user_sessions and not domain_allowed:
+        raise HTTPException(status_code=403, detail="Not authorized to access company data")
+
+
 @router.get("/audit/company/{company_name}")
 async def get_company_audits(
     company_name: str,
@@ -1187,32 +1248,7 @@ async def get_company_audits(
     """
     from src.models import AuditSession
     
-    domain = current_user.split("@")[1].lower() if "@" in current_user else ""
-    generic_domains = {
-        "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", 
-        "aol.com", "zoho.com", "protonmail.com", "proton.me", "mail.com", 
-        "yandex.com", "live.com", "gmx.com"
-    }
-    
-    # Check if they have an active session with this company
-    user_sessions_query = select(func.count(AuditSession.id)).where(
-        func.lower(AuditSession.email) == func.lower(current_user),
-        func.lower(AuditSession.company_name) == func.lower(company_name)
-    )
-    user_sessions = (await db.execute(user_sessions_query)).scalar()
-    
-    # Check domain alignment (exclude generic domains)
-    domain_allowed = False
-    if domain and domain not in generic_domains:
-        domain_name = domain.split(".")[0]
-        if (company_name.lower() == domain or 
-            company_name.lower() == domain_name or 
-            domain in company_name.lower() or 
-            domain_name in company_name.lower()):
-            domain_allowed = True
-            
-    if not user_sessions and not domain_allowed:
-        raise HTTPException(status_code=403, detail="Not authorized to access company data")
+    await verify_company_access(db, current_user, company_name)
         
     
     try:
@@ -1279,6 +1315,8 @@ async def get_savings_realization(
     Fetch savings timeline and realized metrics for a company.
     """
     from src.models import AuditSession
+    
+    await verify_company_access(db, current_user, company_name)
     
     # Enforce tenant isolation by checking if the user is authorized for this company.
     # Note: In standard flow, query by company name
@@ -1370,6 +1408,8 @@ async def upload_pricing_overrides(
     Upload a JSON file containing model pricing overrides for a company.
     Supports either dictionary format (model -> pricing) or list format.
     """
+    await verify_company_access(db, current_user, company_name)
+    
     contents = await file.read()
     try:
         import json
@@ -1483,6 +1523,9 @@ async def get_pricing_overrides(
     Get all active model pricing overrides for a company.
     """
     from src.models import PricingOverride
+    
+    await verify_company_access(db, current_user, company_name)
+    
     query = select(PricingOverride).where(func.lower(PricingOverride.company_name) == func.lower(company_name))
     result = await db.execute(query)
     overrides = result.scalars().all()
@@ -1512,6 +1555,8 @@ async def configure_alert_rule(
     """
     Configure/create/update an alert rule for a company.
     """
+    await verify_company_access(db, current_user, rule_data.company_name)
+    
     from src.models import AlertRule, AlertRuleCreate, AlertRuleResponse
     
     # Check if a rule for this company name, trigger type, and channel already exists.
@@ -1559,6 +1604,8 @@ async def get_alert_rules(
     """
     Get all active alert rules for a company.
     """
+    await verify_company_access(db, current_user, company_name)
+    
     from src.models import AlertRule
     query = select(AlertRule).where(func.lower(AlertRule.company_name) == func.lower(company_name))
     result = await db.execute(query)
@@ -1566,7 +1613,7 @@ async def get_alert_rules(
     return rules
 
 
-@router.delete("/audit/sessions/{session_id}", status_code=403, response_class=None, response_model=None)
+@router.delete("/audit/sessions/{session_id}", status_code=403)
 async def delete_audit_session(
     session_id: str,
     db: AsyncSession = Depends(get_db)
@@ -1820,7 +1867,7 @@ async def list_api_keys(
     return keys
 
 
-@router.delete("/auth/api-keys/{key_id}", status_code=200, response_class=None, response_model=None)
+@router.delete("/auth/api-keys/{key_id}", status_code=200)
 async def revoke_api_key(
     key_id: str,
     db: AsyncSession = Depends(get_db),

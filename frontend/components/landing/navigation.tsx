@@ -4,6 +4,9 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Menu, X, ArrowLeft } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { aurexAPI } from "@/lib/api-client";
+import { AuthModal } from "./auth-modal";
+import { UserDropdown } from "@/components/app/user-dropdown";
 
 const navLinks = [
   { name: "Features", href: "/#features" },
@@ -15,6 +18,8 @@ const navLinks = [
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const isHomePage = pathname === "/";
@@ -25,6 +30,10 @@ export function Navigation() {
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    setHasSession(aurexAPI.hasActiveSession());
   }, []);
 
   return (
@@ -60,7 +69,7 @@ export function Navigation() {
           </a>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-12">
+          <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <a
                 key={link.name}
@@ -72,8 +81,22 @@ export function Navigation() {
                 <span className={`absolute -bottom-1 left-0 w-0 h-px transition-all duration-300 group-hover:w-full ${isScrolled ? "bg-foreground" : "bg-white"}`} />
               </a>
             ))}
-          </div>
 
+            {hasSession ? (
+              <div className="flex items-center gap-4 border-l border-white/[0.08] pl-6 ml-2 text-white">
+                <UserDropdown />
+              </div>
+            ) : (
+              <div className="flex items-center gap-4 border-l border-white/[0.08] pl-6 ml-2">
+                <button
+                  onClick={() => setIsAuthOpen(true)}
+                  className="px-4 py-1.5 text-xs font-semibold bg-white text-black hover:bg-white/90 rounded-full transition-all duration-300 shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Mobile Navigation - Back button or Menu */}
           <div className="md:hidden flex items-center gap-2">
@@ -99,7 +122,6 @@ export function Navigation() {
             </button>
           </div>
         </div>
-
       </nav>
 
       {/* Mobile Menu - Full Screen Overlay */}
@@ -112,14 +134,14 @@ export function Navigation() {
       >
         <div className="flex flex-col h-full px-8 pt-28 pb-8">
           {/* Navigation Links */}
-          <div className="flex-1 flex flex-col justify-center gap-8">
+          <div className="flex-1 flex flex-col justify-center gap-6">
             {navLinks.map((link, i) => (
               <a
                 key={link.name}
                 id={`mobile-nav-link-${link.name.toLowerCase().replace(/\s+/g, "-")}`}
                 href={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`text-5xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${isMobileMenuOpen
+                className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${isMobileMenuOpen
                   ? "opacity-100 translate-y-0"
                   : "opacity-0 translate-y-4"
                   }`}
@@ -128,11 +150,53 @@ export function Navigation() {
                 {link.name}
               </a>
             ))}
+
+            <div className="mt-8 pt-6 border-t border-foreground/10 flex flex-col gap-4">
+              {hasSession ? (
+                <div className="flex flex-col gap-3">
+                  <a
+                    href="/app/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full py-3 text-center text-sm font-semibold bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-white rounded-xl transition-all duration-300"
+                  >
+                    Profile
+                  </a>
+                  <a
+                    href="/app/settings"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full py-3 text-center text-sm font-semibold bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-white rounded-xl transition-all duration-300"
+                  >
+                    Settings
+                  </a>
+                  <button
+                    onClick={() => {
+                      aurexAPI.clearSession();
+                      setHasSession(false);
+                      setIsMobileMenuOpen(false);
+                      router.push("/");
+                    }}
+                    className="w-full py-3 text-center text-sm font-semibold border border-rose-500/10 hover:bg-rose-500/5 rounded-xl transition-all duration-300 text-rose-400"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setIsAuthOpen(true);
+                  }}
+                  className="w-full py-3 text-center text-sm font-semibold bg-foreground text-background hover:opacity-90 rounded-xl transition-all duration-300"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
           </div>
-
-
         </div>
       </div>
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </header>
   );
 }

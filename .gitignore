@@ -23,3 +23,19 @@ backend/.venv/
 *.db
 *.sqlite
 *.sqlite3
+
+# Aurex local ledger cache
+.aurex/
+**/.aurex/
+
+# Features Aurex PDF
+Features Aurex.pdf
+
+# Log files
+*.log
+**/*.log
+
+# JSON results
+session.json
+summary.json
+upload_res.json

@@ -12,6 +12,7 @@ import { aurexAPI, ExecutiveSummary, Issue, LLMEvent } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+    Loader2,
     AlertCircle,
     Zap,
     CheckCircle2,
@@ -449,6 +450,7 @@ export default function AuditPage() {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [isReportView, setIsReportView] = useState(false);
 
     useEffect(() => {
         const userInfo = aurexAPI.getUserInfo();
@@ -479,6 +481,46 @@ export default function AuditPage() {
             setUserEmail(oauthEmail);
             setCompanyName(oauthCompanyName || '');
             window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const sid = params.get('session_id') || params.get('sessionId');
+        if (sid) {
+            setIsReportView(true);
+            async function loadSession() {
+                setAnalyzing(true);
+                setProgress(20);
+                setProgressSteps(["Locating past audit run...", "Retrieving executive analysis summary..."]);
+                try {
+                    const session = await aurexAPI.getAuditSession(sid!);
+                    setProgress(70);
+                    setProgressSteps(prev => [...prev, "Extracting performance recommendations..."]);
+                    if (session && (session as any).analysis_results) {
+                        setSessionId(session.id);
+                        setData((session as any).analysis_results);
+                        setLoadingEvents(true);
+                        try {
+                            const fetched = await aurexAPI.getEvents({ limit: 1000, session_id: session.id });
+                            setEvents(fetched);
+                        } catch (e) {
+                            console.error("Failed to load events for session", e);
+                        } finally {
+                            setLoadingEvents(false);
+                        }
+                    } else {
+                        setError("This audit run does not contain any saved analysis results.");
+                    }
+                } catch (err: any) {
+                    console.error("Failed to fetch session", err);
+                    setError(err?.message || "Failed to load the requested audit session.");
+                } finally {
+                    setAnalyzing(false);
+                }
+            }
+            void loadSession();
         }
     }, []);
 
@@ -593,7 +635,11 @@ export default function AuditPage() {
     const loadEvents = async (workflowFilter?: string) => {
         setLoadingEvents(true);
         try {
-            const fetched = await aurexAPI.getEvents({ limit: 1000, workflow_id: workflowFilter });
+            const fetched = await aurexAPI.getEvents({ 
+                limit: 1000, 
+                workflow_id: workflowFilter,
+                session_id: sessionId || undefined
+            });
             setEvents(fetched);
         } catch (e) { console.error(e); } finally { setLoadingEvents(false); }
     };
@@ -650,6 +696,37 @@ export default function AuditPage() {
     // ─── Upload / Analyzing / Error States ──────────────────────────────────
 
     if (!data && !analyzing) {
+        if (isReportView) {
+            return (
+                <div className="min-h-screen bg-[#111111] flex items-center justify-center p-8 text-white">
+                    <div className="w-full max-w-md space-y-4">
+                        {error ? (
+                            <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-6 space-y-4 text-center">
+                                <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
+                                    <AlertCircle className="h-5 w-5 text-red-400" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-semibold text-red-300">Failed to load report</p>
+                                    <p className="text-xs text-red-400/80 font-mono mt-1 max-h-32 overflow-y-auto pr-1">{error}</p>
+                                </div>
+                                <Button 
+                                    onClick={() => router.push('/app/profile')}
+                                    className="bg-white hover:bg-white/90 text-black text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
+                                >
+                                    Back to Profile
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="text-center space-y-3.5">
+                                <Loader2 className="w-8 h-8 animate-spin text-white/30 mx-auto" />
+                                <p className="text-xs text-white/40 font-mono">Retrieving saved cost audit report...</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="min-h-screen bg-[#111111] flex flex-col">
                 {/* Top bar */}
