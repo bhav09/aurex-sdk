@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Cpu, Cloud, Layers, BookOpen, ArrowRight, Bot } from "lucide-react";
+import { Cpu, Cloud, Layers, BookOpen, ArrowRight, Bot, Shield } from "lucide-react";
 
 export const metadata = {
   title: "Aurex SDK Documentation",
   description:
-    "Track LLM cost locally, sync metadata to your project, and block waste using real-time circuit breakers.",
+    "Track LLM cost locally, sync metadata to your project, and recover from billed-but-failed provider responses.",
 };
 
 const cards = [
@@ -17,20 +17,26 @@ const cards = [
   {
     href: "/docs/deployment",
     title: "Cloud Deployment",
-    description: "Serverless flush patterns, read-only filesystem fallbacks, bounded queues, and per-key rate limits.",
+    description: "Serverless flush, filesystem fallbacks, cloud sync resilience, and ingest rate limits.",
     icon: Cloud,
   },
   {
     href: "/docs/harness",
     title: "Harness Integration",
-    description: "Choose patch vs wrap vs instrument(client) based on your observability maturity.",
+    description: "Choose patch vs wrap vs manual logging based on your observability stack.",
     icon: Layers,
   },
   {
     href: "/docs/reference",
-    title: "Full API Reference",
-    description: "AurexConfig, BudgetGuard, providers, guards, health monitoring, and CI policy gates.",
+    title: "API Reference",
+    description: "Focused pages for config, guards, providers, health, and CI — one topic per URL.",
     icon: BookOpen,
+  },
+  {
+    href: "/docs/reliability",
+    title: "Reliability & Loss Recovery",
+    description: "Provider-call retry, fallbacks, observe/enforce modes, and loss_avoided accounting.",
+    icon: Shield,
   },
 ];
 
@@ -47,25 +53,28 @@ export default function DocsOverviewPage() {
         </h1>
         <p className="text-white/50 max-w-2xl leading-relaxed">
           Aurex watches LLM calls locally, hashes prompts for zero-PII telemetry, and optionally syncs metadata to
-          your Aurex project. Budget guards and downgrade rules run in-process without adding network latency to every
-          call.
+          your Aurex project. Budget guards and provider resilience run in-process without adding latency to every call.
         </p>
       </div>
 
       <div className="flex items-start gap-3 p-4 rounded-xl border border-white/[0.08] bg-white/[0.02]">
         <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
         <div>
-          <h2 className="text-sm font-semibold text-white">Agent-friendly reference</h2>
+          <h2 className="text-sm font-semibold text-white">Agent-friendly docs</h2>
           <p className="text-xs text-white/40 mt-1">
-            Task → URL routing table and full API spec for coding assistants:{" "}
+            Start at{" "}
             <Link href="/llms.txt" className="text-indigo-400 hover:text-indigo-300">
               /llms.txt
+            </Link>{" "}
+            for task → URL routing. Fetch one page per concern (e.g.{" "}
+            <Link href="/docs/reference/config" className="text-indigo-400 hover:text-indigo-300">
+              /docs/reference/config
             </Link>
-            . Use anchor links (e.g.{" "}
-            <Link href="/docs/reference#config-reference" className="text-indigo-400 hover:text-indigo-300">
-              /docs/reference#config-reference
+            ,{" "}
+            <Link href="/docs/reliability/policy" className="text-indigo-400 hover:text-indigo-300">
+              /docs/reliability/policy
             </Link>
-            ) to jump directly to a section.
+            ) — avoid loading hub pages for implementation detail.
           </p>
         </div>
       </div>

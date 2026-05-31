@@ -41,3 +41,35 @@ export class AurexBlocked extends AurexError {
     this.action = opts.action;
   }
 }
+
+export class AurexRecovered extends AurexError {
+  workflowId?: string;
+  attempt?: number;
+  model?: string;
+
+  constructor(
+    message: string,
+    opts: { workflowId?: string; attempt?: number; model?: string } = {},
+  ) {
+    super(message, opts);
+    this.name = "AurexRecovered";
+    this.workflowId = opts.workflowId;
+    this.attempt = opts.attempt;
+    this.model = opts.model;
+  }
+}
+
+export class AurexResilienceExhausted extends AurexError {
+  workflowId?: string;
+  lastError?: string;
+
+  constructor(
+    message: string,
+    opts: { workflowId?: string; lastError?: string } = {},
+  ) {
+    super(message, opts);
+    this.name = "AurexResilienceExhausted";
+    this.workflowId = opts.workflowId;
+    this.lastError = opts.lastError;
+  }
+}

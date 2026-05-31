@@ -56,3 +56,35 @@ class AurexBlocked(AurexError):
         self.workflow_id = workflow_id
         self.reason = reason
         self.action = action
+
+
+class AurexRecovered(AurexError):
+    """Informational: a failed call was recovered via resilience policy."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        workflow_id: str | None = None,
+        attempt: int | None = None,
+        model: str | None = None,
+    ):
+        super().__init__(message, workflow_id=workflow_id, attempt=attempt, model=model)
+        self.workflow_id = workflow_id
+        self.attempt = attempt
+        self.model = model
+
+
+class AurexResilienceExhausted(AurexError):
+    """All resilience attempts exhausted (enforce mode only)."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        workflow_id: str | None = None,
+        last_error: str | None = None,
+    ):
+        super().__init__(message, workflow_id=workflow_id, last_error=last_error)
+        self.workflow_id = workflow_id
+        self.last_error = last_error

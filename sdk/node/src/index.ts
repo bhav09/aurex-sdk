@@ -12,7 +12,13 @@ import {
 import { jaccardNGramSimilarity } from "./semantic";
 import { syncBatchWithRetry } from "./cloud_sync";
 import { emitWarningOnce, prepareLedgerStorage } from "./ledger_utils";
-import { AurexBudgetExceeded } from "./exceptions";
+import { AurexBudgetExceeded, AurexResilienceExhausted } from "./exceptions";
+import {
+  AttemptRecord,
+  executeWithResilience,
+  parseResilienceConfig,
+  ResiliencePolicy,
+} from "./resilience";
 
 export const aurexContext = new AsyncLocalStorage<Record<string, any>>();
 
@@ -53,6 +59,7 @@ export interface AurexConfig {
   syncMaxRetries?: number;
   perProcessLedger?: boolean;
   storageMode?: "file" | "memory";
+  resilience?: Record<string, unknown>;
 }
 
 function resolveCloudEndpoint(config?: AurexConfig): string {
@@ -85,6 +92,13 @@ export interface AurexEvent {
   tool_names?: string[];
   tags?: Record<string, string>;
   quality_score?: number;
+  attempt_index?: number;
+  recovery_provider?: string;
+  projected_cost?: number;
+  latency_ms?: number;
+  status?: string;
+  error_code?: string;
+  finish_reason?: string;
 }
 
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -283,6 +297,11 @@ export class AurexAuditor {
   private eventsDropped = 0;
   private patchStatus: Record<string, string> = {};
   private readonly warningFlag = { emitted: false };
+  private resiliencePolicy: ResiliencePolicy;
+  private registeredFallbacks: Record<
+    string,
+    { callFn: () => Promise<unknown> | unknown; provider: string; model: string }
+  > = {};
 
   public downgradeMap: Record<string, string> = {};
   public defaultPricing?: { input: number; output: number };
@@ -316,7 +335,10 @@ export class AurexAuditor {
       syncMaxRetries: config?.syncMaxRetries ?? 3,
       perProcessLedger: config?.perProcessLedger ?? true,
       storageMode: config?.storageMode ?? "file",
+      resilience: config?.resilience || {},
     };
+
+    this.resiliencePolicy = parseResilienceConfig(this.config.resilience);
 
     const prepared = prepareLedgerStorage(
       this.config.ledgerPath,
@@ -448,6 +470,81 @@ export class AurexAuditor {
     MODEL_PRICING[model] = { input: inputCost, output: outputCost };
   }
 
+  public registerFallback(
+    name: string,
+    callFn: () => Promise<unknown> | unknown,
+    opts: { provider: string; model: string },
+  ): void {
+    this.registeredFallbacks[name] = {
+      callFn,
+      provider: opts.provider,
+      model: opts.model,
+    };
+  }
+
+  private resilienceOnAttempt(
+    record: AttemptRecord,
+    workflowId: string,
+    resp: unknown,
+    exc?: unknown,
+  ): void {
+    const extra: Record<string, unknown> = {
+      resilience_kind: record.classification.kind,
+      loss_avoided: record.lossAvoided,
+    };
+    if (exc) extra.error = String((exc as Error)?.message || exc);
+    this.logEvent({
+      model: record.model,
+      workflowId,
+      outcome: record.outcome,
+      costType: record.costType,
+      retryCount: record.attemptIndex,
+      provider: record.provider,
+      attemptIndex: record.attemptIndex,
+      recoveryProvider: record.recoveryProvider,
+      projectedCost: record.projectedCost,
+      latencyMs: record.classification.latencyMs,
+      status: record.classification.status,
+      errorCode: record.classification.errorCode,
+      finishReason: record.classification.finishReason,
+      extraMetadata: extra,
+    });
+    if (record.outcome === "failure" && exc) {
+      this.markFailure(workflowId, String((exc as Error)?.message || exc), extra as Record<string, any>);
+    }
+  }
+
+  public async callWithResilience<T>(
+    callFn: () => Promise<T> | T,
+    opts: { provider: string; workflowId: string; model: string; idempotencyKey?: string },
+  ): Promise<T> {
+    const policy = this.resiliencePolicy;
+    if (!policy.enabled) {
+      try {
+        return await Promise.resolve(callFn());
+      } catch (ex) {
+        this.markFailure(opts.workflowId, String((ex as Error)?.message || ex));
+        throw ex;
+      }
+    }
+
+    const registered: Record<string, () => Promise<unknown> | unknown> = {};
+    for (const [k, v] of Object.entries(this.registeredFallbacks)) {
+      registered[k] = v.callFn;
+    }
+
+    const { resp } = await executeWithResilience(callFn, policy, {
+      provider: opts.provider,
+      model: opts.model,
+      workflowId: opts.workflowId,
+      idempotencyKey: opts.idempotencyKey,
+      onAttempt: (record, r, exc) => this.resilienceOnAttempt(record, opts.workflowId, r, exc),
+      registeredFallbacks: registered,
+      calculateCostFn: (m, i, o) => calculateCost(m, i, o),
+    });
+    return resp;
+  }
+
   /**
    * Log LLM metadata asynchronously.
    * Prompts and completions are hashed locally (Zero-PII Promise) before logging.
@@ -473,6 +570,13 @@ export class AurexAuditor {
     tags?: Record<string, string>;
     qualityScore?: number;
     provider?: string;
+    attemptIndex?: number;
+    recoveryProvider?: string;
+    projectedCost?: number;
+    latencyMs?: number;
+    status?: string;
+    errorCode?: string;
+    finishReason?: string;
   }) {
     const inputT = params.inputTokens || 0;
     const outputT = params.outputTokens || 0;
@@ -507,6 +611,13 @@ export class AurexAuditor {
       tool_names: params.toolNames || [],
       tags: params.tags || {},
       quality_score: params.qualityScore,
+      attempt_index: params.attemptIndex,
+      recovery_provider: params.recoveryProvider,
+      projected_cost: params.projectedCost,
+      latency_ms: params.latencyMs,
+      status: params.status,
+      error_code: params.errorCode,
+      finish_reason: params.finishReason,
     };
 
     // Optional OpenTelemetry Export
@@ -922,7 +1033,16 @@ export class AurexAuditor {
         messages,
       });
       const params = applyDecisionToCallParams(raw, decision);
-      return callFn(params).then((resp) => {
+      const workflowId =
+        (raw as any).metadata?.workflow_id ||
+        (raw as any).user ||
+        ctx.workflowId ||
+        "default_workflow";
+      return this.callWithResilience(() => callFn(params), {
+        provider: extractProvider(String(params.model || model)),
+        workflowId,
+        model: String((params as any).model || model),
+      }).then((resp) => {
         const text =
           resp?.choices?.[0]?.message?.content ||
           resp?.content?.[0]?.text ||
@@ -1068,16 +1188,31 @@ export class AurexAuditor {
   /** Flush queued events and await cloud sync completion */
   public async flushAndWait(timeoutMs = 30000): Promise<boolean> {
     const errorsBefore = this.syncErrorCount;
-    if (this.queue.length === 0) {
-      return true;
+    const deadline = Date.now() + timeoutMs;
+
+    const runFlush = async () => {
+      if (this.queue.length === 0) return;
+      const batch = [...this.queue];
+      this.queue = [];
+      this.writeBatchToStorage(batch);
+      if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
+        await this.syncToCloud(batch);
+      }
+    };
+
+    await Promise.race([
+      runFlush(),
+      new Promise<void>((_, reject) => {
+        const remaining = deadline - Date.now();
+        setTimeout(() => reject(new Error("flushAndWait timeout")), Math.max(0, remaining));
+      }),
+    ]).catch(() => {
+      /* timeout — return false below */
+    });
+
+    if (Date.now() > deadline) {
+      return false;
     }
-    const batch = [...this.queue];
-    this.queue = [];
-    this.writeBatchToStorage(batch);
-    if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
-      await this.syncToCloud(batch);
-    }
-    void timeoutMs;
     return this.syncErrorCount === errorsBefore;
   }
 
@@ -1301,12 +1436,11 @@ export class AurexAuditor {
       const extraParams = self.extractAurexExtraParams(params);
       const workflowId = extraParams.workflowId || "default_workflow";
       let resp;
-      try {
-        resp = await original(...args);
-      } catch (ex: any) {
-        self.markFailure(workflowId, ex.message || String(ex));
-        throw ex;
-      }
+      resp = await self.callWithResilience(() => original(...args), {
+        provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+        workflowId,
+        model: (params?.model || args?.[0]?.model || 'unknown') as string,
+      });
 
       if (params.stream) {
         return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false, extraParams.tags, extraParams.qualityScore);
@@ -1417,12 +1551,11 @@ export class AurexAuditor {
           const extraParams = self.extractAurexExtraParams(params);
           const workflowId = extraParams.workflowId || "default_workflow";
           let resp;
-          try {
-            resp = await origCreate(...args);
-          } catch (ex: any) {
-            self.markFailure(workflowId, ex.message || String(ex));
-            throw ex;
-          }
+          resp = await self.callWithResilience(() => origCreate(...args), {
+            provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+            workflowId,
+            model: (params?.model || args?.[0]?.model || 'unknown') as string,
+          });
 
           if (params.stream) {
             return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, true, extraParams.tags, extraParams.qualityScore);
@@ -1533,12 +1666,11 @@ export class AurexAuditor {
           const extraParams = self.extractAurexExtraParams(params);
           const workflowId = extraParams.workflowId || "default_workflow";
           let resp;
-          try {
-            resp = await origCreate(...args);
-          } catch (ex: any) {
-            self.markFailure(workflowId, ex.message || String(ex));
-            throw ex;
-          }
+          resp = await self.callWithResilience(() => origCreate(...args), {
+            provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+            workflowId,
+            model: (params?.model || args?.[0]?.model || 'unknown') as string,
+          });
 
           if (params.stream) {
             return self.wrapStream(resp, params, workflowId, userPrompt, systemPrompt, false, extraParams.tags, extraParams.qualityScore);
@@ -1669,12 +1801,11 @@ export class AurexAuditor {
           }
           
           let resp;
-          try {
-            resp = await origGenerate(...args);
-          } catch (ex: any) {
-            self.markFailure(workflowId, ex.message || String(ex));
-            throw ex;
-          }
+          resp = await self.callWithResilience(() => origGenerate(...args), {
+            provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+            workflowId,
+            model: (params?.model || args?.[0]?.model || 'unknown') as string,
+          });
           
           try {
             const usage = resp?.usageMetadata || {};
@@ -1774,12 +1905,11 @@ export class AurexAuditor {
           }
           
           let resp;
-          try {
-            resp = await origGenerateStream(...args);
-          } catch (ex: any) {
-            self.markFailure(workflowId, ex.message || String(ex));
-            throw ex;
-          }
+          resp = await self.callWithResilience(() => origGenerateStream(...args), {
+            provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+            workflowId,
+            model: (params?.model || args?.[0]?.model || 'unknown') as string,
+          });
           
           async function* wrapGoogleStream(stream: any) {
             let accumulatedContent = "";
@@ -1881,12 +2011,11 @@ export class AurexAuditor {
         }
         
         let resp;
-        try {
-          resp = await originalChat(...args);
-        } catch (ex: any) {
-          self.markFailure(workflowId, ex.message || String(ex));
-          throw ex;
-        }
+        resp = await self.callWithResilience(() => originalChat(...args), {
+          provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+          workflowId,
+          model: (params?.model || args?.[0]?.model || 'unknown') as string,
+        });
         
         if (params.stream) {
           async function* wrapOllamaStream(stream: any) {
@@ -1985,12 +2114,11 @@ export class AurexAuditor {
         }
         
         let resp;
-        try {
-          resp = await originalGenerate(...args);
-        } catch (ex: any) {
-          self.markFailure(workflowId, ex.message || String(ex));
-          throw ex;
-        }
+        resp = await self.callWithResilience(() => originalGenerate(...args), {
+          provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+          workflowId,
+          model: (params?.model || args?.[0]?.model || 'unknown') as string,
+        });
         
         if (params.stream) {
           async function* wrapOllamaStream(stream: any) {
@@ -2120,12 +2248,11 @@ export class AurexAuditor {
         }
         
         let resp;
-        try {
-          resp = await origChat.call(this, ...args);
-        } catch (ex: any) {
-          self.markFailure(workflowId, ex.message);
-          throw ex;
-        }
+        resp = await self.callWithResilience(() => origChat.call(this, ...args), {
+          provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+          workflowId,
+          model: (params?.model || args?.[0]?.model || 'unknown') as string,
+        });
         
         // Handle streaming
         if (params.stream) {
@@ -2204,12 +2331,11 @@ export class AurexAuditor {
         }
         
         let resp;
-        try {
-          resp = await origGen.call(this, ...args);
-        } catch (ex: any) {
-          self.markFailure(workflowId, ex.message);
-          throw ex;
-        }
+        resp = await self.callWithResilience(() => origGen.call(this, ...args), {
+          provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+          workflowId,
+          model: (params?.model || args?.[0]?.model || 'unknown') as string,
+        });
         
         const text = typeof resp === "string" ? resp : (resp?.generated_text || "");
         self.recordResponse(workflowId, text);
@@ -2255,12 +2381,11 @@ export class AurexAuditor {
         }
         
         let resp;
-        try {
-          resp = await origGenStream.call(this, ...args);
-        } catch (ex: any) {
-          self.markFailure(workflowId, ex.message);
-          throw ex;
-        }
+        resp = await self.callWithResilience(() => origGenStream.call(this, ...args), {
+          provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
+          workflowId,
+          model: (params?.model || args?.[0]?.model || 'unknown') as string,
+        });
         
         const origStream = resp;
         async function* wrappedGenStream() {
