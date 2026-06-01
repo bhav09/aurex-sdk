@@ -1,625 +1,887 @@
-# Implementation Rationale — SDK Reliability, Backend Accounting & Agent-Optimized Docs
+# Aurex — Design Decisions & Internal Architecture
 
-This document explains **what was built**, **why it was built that way**, and **what was deliberately not built**. It covers the reliability/loss-recovery feature set, backend ingest and analytics, test strategy, and the documentation sub-page overhaul on branch `aa`.
+This document explains **what Aurex is**, **how the SDK and backend actually work inside**, and **why we built things the way we did**. It is not limited to one feature or one chat session. Use it before changing SDK behavior, ingest contracts, guards, or documentation.
 
-Read this before changing resilience behavior, ledger ingest fields, or doc structure.
+**Audience:** engineers, reviewers, and AI agents integrating Aurex.
+
+**Plain-language rule:** if a section uses jargon, the next paragraph explains it in everyday terms.
 
 ---
 
 ## Table of contents
 
-1. [Executive summary](#1-executive-summary)
-2. [The problem we are solving](#2-the-problem-we-are-solving)
-3. [Product boundaries (anti-dilution)](#3-product-boundaries-anti-dilution)
-4. [Design principles and invariants](#4-design-principles-and-invariants)
-5. [Architecture overview](#5-architecture-overview)
-6. [SDK — Python (`aurex_sdk/resilience.py`)](#6-sdk--python-aurex_sdkresiliencepy)
-7. [SDK — Python auditor integration](#7-sdk--python-auditor-integration)
-8. [SDK — Node (`sdk/node/src/resilience.ts`)](#8-sdk--node-sdknodesrcresiliencets)
-9. [SDK — Node auditor integration & `flushAndWait` fix](#9-sdk--node-auditor-integration--flushandwait-fix)
-10. [Exceptions: `AurexRecovered` and `AurexResilienceExhausted`](#10-exceptions-aurexrecovered-and-aurexresilienceexhausted)
-11. [Counterfactual accounting (`loss_avoided`, `projected_cost`)](#11-counterfactual-accounting-loss_avoided-projected_cost)
-12. [Observe vs enforce modes](#12-observe-vs-enforce-modes)
-13. [Idempotency policy](#13-idempotency-policy)
-14. [Proof-window sampling](#14-proof-window-sampling)
-15. [Fail-open semantics](#15-fail-open-semantics)
-16. [Fallback registration (customer-owned keys)](#16-fallback-registration-customer-owned-keys)
-17. [Backend — schema and migration 002](#17-backend--schema-and-migration-002)
-18. [Backend — ledger ingest mapping](#18-backend--ledger-ingest-mapping)
-19. [Backend — dashboard and savings analytics](#19-backend--dashboard-and-savings-analytics)
-20. [Testing strategy](#20-testing-strategy)
-21. [Documentation overhaul (agent-optimized)](#21-documentation-overhaul-agent-optimized)
-22. [Naming: cloud sync resilience vs provider resilience](#22-naming-cloud-sync-resilience-vs-provider-resilience)
-23. [Rollback, ops, and migration order](#23-rollback-ops-and-migration-order)
-24. [Known limitations and future work](#24-known-limitations-and-future-work)
-25. [File index (what changed where)](#25-file-index-what-changed-where)
+### Foundations
+1. [What Aurex is (and is not)](#1-what-aurex-is-and-is-not)
+2. [Core product decisions](#2-core-product-decisions)
+3. [Design principles we never compromise on](#3-design-principles-we-never-compromise-on)
+
+### How the SDK works internally
+4. [SDK architecture at a glance](#4-sdk-architecture-at-a-glance)
+5. [The singleton auditor](#5-the-singleton-auditor)
+6. [Three ways to integrate](#6-three-ways-to-integrate)
+7. [Monkey-patching providers](#7-monkey-patching-providers)
+8. [The `wrap()` / manual harness path](#8-the-wrap--manual-harness-path)
+9. [What happens on every LLM call (step by step)](#9-what-happens-on-every-llm-call-step-by-step)
+10. [The decision engine (`pre_call_check`)](#10-the-decision-engine-pre_call_check)
+11. [Budget guard: two checkpoints](#11-budget-guard-two-checkpoints)
+12. [Logging an event (`log_event`)](#12-logging-an-event-log_event)
+13. [The local ledger](#13-the-local-ledger)
+14. [Cloud sync (SDK → backend)](#14-cloud-sync-sdk--backend)
+15. [Pricing and cost calculation](#15-pricing-and-cost-calculation)
+16. [Outcomes (`mark_success` / `mark_failure`)](#16-outcomes-mark_success--mark_failure)
+17. [Provider resilience (retry & fallbacks)](#17-provider-resilience-retry--fallbacks)
+18. [Offline heuristics and CI gates](#18-offline-heuristics-and-ci-gates)
+19. [Python vs Node parity](#19-python-vs-node-parity)
+
+### Backend & platform
+20. [Backend architecture](#20-backend-architecture)
+21. [Two ways events enter the database](#21-two-ways-events-enter-the-database)
+22. [Authentication and multi-tenancy](#22-authentication-and-multi-tenancy)
+23. [Dashboard and analytics](#23-dashboard-and-analytics)
+24. [Audit upload vs live SDK telemetry](#24-audit-upload-vs-live-sdk-telemetry)
+
+### Frontend & docs
+25. [Frontend decisions](#25-frontend-decisions)
+26. [Documentation structure (agent-optimized)](#26-documentation-structure-agent-optimized)
+
+### History, ops, and gaps
+27. [Decision timeline (from project history)](#27-decision-timeline-from-project-history)
+28. [Rollback and deployment checklist](#28-rollback-and-deployment-checklist)
+29. [Known limitations and honest gaps](#29-known-limitations-and-honest-gaps)
+30. [File index](#30-file-index)
 
 ---
 
-## 1. Executive summary
+## 1. What Aurex is (and is not)
 
-This changeset adds **provider-call resilience** to the Aurex SDK (Python + Node parity), **counterfactual loss accounting** so customers can see billed-but-failed spend and recovery value, **backend support** for new event fields and dashboard metrics, and an **agent-optimized documentation split** so AI coding assistants load one small page per task instead of an 890-line reference page.
+### What it is
 
-Everything is **opt-in** (`resilience.enabled=false` by default), **flag-gated** (`mode: observe | enforce`), and **additive** on the backend (nullable columns, new enum values). Disabling resilience restores prior behavior.
+Aurex is a **local-first library** (Python + Node SDK) that sits next to your LLM application. It:
 
----
+- **Watches** LLM calls (OpenAI, Anthropic, Google, LiteLLM, Ollama, Hugging Face, etc.)
+- **Measures** tokens and cost using a built-in pricing table
+- **Guards** spend in real time (budget limits, downgrade, compress, block)
+- **Records** metadata to a local JSON Lines file (`.aurex/ledger.jsonl`)
+- **Optionally syncs** metadata to your Aurex backend for dashboards
+- **Detects waste** offline (loops, prompt duplication, expensive model misuse)
+- **Recovers** from provider failures when you opt in (classify, retry, fallback, account for “loss avoided”)
 
-## 2. The problem we are solving
+In simple terms: **Aurex is a smart electricity meter + circuit breaker for LLM spend**, not a replacement for OpenAI or Anthropic.
 
-LLM providers are not 100% reliable. Customers lose money and latency in three distinct ways:
+### What it is not
 
-### 2.1 Hard failures
-
-Provider throws: `429`, `5xx`, timeout, network reset. Often **not billed**, but the customer's app manually retries or reroutes → **duplicate cost + latency**. Real-time and low-latency workloads feel this most.
-
-**Before this work:** Aurex only saw exceptions in patchers and marked workflow failure. No structured classification, no recovery ladder, no accounting for what a manual reroute would have cost.
-
-### 2.2 Soft failures (“billed-but-failed”)
-
-HTTP **200** with unusable output:
-
-- `finish_reason: content_filter`
-- Truncation (`length` / `max_tokens`)
-- Empty `content`
-- Refusal
-- Malformed tool/JSON responses
-
-**The provider still bills input + partial output. The customer pays for nothing usable.**
-
-**Before this work:** Patchers treated HTTP 200 as success. Aurex was **blind** to unfulfilled spend — the core gap this feature addresses.
-
-### 2.3 Manual reroute tax
-
-On failure, apps often call a second provider/model. That **duplicate spend** is invisible in dashboards and hard to attribute to “reliability savings.”
-
-**Why counterfactual accounting:** We record `projected_cost` (what a naive manual reroute would cost) and `loss_avoided` (value of recovery or observe-mode prevention) so reliability ROI is **measurable**, not anecdotal.
-
----
-
-## 3. Product boundaries (anti-dilution)
-
-### IN scope
-
-- Reliability at **LLM provider-call boundaries we already patch** (OpenAI, Anthropic, Google, LiteLLM, Ollama, Hugging Face) plus `wrap()` / `awrap()`.
-- Framed as **wasted-spend prevention** — cost identity preserved (Profile A: fintech/ledger).
-- Generic `wrap()` seam for customers to extend patterns themselves.
-
-### OUT of scope (deliberate)
-
-| Not building | Why |
+| Not this | Why we avoided it |
 | :--- | :--- |
-| Hosted inline proxy/gateway (LiteLLM/Portkey/Cloudflare style) | Adds latency SPOF; competes outside Aurex identity; we are a **library**, not a network hop |
-| Storing or proxying provider API keys | Security/compliance; customer registers callables with **their** clients |
-| Reliability for arbitrary DB/storage/cloud APIs | Scope creep; LLM boundary is where we already intercept |
-| Silent auto-reroute in production by default | Trust requires observe-first rollout |
+| A hosted LLM proxy/gateway | Adds latency, single point of failure, key custody; competes with LiteLLM/Portkey |
+| A prompt storage product | Zero-PII default: we hash prompts locally; raw text stays on your machine |
+| A generic retry library for databases/APIs | Scope is LLM provider boundaries we already patch |
+| A “magic auto-save 50%” black box | Observe mode proves value before enforce mode changes call behavior |
 
 ---
 
-## 4. Design principles and invariants
+## 2. Core product decisions
 
-| Invariant | Implementation | Profile |
-| :--- | :--- | :--- |
-| **Fail-open** | If resilience orchestration errors, fall back to single raw `call_fn()` | Safety |
-| **Bounded execution** | `max_attempts`, `timeout_ms`, `max_extra_cost_usd` | C (AI/agentic) |
-| **Idempotency** | Conservative retry rules; `require_key` mode for tool calls | A (ledger) |
-| **Append-only accounting** | Each attempt → separate `log_event`; no mutation of prior rows | A (audit) |
-| **Opt-in & phased** | Default off; `observe` before `enforce` | Rollout trust |
-| **Conservation awareness** | Extra retry spend tracked against `max_extra_cost_usd` | A |
-| **Zero PII default** | Same metadata-only cloud sync; no prompt bodies unless opted in | Privacy |
+### 2.1 Local-first control plane
 
-**BudgetGuard vs provider resilience:** BudgetGuard is an **in-process spend circuit breaker** (block before call). Provider resilience is **after the call** (classify, retry, fallback). Docs call this out explicitly so agents and humans do not conflate them.
+**Decision:** Write telemetry to disk (or memory) first; sync to cloud in a background thread.
+
+**Reason:** LLM calls are latency-sensitive. Blocking every call on HTTP would add tens to hundreds of milliseconds. The hot path only enqueues a small JSON object (`put_nowait`). File I/O and network happen later.
+
+**Trade-off:** Short-lived processes (Lambda) must call `flush()` / `flushAndWait()` before exit, or events may not reach the cloud. We document this explicitly.
+
+### 2.2 Zero-PII by default
+
+**Decision:** Hash prompts and responses with SHA-256 locally. Cloud payload is metadata (tokens, cost, model, workflow id, optional hashes).
+
+**Reason:** Enterprise buyers worry about data leaving their VPC. Hashing gives deduplication and audit signals without exfiltrating content.
+
+**Opt-in:** `sync_prompt_hashes` / `AUREX_SYNC_PROMPT_HASHES=1` sends hashes to the backend when the customer accepts that trade-off.
+
+### 2.3 In-process guards (no network on the hot path)
+
+**Decision:** `pre_call_check` and budget evaluation run entirely inside the customer process.
+
+**Reason:** A budget guard that waits on a remote API is useless when the provider call itself is the expensive operation. Guards must decide **before** or **immediately after** the call without round-trips.
+
+### 2.4 Warn by default, enforce when configured
+
+**Decision:** Guard actions default to logging/warning. Throwing or blocking requires `on_budget_exceeded: "throw"` or `AUREX_BLOCK_ON_WASTE=1`.
+
+**Reason:** Dropping a new SDK into production that suddenly blocks LLM traffic causes incidents. Customers opt into hard enforcement after tuning thresholds.
+
+### 2.5 Cost identity: Aurex optimizes waste, not “cheaper models for everyone”
+
+**Decision:** Frame features as **wasted spend prevention** (duplicate prompts, loops, billed-but-empty responses, manual reroutes), not generic model routing.
+
+**Reason:** Keeps the product differentiated from routers and avoids race-to-bottom on model quality.
+
+### 2.6 Python + Node parity
+
+**Decision:** Both SDKs expose the same concepts (singleton, patch, wrap, budget guard, cloud sync, resilience).
+
+**Reason:** Teams run Python for agents and Node for web/API. Divergent behavior would break trust and docs.
 
 ---
 
-## 5. Architecture overview
+## 3. Design principles we never compromise on
+
+| Principle | What it means in code |
+| :--- | :--- |
+| **Fail-open** | If Aurex hook, patch, or resilience code crashes, the underlying LLM call still runs (or the original error propagates). We never make reliability worse than no Aurex. |
+| **Append-only telemetry** | Each attempt is a new ledger event. Corrections are new rows, not edits. |
+| **Bounded work** | Queues, batch sizes, retry counts, and extra-cost caps are hard-limited. |
+| **Explicit contracts** | Config fields, ingest JSON, and doc URLs are versioned and documented. |
+| **Conservative retries** | Default idempotency policy does not blindly retry soft failures that may still bill. |
+| **Customer owns provider keys** | Fallbacks use `register_fallback` callables with the customer’s clients. |
+
+---
+
+## 4. SDK architecture at a glance
+
+Both Python (`aurex_sdk/auditor.py`) and Node (`sdk/node/src/index.ts`) follow the same shape:
 
 ```
-Customer app
-  └─ AurexAuditor (singleton)
-       ├─ pre_call_check (existing guards — unchanged semantics)
-       └─ patched provider call OR wrap()
-            └─ execute_with_resilience / callWithResilience (when enabled)
-                 ├─ classify response OR exception
-                 ├─ log_event per attempt (append-only)
-                 ├─ observe: no retry; record projected loss_avoided
-                 └─ enforce: backoff → retry / registered fallback (cost-capped)
-                      └─ cloud sync → POST /api/v1/ledger/events
-                           └─ dashboard: billed_but_failed_cost, loss_avoided, recovery_rate
+┌─────────────────────────────────────────────────────────┐
+│                    AurexAuditor (singleton)              │
+├─────────────────────────────────────────────────────────┤
+│  Config (AurexConfig)                                   │
+│  Pricing table (MODEL_PRICING + overrides)             │
+│  Resilience policy (optional)                            │
+│  Budget guard config                                     │
+├─────────────────────────────────────────────────────────┤
+│  In-memory queue (bounded)                               │
+│  Background worker (flush interval + batch size)         │
+│  Session / minute cost trackers                          │
+│  Recent prompts/responses (for loop detection)           │
+├─────────────────────────────────────────────────────────┤
+│  Integration surfaces:                                   │
+│    • auto-hook (import time)                             │
+│    • patch_openai / patchAll / …                         │
+│    • wrap() / awrap()                                    │
+│    • log_event() manual                                  │
+└─────────────────────────────────────────────────────────┘
+         │                              │
+         ▼                              ▼
+   Local ledger (.jsonl)         POST /api/v1/ledger/events
 ```
 
-**Why choke-point routing:** We already wrap `original_create(...)` at provider patch sites. Inserting resilience there captures **all** auto-instrumented traffic without requiring customers to rewrite call sites. `wrap()` gets the same path for harness users.
+**Why a singleton:** One queue, one worker thread, one patch status map per process. Multiple auditors would double-count and fight over the same ledger file.
 
-**Why a separate `resilience.py` / `resilience.ts` module:** Keeps `auditor.py` / `index.ts` from becoming unmaintainable; enables unit tests on classifier and executor without mocking entire patchers; mirrors Python/Node parity structure used elsewhere in the SDK.
+**Escape hatch:** `AurexAuditor.reset()` for tests and serverless cold starts.
 
 ---
 
-## 6. SDK — Python (`aurex_sdk/resilience.py`)
+## 5. The singleton auditor
 
-### 6.1 `ResiliencePolicy`
+### Lifecycle (Python; Node mirrors this)
 
-Declarative config parsed from `AurexConfig.resilience`:
+1. **First `AurexAuditor(...)` or `getInstance(...)`**  
+   - Parses config  
+   - Resolves ledger path (`prepare_ledger_storage`)  
+   - Creates bounded queue (default 10,000 events)  
+   - Replays `pending.jsonl` from last crash into main ledger  
+   - Starts daemon worker thread  
+   - Registers `atexit` / signal handlers for graceful shutdown  
 
-| Field | Default | Rationale |
+2. **Second init with new config**  
+   - Warns once and **ignores** new config (by design)  
+   - Use `reset()` if you truly need reconfiguration  
+
+3. **Shutdown**  
+   - Stops worker  
+   - Drains queue to `pending.jsonl` (file mode)  
+   - Closes sync resources  
+
+### Fork safety (Python)
+
+After `fork()` (some WSGI/Celery setups), the worker thread is invalid. We re-init the worker in the child via `os.register_at_fork(after_in_child=...)`.
+
+**Why:** Otherwise the child process silently stops flushing events.
+
+---
+
+## 6. Three ways to integrate
+
+| Method | When to use | Double-count risk |
 | :--- | :--- | :--- |
-| `enabled` | `false` | Zero behavior change until opt-in |
-| `mode` | `"observe"` | Trust builder: measure before mutating production calls |
-| `timeout_ms` | `60000` | Per-attempt wall clock; prevents hung threads in enforce |
-| `max_attempts` | `2` | Hard cap on retry fan-out (initial + 1 retry by default) |
-| `max_extra_cost_usd` | `0.05` | Prevents runaway retry cost blowup |
-| `retry_on` | see `DEFAULT_RETRY_ON` | Explicit allowlist of retriable kinds |
-| `backoff` | base 200ms, max 5s, jitter 0.5 | Reduces thundering herd on 429/5xx |
-| `idempotency` | `"auto"` | Conservative retry for soft failures |
-| `fallbacks` | `[]` | Ordered ladder; names map to `register_fallback` |
-| `proof_window_pct` | `0.0` | Optional controlled experiment sampling |
-| `on_recovery` | optional callback | Customer hook without parsing ledger |
-| `classify_response_override` | optional | Enterprise/custom classifier escape hatch |
+| **Auto-hook** (`aurex install-hook`, `AUREX_ENABLED=1`) | Zero code change; quick start | Low |
+| **Patch** (`patch_all()`, `patchOpenAI()`, …) | You control init; want automatic interception | Low if you don’t also wrap the same call |
+| **Wrap** (`wrap()` / manual `log_event`) | You already have a custom LLM wrapper or middleware | Low if patch is disabled |
+| **Manual log only** | You already emit tokens elsewhere (OTel, LangChain callback) | Low if patch disabled |
 
-### 6.2 Classification
+**Decision:** Support all paths because real teams have different maturity levels. The harness decision matrix doc explains combinations.
 
-**Why two classifiers (`classify_response` + `classify_exception`):** Soft failures arrive as successful HTTP responses; hard failures arrive as exceptions. Single code path would miss billed-but-empty 200s.
-
-**`ClassificationResult` fields:**
-
-- `usable` — can downstream logic proceed?
-- `kind` — stable string for `retry_on` matching and analytics
-- `billed` — did provider likely charge? (empty/filter/truncated → `true`)
-- `status` — `ok` | `degraded` | `error` for dashboard filtering
-- `finish_reason`, `error_code`, `latency_ms` — provider telemetry for ingest
-
-**Provider-agnostic text extraction (`_extract_text`, `_extract_finish_reason`):** OpenAI uses `choices[0].message.content`; Anthropic uses `content` blocks; dict-shaped responses supported for tests and LiteLLM. Without this, classification would be OpenAI-only and parity would break.
-
-**Default `retry_on` kinds:** `timeout`, `429`, `5xx`, `network`, `empty`, `content_filter`, `truncated`, `refusal`, `tool_error` — covers both hard and soft recoverable cases in enforce mode.
-
-### 6.3 `execute_with_resilience`
-
-**Sync executor with optional thread-pool timeout:** Python provider SDKs are often sync; `concurrent.futures` enforces `timeout_ms` without assuming async clients.
-
-**Attempt loop:**
-
-1. Resolve fallback for attempt index from policy + registered callables.
-2. Call provider (with timeout).
-3. Classify → if usable, return (outcome `success` or `recovered`).
-4. If soft failure → record `cost_type=unfulfilled_spend`, `outcome=degraded`, compute `projected_cost`.
-5. If enforce + retryable + within caps → backoff and continue.
-6. If exhausted in enforce → raise `AurexResilienceExhausted`.
-
-**Why `async_execute_with_resilience` duplicate:** Async patch paths (`awrap`, async OpenAI) must not block the event loop with sync sleep/thread pool in the async path; mirror logic uses `asyncio.sleep` and async call semantics.
-
-### 6.4 `estimate_projected_reroute_cost`
-
-Models **naive manual recovery**: `billed_cost_of_failed_attempt + estimated_full_second_call_on_fallback_model`.
-
-**Why naive is OK:** Counterfactual is for **directional ROI**, not invoicing. Uses existing `calculate_cost` / `MODEL_PRICING` so estimates stay consistent with the rest of Aurex billing views.
+**Anti-pattern we guard against:** Patching **and** wrapping the same call path → duplicate `log_event` rows. Patches set `__aurex_patched__` on functions; health output exposes `patch_status` so you can verify.
 
 ---
 
-## 7. SDK — Python auditor integration
+## 7. Monkey-patching providers
 
-### 7.1 `_call_with_resilience` / `_acall_with_resilience`
+### What patching does
 
-Thin adapters that:
+We replace the provider SDK’s create/chat method with a wrapper that:
 
-1. Wire `on_attempt` → `_resilience_on_attempt` → `log_event`.
-2. Pass registered fallbacks dict into executor.
-3. When `policy.enabled=false`, preserve **legacy** behavior: direct call + `mark_failure` on exception.
+1. Pulls Aurex metadata from kwargs or context (`workflow_id`, tags, …)
+2. Runs `pre_call_check`
+3. Applies decision (downgrade model, compress messages, block, or suggest cache)
+4. Calls the provider through resilience layer (if enabled)
+5. Parses usage from the response (including streams)
+6. Calls `log_event`
 
-**Why every patch choke point was updated:** Missing one provider would create silent holes in reliability coverage and inconsistent ledger data.
+### Patch order (`patch_all`)
 
-### 7.2 `_resilience_on_attempt`
+LiteLLM first (multi-provider shim), then Anthropic, OpenAI, Google, Ollama, Hugging Face.
 
-Maps `AttemptRecord` → extended `log_event` fields:
+**Why LiteLLM first:** Many apps route all models through LiteLLM; patching it catches traffic that never touches native SDKs.
 
-- `outcome`, `cost_type`, `attempt_index`, `recovery_provider`, `projected_cost`
-- `status`, `error_code`, `latency_ms`, `finish_reason`
-- `extra_metadata.resilience_kind`, `extra_metadata.loss_avoided`
+### Idempotent patches
 
-**Why log every attempt:** Append-only audit trail (Profile A). Analytics can reconstruct ladders; no UPDATE-in-place on events.
+Each patched function gets `__aurex_patched__ = True`. Re-patching records `"already_patched"` in `patch_status` instead of nesting wrappers.
 
-### 7.3 `register_fallback(name, call_fn, *, provider, model)`
+**Why:** Double patches would duplicate logs and multiply guard overhead.
 
-**Why named registration instead of inline lambdas in config:** Config must be JSON-serializable for env-based setup; callables live in code. Names referenced in `fallbacks: [{ "call": "openai_mini", ... }]`.
+### Streaming
 
-**Why we never hold provider keys:** Customer's `call_fn` uses their OpenAI/Anthropic client. Aurex stays out of key management and proxy liability.
+Stream wrappers accumulate chunks, then log **one** event when the stream completes (with total tokens if the provider exposes them).
 
-### 7.4 `AurexConfig.resilience`
+**Why:** Per-chunk logging would inflate event count and distort cost guards.
 
-Added to config dataclass and parsed once at auditor init into `_resilience_policy`. **Why parse once:** Avoid re-parsing dict on every LLM call (hot path).
+### `cache_suggest` short-circuit
 
-### 7.5 Cloud integration test fix (`test_cloud_integration.py`)
+When semantic cache heuristic fires, we can return a mock response without calling the provider.
 
-Added `setUp`/`tearDown` `AurexAuditor.reset()` so singleton state does not leak between tests. **Why:** Resilience work increased auditor state; tests became order-dependent without reset.
-
----
-
-## 8. SDK — Node (`sdk/node/src/resilience.ts`)
-
-**Parity goal:** Node SDK is used in serverless/Edge; behavioral drift from Python would break dual-stack customers.
-
-### 8.1 Config parsing
-
-`parseResilienceConfig` accepts **both** snake_case and camelCase (`timeout_ms` / `timeoutMs`). **Why:** Python SDK uses snake_case; Node idiomatic is camelCase; single config object may come from JSON shared across stacks.
-
-### 8.2 Classification & executor
-
-Same truth table as Python. `callWithResilience` is async-native (Promise-based providers).
-
-### 8.3 Observe-mode double-call bug fix
-
-**Problem:** Outer fail-open catch could re-invoke `callFn()` after observe mode already executed once, doubling provider calls.
-
-**Fix:** Re-raise when `lastExc` is set instead of falling through to fail-open second call. **Why this matters:** Observe mode must be **strictly non-mutating**; double calls violate the trust contract and cost money.
-
-Same fix applied symmetrically in Python's outer `except` (`if last_exc is not None: raise last_exc`).
+**Why:** Lets apps plug in a real cache on `on_cache_hit` without paying for an LLM call.
 
 ---
 
-## 9. SDK — Node auditor integration & `flushAndWait` fix
+## 8. The `wrap()` / manual harness path
 
-### 9.1 `callWithResilience` on patch sites
+### Python: `contextvars`
 
-All async `origCreate` / `original` choke points route through `callWithResilience` when enabled — same reasoning as Python choke points.
+`wrap(call_fn, build_params, options)` sets a **context variable** (`aurex_context`) for the duration of the call. Nested calls see per-request:
 
-### 9.2 `registerFallback`
+- `workflow_id`
+- `budget_guard` overrides
+- `downgrade_map`
+- Heuristic thresholds
 
-Mirrors Python `register_fallback` API surface.
+**Why contextvars:** Thread-safe and async-safe in Python 3.7+; global singleton config stays unchanged for other requests.
 
-### 9.3 `flushAndWait(timeoutMs)` fix
+### Node: `AsyncLocalStorage`
 
-**Before:** Timeout parameter was effectively a no-op; serverless handlers could exit before sync completed.
+Same idea: `aurexContext.run(mergedOptions, () => …)` so concurrent requests don’t leak budget limits.
 
-**After:** Uses `Promise.race` against queue drain with remaining time budget. **Why:** Cloud deployment docs promise flush-before-return; broken timeout undermined serverless reliability (cloud **sync** resilience, not provider resilience).
+### When wrap beats patch
 
----
-
-## 10. Exceptions: `AurexRecovered` and `AurexResilienceExhausted`
-
-| Exception | When | Rationale |
-| :--- | :--- | :--- |
-| `AurexRecovered` | Informational signal that recovery succeeded | Lets `on_recovery` hooks and tests detect recovery without parsing ledger |
-| `AurexResilienceExhausted` | Enforce mode, ladder exhausted | Explicit failure mode vs ambiguous provider error; carries `workflow_id`, `last_error` |
-
-**Why not raise on observe soft failures:** Observe must not change control flow; caller still receives the degraded response or original exception.
+- Multi-tenant SaaS with **per-tenant budgets** on the same process  
+- LangChain/LiteLLM middleware where patch would fight existing wrappers  
+- You want guards without touching global provider modules  
 
 ---
 
-## 11. Counterfactual accounting (`loss_avoided`, `projected_cost`)
+## 9. What happens on every LLM call (step by step)
 
-### 11.1 On soft failure (degraded)
+Here is the full path for a patched OpenAI chat completion (non-streaming):
 
-- Record actual `cost` when `classification.billed`.
-- Compute `projected_cost` = estimated manual reroute cost.
-- In **observe** mode: `loss_avoided = projected_cost` (what you **would** have wasted without a future recovery policy).
-- In **enforce** mode: soft failure may retry; `loss_avoided` on intermediate attempts stays 0 until recovery math applies.
-
-### 11.2 On recovery (attempt > 0, usable response)
-
-- `outcome = recovered`
-- `projected_cost` ≈ cost of naive reroute without resilience
-- `loss_avoided = projected_cost` (value of automated recovery vs manual duplicate call)
-
-**Why store in both top-level ingest fields and `extra_metadata`:** Backend ingest historically used `extra_metadata` for extensibility; top-level columns enable SQL aggregation on dashboard.
-
----
-
-## 12. Observe vs enforce modes
-
-| Mode | Provider calls | Ledger | Production risk |
-| :--- | :--- | :--- | :--- |
-| **observe** | Single call only | Classifies + counterfactual metrics | None — behavior identical to today except extra telemetry |
-| **enforce** | Retry/fallback within caps | Records ladder + recovered/degraded outcomes | Low if caps configured; mitigated by defaults |
-
-**Default when enabling:** `mode: observe` — **why:** Sales and engineering can prove ROI (`loss_avoided` in dashboard) before turning on mutating retries.
-
----
-
-## 13. Idempotency policy
-
-| Value | Behavior | Why |
-| :--- | :--- | :--- |
-| `off` | Never retry in enforce | Maximum safety for side-effecting tools |
-| `require_key` | Retry hard failures only if `idempotency_key` present | Explicit caller contract |
-| `auto` (default) | Retry only `timeout`, `429`, `5xx`, `network` — **not** soft failures by default | Soft failures may still charge; blind retry doubles spend |
-
-**Conservative default:** Profile A — retries never double-charge on ambiguous tool calls unless customer opts in.
-
----
-
-## 14. Proof-window sampling
-
-`proof_window_pct` (0–1): deterministic hash bucket on `workflow_id:model` decides if enforce recovery runs **even in observe mode** for a small fraction of traffic.
-
-**Why:** Observe mode cannot measure **actual** recovered value without occasionally executing recovery. Sampling is:
-
-- Deterministic (same workflow always same bucket — debuggable)
-- Capped by percentage
-- Off by default (`0.0`)
-
-**Why hash-based not random:** Reproducible in tests and support investigations.
-
----
-
-## 15. Fail-open semantics
-
-If resilience **orchestration** throws (bug, unexpected provider shape):
-
-1. Python: if `last_exc` from provider → re-raise provider error (not double call).
-2. Else: single raw `call_fn()` attempt with meta `{ resilience: "fail_open" }`.
-3. Node: same pattern with async `callFn()`.
-
-**Why:** Aurex must **never** make reliability worse than no Aurex. A bug in classification should not block production LLM traffic.
-
----
-
-## 16. Fallback registration (customer-owned keys)
-
-Fallback ladder entries:
-
-```json
-{ "name": "openai_mini", "after": ["network", "5xx"], "provider": "openai", "model": "gpt-4o-mini" }
+```
+1. App calls openai.chat.completions.create(...)
+2. Aurex wrapper runs
+3. Extract workflow_id, tags from kwargs or context
+4. pre_call_check(model, prompt, messages, workflow_id)
+      → AurexDecision: proceed | downgrade | compress | block | cache_suggest
+5. apply_decision_to_call_params — may change model/messages or raise AurexBlocked
+6. _call_with_resilience (if resilience.enabled) OR direct original()
+7. Provider returns response OR throws
+8. Classify + log each resilience attempt (if enabled)
+9. Parse usage tokens from response
+10. log_event(model, tokens, cost, workflow_id, …)
+11. _check_budget — post-call budget reaction (warn/webhook/throw)
+12. Return response to app (or raise)
 ```
 
-Or `{ "call": "registered_name" }` → `register_fallback("registered_name", fn, ...)`.
-
-**Same-provider cheaper model:** Mutate model in params and re-call original client — no extra registration.
-
-**Cross-provider:** Requires registered callable — **why:** Aurex cannot instantiate Anthropic/OpenAI clients without customer credentials.
+**Key insight:** Steps 4–5 happen **before** the provider call. Step 10–11 happen **after**. Resilience sits at step 6–8.
 
 ---
 
-## 17. Backend — schema and migration 002
+## 10. The decision engine (`pre_call_check`)
 
-### 17.1 ORM extensions (`backend/src/models/llm_event.py`)
+Implemented in `auditor.py` with types in `decisions.py`. Checks run **in order**; first match wins unless combined actions apply.
 
-**OutcomeEnum additions:**
+| Order | Check | Typical action | Why it exists |
+| :---: | :--- | :--- | :--- |
+| 1 | Semantic cache (Jaccard > 0.9 vs recent prompts) | `cache_suggest` | Avoid repeat LLM cost for near-duplicate prompts |
+| 2 | Budget guard (predicted cost + limits) | `block` | Stop runaway spend before it happens |
+| 3 | Ignored workflows | skip | Allowlist admin/internal flows |
+| 4 | Duplicate system prompt hash | `compress` | Strip repeated system prompts from context |
+| 5 | Runaway context (3 steps ≥ 2.2× growth) | `downgrade` + inject summarize instruction | Agent loops blowing context |
+| 6 | Near session budget (80%) or simple prompt on expensive model | `downgrade` | Automatic model swap |
+| 7 | Context explosion (≥ 3.5× first request) | `compress` | Long conversations eating input cost |
+| 8 | Semantic loop (prompt similar to last responses) | `compress` + instruction | Detect “model talking to itself” |
+| 9 | High retries + loop score | POST `/escalations` | Human-in-the-loop for stuck agents |
 
-- `RECOVERED` — successful recovery after failure
-- `DEGRADED` — billed-but-failed / soft failure path
+### Decision actions
 
-**CostTypeEnum addition:**
-
-- `UNFULFILLED_SPEND` — money spent without usable output
-
-**Columns (reliability telemetry):**
-
-| Column | Purpose |
+| Action | Meaning |
 | :--- | :--- |
-| `status` | Provider-level status string from SDK |
-| `error_code` | Classified kind / error code |
-| `latency_ms` | Attempt latency |
-| `finish_reason` | Provider finish reason |
-| `reported_cost_usd`, `cost_source` | Align with migrate_001 spec |
-| `projected_cost` | Counterfactual reroute estimate |
-| `recovery_provider` | Provider used after fallback |
-| `attempt_index` | Position in retry ladder |
+| `proceed` | Call goes through unchanged |
+| `downgrade` | Swap to cheaper model from downgrade map |
+| `compress` | Prune or rewrite messages (system prompt dedup, instructions) |
+| `block` | Stop call; optional throw `AurexBlocked` |
+| `cache_suggest` | Hint app to use cache; may short-circuit with mock |
 
-**Why additive nullable columns:** Zero-downtime deploy; old SDK clients still ingest; rollback = stop sending new fields.
+### Downgrade map
 
-### 17.2 Migration `backend/scripts/migrate_002_reliability_fields.py`
+Static defaults (e.g. `gpt-4o` → `gpt-4o-mini`) plus `config.downgrade_map` plus per-`wrap()` overrides.
 
-Idempotent `ALTER TABLE` for `projected_cost`, `recovery_provider`, `attempt_index`. Supports SQLite (dev) and Postgres-style `information_schema` (prod).
-
-**Run order:** migrate_001 (if not already) → migrate_002 before trusting dashboard reliability metrics.
+**Why configurable map:** Model names and pricing change; customers pick their own cheaper targets.
 
 ---
 
-## 18. Backend — ledger ingest mapping
+## 11. Budget guard: two checkpoints
 
-`backend/src/services/ledger.py` changes:
+**Important:** “Circuit breaker” in Aurex docs means **spend/rate limits**, not AWS-style open/half-open service circuits.
 
-- `_parse_outcome` / `_parse_cost_type` — tolerant string parsing (`recovered`, `unfulfilled_spend`, enum prefixes).
-- Map previously dropped SDK fields: `latency_ms`, `status`, `error_code`, `finish_reason`, `projected_cost`, `recovery_provider`, `attempt_index`.
-- Merge `loss_avoided` from top-level or `extra_metadata`.
+### Pre-call (`pre_call_check`)
 
-**Why per-event try/except ingest:** One bad event must not reject entire batch (existing pattern preserved).
+Uses **predicted** cost of the upcoming call plus rolling windows:
 
-**Why duplicate `projected_cost` into metadata:** Older analytics readers may only scan JSON metadata; dashboard SQL uses columns.
+- `max_cost_per_session` (per `workflow_id`)
+- `max_cost_per_minute`
+- `max_requests_per_minute`
+- `max_context_tokens`
+
+Can **block before** the provider is invoked.
+
+### Post-call (`_check_budget` / `checkBudget`)
+
+Runs after `log_event` updates session totals. Reacts to **actual** spend:
+
+- `on_budget_exceeded: warn` — stderr log  
+- `webhook` — POST to customer URL  
+- `throw` — raise `AurexBudgetExceeded`  
+- `dry_run` — evaluate only  
+
+**Why two phases:** Pre-call prevents the next call; post-call catches drift when token estimates were wrong or multiple workers share a workflow id inconsistently.
+
+### Budget guard ≠ provider resilience
+
+| | Budget guard | Provider resilience |
+| :--- | :--- | :--- |
+| **When** | Before/after spend accounting | During provider call |
+| **Goal** | Cap total spend | Recover from failed/empty responses |
+| **Default** | Empty config = off | `enabled: false` |
 
 ---
 
-## 19. Backend — dashboard and savings analytics
+## 12. Logging an event (`log_event`)
 
-### 19.1 Dashboard overview (`backend/src/api/dashboard.py`)
+### On the caller thread (fast)
 
-New metrics:
+1. Timestamp (UTC ISO)  
+2. Hash prompt / system / response (SHA-256)  
+3. `calculate_cost(model, input_tokens, output_tokens, cache…)`  
+4. Build event dict (provider, model, workflow, outcome, resilience fields, tags)  
+5. Update in-memory session and minute windows (for guards)  
+6. `queue.put_nowait(event)` — or spill to overflow file if full  
 
-| Metric | Definition |
+### On the worker thread (slow)
+
+1. Batch when `max_batch_size` (100) or `flush_interval` (30s)  
+2. Append JSON lines to ledger file **or** append to memory list  
+3. If cloud sync on: `POST` batch to backend  
+
+**Why cost is computed before queueing:** `pre_call_check` on the **next** call sees up-to-date session totals.
+
+**Why queue instead of sync write:** Producers never block on disk or network.
+
+---
+
+## 13. The local ledger
+
+### File layout
+
+| File | Purpose |
 | :--- | :--- |
-| `billed_but_failed_cost` | Sum of `cost` where outcome/cost_type indicates unfulfilled/degraded spend |
-| `loss_avoided` | From recovered events' `projected_cost - cost` plus observe-mode `extra_metadata.loss_avoided` |
-| `recovery_rate` | `recovered / (failures + degraded + unfulfilled)` |
+| `.aurex/ledger.jsonl` | Main append-only log |
+| `.aurex/ledger.<worker>.jsonl` | Per-process file when `per_process_ledger=true` |
+| `pending.jsonl` | Queue drained at shutdown; replayed on next startup |
+| `queue_overflow.jsonl` | Spill when in-memory queue is full |
 
-**Why both column and metadata for `loss_avoided`:** Observe-mode events may only populate metadata during phased rollout; summing both avoids under-reporting.
+### Storage fallback chain
 
-### 19.2 Savings timeline (`backend/src/api/routes.py`)
+1. Try configured `ledger_path`  
+2. Try `/tmp/.aurex/...`  
+3. Fall back to **memory-only** (warn once)  
 
-- New category `reliability_savings` in `category_breakdown`.
-- Timeline entries include `loss_avoided` from session `analysis_results.reliability_summary`.
-- Intervention types `reliability_savings`, `unfulfilled_spend`, `billed_but_failed` map into category rollup.
+**Why per-process ledger:** Gunicorn/K8s replicas writing one file causes corruption and lock contention.
 
-**Why a separate savings category:** FinOps users need to distinguish **model downgrade savings** from **reliability/recovery savings** — different intervention levers.
+**Why pending.jsonl:** Lambda kill / crash mid-batch shouldn’t lose queued events that never hit disk.
 
----
+### Environment overrides
 
-## 20. Testing strategy
-
-### 20.1 Python (`sdk/python/test_resilience.py`)
-
-- Classifier truth table (success, empty, content_filter, timeout)
-- `parse_resilience_config`
-- Observe: single call on network error (no retry)
-- Enforce: recovery on second attempt
-- Enforce exhausted → `AurexResilienceExhausted`
-- Projected reroute cost math
-
-**Why unit tests on `resilience.py` directly:** Fast, deterministic, no patcher mock choreography (Profile Z testing anti-pattern avoided).
-
-### 20.2 Python patchers / cloud (`test_patchers.py`, `test_cloud_integration.py`)
-
-Existing suites extended; singleton reset prevents cross-test pollution.
-
-### 20.3 Node (`frontend/tests/unit/sdk-node-resilience.test.ts`)
-
-Mirrors Python scenarios for `classifyResponse`, observe/enforce, fail-open, counterfactual.
-
-**Why tests live under `frontend/tests/unit`:** Existing Node SDK test harness runs via frontend vitest — convention preserved.
-
-### 20.4 Backend (`backend/tests/unit/test_resilience_ingest.py`, `test_dashboard_reliability.py`)
-
-- Ingest accepts new fields and enum values
-- Dashboard rollup math for reliability metrics
-
-**Why backend tests separate from SDK:** Contract verification at HTTP/DB boundary; catches ingest mapping regressions SDK tests would miss.
+- `AUREX_LEDGER_PATH` — force writable path in read-only containers  
+- `AUREX_WORKER_ID` — stable suffix instead of PID when workers restart  
 
 ---
 
-## 21. Documentation overhaul (agent-optimized)
+## 14. Cloud sync (SDK → backend)
 
-### 21.1 Problem
+**Separate from provider resilience.** This section is about uploading telemetry **after** calls complete.
 
-- `frontend/app/docs/reference/page.tsx` was **~890 lines** — context rot for AI agents.
-- `llms.txt` pointed agents at `#anchors` on that monolith.
-- Reliability feature had **zero** doc pages despite full implementation.
+### Gating
 
-### 21.2 Solution — one concern per URL
+Sync runs only when:
 
-| Area | Hub | Sub-pages |
+- `cloud_sync=true` (or Node default when `apiKey` set)  
+- `local_only=false`  
+- Valid `api_key` / `apiKey` present  
+
+### Transport
+
+- Endpoint: `{baseUrl}/ledger/events` (canonical v1)  
+- Auth: `Bearer aux_*`  
+- Payload: `{ "events": [ { …, "cost_usd": float } ] }`  
+- Retries: exponential backoff + jitter; honor HTTP 429 `Retry-After`  
+- Timeout: `sync_timeout_seconds` / `syncTimeoutMs` per attempt  
+
+### Failure behavior
+
+Failed sync increments `sync_error_count`; events **remain on disk**. We do not silently drop local ledger rows on network failure.
+
+**Why:** Local ledger is source of truth; cloud is a mirror for dashboards.
+
+### Privacy strip
+
+Unless `sync_prompt_hashes`, hash fields may be stripped before upload.
+
+---
+
+## 15. Pricing and cost calculation
+
+### Lookup order (`get_model_pricing`)
+
+1. Wildcard patterns (`local/*`, `ft:*`)  
+2. Exact normalized model name  
+3. Longest substring match  
+4. Hugging Face serverless → $0  
+5. `config.default_pricing`  
+6. Hard fallback ($1.50 / $6.00 per 1M in/out)  
+
+### `calculate_cost` extras
+
+- Cached input tokens at reduced rate (provider-specific multipliers)  
+- Cache write tokens  
+- Batch API 50% discount when `is_batch`  
+- Reasoning tokens where exposed  
+
+### Overrides
+
+- JSON file via `pricing_path` / `AUREX_PRICING_PATH`  
+- Runtime `register_model_pricing(model, input, output)`  
+
+**Why client-side cost:** Guards need immediate numbers. Backend recalculates if cost missing on ingest (drift risk acknowledged; company overrides exist server-side).
+
+---
+
+## 16. Outcomes (`mark_success` / `mark_failure`)
+
+Token spend alone doesn’t tell you if the **task** succeeded.
+
+**Decision:** Apps call `mark_success(workflow_id)` or `mark_failure(workflow_id, reason)` once per logical workflow.
+
+These log synthetic events (`model: aurex-outcome`, `cost_type: outcome_signal`) used for cost-per-success metrics on the dashboard.
+
+**Why separate from LLM events:** A workflow may involve ten LLM calls but one business outcome.
+
+---
+
+## 17. Provider resilience (retry & fallbacks)
+
+*This is the largest recent feature; summarized here in plain English. See also sections 2–3 for principles.*
+
+### The problem
+
+1. **Hard failures** — timeouts, 429, 5xx (often not billed; manual retry costs money)  
+2. **Soft failures** — HTTP 200 but empty/filtered/truncated/refused (**still billed**)  
+3. **Manual reroute** — second provider call after failure (duplicate cost; invisible savings)  
+
+### What we built
+
+Opt-in `resilience` config on `AurexConfig`:
+
+| Field | Default | Purpose |
 | :--- | :--- | :--- |
-| API Reference | `/docs/reference` | 11 pages (autohook, integration, config, …) |
-| Cloud Deployment | `/docs/deployment` | serverless-flush, filesystem, cloud-sync, rate-limits |
-| Reliability | `/docs/reliability` | overview, policy, observe-enforce, fallbacks, classification, accounting |
-| Install / Harness | existing + | env-vars, decision-matrix |
+| `enabled` | `false` | Master switch |
+| `mode` | `observe` | `observe` = measure only; `enforce` = retry/fallback |
+| `max_attempts` | `2` | Cap retry count |
+| `max_extra_cost_usd` | `0.05` | Cap extra spend from retries |
+| `timeout_ms` | `60000` | Per-attempt timeout |
+| `retry_on` | list of kinds | Which failures may retry |
+| `fallbacks` | `[]` | Ordered ladder |
+| `idempotency` | `auto` | Conservative retry rules |
+| `proof_window_pct` | `0` | Sample enforce behavior in observe for A/B proof |
 
-**Page template (every sub-page):**
+### Classification
 
-1. Agent hint banner
-2. Scope in / out
-3. Minimal Python + Node example
-4. Focused reference table
-5. “See also” links (no duplicated full config tables)
+Every response or exception gets a **kind**: `success`, `timeout`, `429`, `5xx`, `network`, `empty`, `content_filter`, `truncated`, `refusal`, `tool_error`, …
 
-**Shared components:** `DocPageShell`, `DocSeeAlso`, `DocHubCards`, `DocHashRedirect`.
+Soft failures set `billed=true` and `cost_type=unfulfilled_spend`.
 
-### 21.3 `llms.txt` rewrite
+**Why classification module is separate (`resilience.py` / `resilience.ts`):** Testable without mocking OpenAI; shared by all providers.
 
-- Task → **single URL** routing table (no `#anchors` on reference).
-- Slim API summary pointing to sub-pages for details.
-- Reliability routes and new exceptions documented.
-- Rule: **fetch one page per task**; do not load hubs for implementation detail.
+### Observe vs enforce
 
-### 21.4 Backward compatibility
-
-- `DocHashRedirect` on hub pages maps legacy hashes (`#config-reference` → `/docs/reference/config`, etc.).
-- `next.config.mjs` path redirects for old slugs.
-- Updated in-repo links; overview card for Reliability added.
-
-**Why invest in docs structure:** Agents are first-class SDK consumers; bad docs → bad integrations → support cost and wrong retry semantics in production.
-
----
-
-## 22. Naming: cloud sync resilience vs provider resilience
-
-Two different concepts — **must not be conflated:**
-
-| Term | Doc path | Meaning |
+| Mode | Calls provider | Changes behavior? |
 | :--- | :--- | :--- |
-| **Cloud sync resilience** | `/docs/deployment/cloud-sync` | SDK → Aurex backend HTTP: retries, 429, `events_dropped`, `flushAndWait` |
-| **Provider-call resilience** | `/docs/reliability/*` | SDK → OpenAI/Anthropic: classify, retry, fallback, `loss_avoided` |
+| observe | Once | No — only extra telemetry + counterfactual `loss_avoided` |
+| enforce | Up to `max_attempts` | Yes — retry/backoff/fallback within cost cap |
 
-**Why separate URLs:** Agents searching “resilience” were loading cloud sync docs and misconfiguring `resilience.enabled` vs `sync_max_retries`.
+**Rollout path:** enable → observe → prove dashboard ROI → enforce.
+
+### Fallbacks
+
+```python
+auditor.register_fallback("mini", call_fn, provider="openai", model="gpt-4o-mini")
+```
+
+**Why registration API:** Config stays JSON-serializable; callables use **customer** API keys. Aurex never proxies LLM traffic.
+
+### Counterfactual accounting
+
+- `projected_cost` — what a naive manual reroute would cost  
+- `loss_avoided` — value recovered or preventable waste  
+
+Backend dashboard: `billed_but_failed_cost`, `loss_avoided`, `recovery_rate`.
+
+### Fail-open (again)
+
+If resilience code bugs out → single raw provider call. If provider already failed → re-raise that error (never double-call in observe mode — we fixed this bug in Node and Python).
+
+### Exceptions
+
+- `AurexResilienceExhausted` — enforce mode, ladder exhausted  
+- `AurexRecovered` — informational recovery signal  
 
 ---
 
-## 23. Rollback, ops, and migration order
+## 18. Offline heuristics and CI gates
 
-### Instant SDK rollback
+### `aurex audit` / `npx aurex ci`
+
+Reads local `ledger.jsonl` **without** network. Detects:
+
+- System prompt waste (repeated hashes)  
+- Agent loops (context doubling)  
+- Expensive model on simple prompts  
+- Context explosion  
+
+Outputs a **credit score** (100 − waste%) and ranked issues.
+
+**Why offline:** CI and air-gapped environments; same rules as runtime heuristics but batch analysis.
+
+### CI flags
+
+- `--fail-under`, `--max-waste-usd`, `--mode block` — fail pipeline on policy breach  
+
+**Decision:** Default CI mode is `warn` (exit 0) so adoption doesn’t break builds on day one.
+
+---
+
+## 19. Python vs Node parity
+
+| Area | Python | Node |
+| :--- | :--- | :--- |
+| Singleton | `AurexAuditor()` | `getInstance()` |
+| Context | `contextvars` | `AsyncLocalStorage` |
+| Worker | `threading` daemon | `setInterval` + async flush |
+| Config keys | snake_case | camelCase (+ accepts snake for resilience) |
+| Sync path | sync + async executors | Promise-native |
+| Tests | `pytest` in `sdk/python` | vitest in `frontend/tests/unit` |
+
+**Known minor differences:** Python has `storage_mode` memory fallback; Node uses `storageMode`. Google patch is Python-only today.
+
+---
+
+## 20. Backend architecture
+
+FastAPI app at `/api/v1` with routers:
+
+| Router | Role |
+| :--- | :--- |
+| `ledger.py` | Canonical SDK ingest `POST /ledger/events` |
+| `keys.py` | Project API keys (`aux_*`, scopes, rotation) |
+| `projects.py` | Multi-tenant projects |
+| `dashboard.py` | JWT-scoped overview, events, SSE |
+| `escalations.py` | SDK loop/budget escalations |
+| `savings.py` | Savings realization |
+| `routes.py` | Legacy audit upload, insights, analytics |
+
+**Decision:** New SDK traffic uses `/ledger/events`; legacy `/sdk/events` and CSV upload paths remain for backward compatibility.
+
+---
+
+## 21. Two ways events enter the database
+
+### Modern path (SDK live telemetry)
+
+`POST /api/v1/ledger/events`
+
+- Auth: API key with `ledger:write` scope  
+- Project id from key — **never trust body**  
+- Batch up to 500 events  
+- Rate limit ~600 events/minute per key  
+- Sets `LLMEvent.project_id`  
+
+### Legacy path
+
+`POST /api/v1/sdk/events` and CSV audit upload
+
+- Tied to `AuditSession` and email-scoped access  
+- Smaller batches; different session model  
+
+**Why both exist:** Early product was CSV audit-first; SDK cloud sync came later. Migrating customers gradually avoids breaking old integrations.
+
+### Ingest service (`services/ledger.py`)
+
+- Per-event try/except — one bad row doesn’t reject batch  
+- Server calculates cost if client omitted it  
+- Maps resilience fields to columns + metadata  
+- Optional Pub/Sub publish for realtime dashboard  
+
+---
+
+## 22. Authentication and multi-tenancy
+
+### Auth modes
+
+1. **JWT** — dashboard users (OTP email / Google OAuth)  
+2. **API key** — SDK (`aux_*` Argon2; legacy `ax_live_*` SHA-256)  
+3. **Hybrid** — some routes accept either  
+
+### Security decisions (from security remediation work)
+
+- Default JWT secret blocked in production startup  
+- Company access checks use exact domain match (not substring — IDOR fix)  
+- OTP: disposable email blocklist, rate limits  
+- API key revocation cached in Redis with in-process fallback when Redis absent  
+- Keys with `scopes=null` grandfathered (backward compat)  
+
+### Multi-tenant scoping
+
+Dashboard queries filter by `project_id` from JWT or org membership. SDK events bind to project via API key.
+
+**Why project-scoped keys:** Team A must never see Team B telemetry (Profile D).
+
+---
+
+## 23. Dashboard and analytics
+
+### Overview metrics (7-day window)
+
+- Spend, success/failure counts, retry rate  
+- Model and workflow breakdowns  
+- **Reliability:** `billed_but_failed_cost`, `loss_avoided`, `recovery_rate`  
+
+### Savings timeline
+
+Categories include `reliability_savings` separate from `runaway_loop`, `expensive_model_misuse`, etc.
+
+**Why split categories:** Different fixes — reliability needs fallbacks; misuse needs downgrade rules.
+
+### Realtime SSE
+
+Polls DB every ~5s (Pub/Sub optional). Honest limitation: not true push unless infra wired.
+
+### Analytics side channel
+
+`analytics_events.jsonl` + optional BigQuery for product analytics (CTA clicks, uploads). Separate from customer LLM ledger.
+
+---
+
+## 24. Audit upload vs live SDK telemetry
+
+| | CSV / JSON audit upload | Live SDK sync |
+| :--- | :--- | :--- |
+| **Source** | Exported logs, batch files | Running app |
+| **Engine** | `EnhancedDetectionEngine` (7 analyzers) | Runtime guards + resilience |
+| **Session model** | `AuditSession` per upload | Continuous `LLMEvent` stream |
+| **Use case** | Quarterly waste review | Real-time ops + CI |
+
+**Decision:** Keep audit upload for prospects who can’t install SDK day one; SDK is the long-term control plane.
+
+---
+
+## 25. Frontend decisions
+
+### App structure (Next.js App Router)
+
+- Marketing: `/`, `/book`, legal  
+- Docs: `/docs/**` split into small pages  
+- Audit funnel: `/audit`  
+- Product app: `/app/**` (JWT required)  
+
+### API client
+
+Single `NEXT_PUBLIC_API_URL`; JWT in localStorage; typed interfaces mirroring backend DTOs.
+
+### Theme
+
+Dark-first **oklch** semantic tokens (`--shell`, `--surface`, …). Recent work **lightened** near-black backgrounds for readability — cosmetic, not structural.
+
+### Docs as product
+
+Dual Python/Node code blocks; `/llms.txt` agent routing table; reliability docs mirror SDK behavior.
+
+### Testimonials / savings UX
+
+ROI figures updated to conservative numbers ($650/mo) — marketing honesty decision, not SDK logic.
+
+---
+
+## 26. Documentation structure (agent-optimized)
+
+### Problem we solved
+
+One 890-line reference page caused **context rot** for AI agents — too much irrelevant text per task.
+
+### Solution
+
+- **One concern per URL** (~200 lines max per page)  
+- **Hub pages** are indexes only (`/docs/reference`, `/docs/reliability`, `/docs/deployment`)  
+- **`/llms.txt`** maps task → single URL  
+- **Agent hint banner** on every page  
+- **`DocHashRedirect`** maps old `#anchors` to new routes  
+
+### Two “resilience” doc families
+
+| Docs | Meaning |
+| :--- | :--- |
+| `/docs/deployment/cloud-sync` | HTTP upload retries, 429, flush |
+| `/docs/reliability/*` | Provider retry, fallbacks, loss accounting |
+
+**Why:** Agents were conflating `sync_max_retries` with `resilience.enabled`.
+
+---
+
+## 27. Decision timeline (from project history)
+
+Approximate evolution on branch `aa` (newest first):
+
+| Commit theme | Decision embodied |
+| :--- | :--- |
+| Provider resilience + agent docs | Observe/enforce, loss accounting, doc sub-pages, `reason.md` |
+| SDK cloud hardening + softer UI | `flushAndWait`, ledger fallbacks, rate limits, theme tokens |
+| Dynamic pricing + Hugging Face | `register_model_pricing`, HF patch, wildcard pricing |
+| Security remediations | Auth hardening, IDOR fixes, key scopes |
+| Dashboard / profile | JWT app shell, project scoping |
+| Auth integration | OTP/Google, multi-tenant bootstrap |
+| Brand Lumina → Aurex | Single product name across CLI and UI |
+| LiteLLM pricing + SDK parity | Universal router support |
+
+**Meta-decision:** Ship **additive** features behind flags; never break existing ledger or ingest shapes without migration.
+
+---
+
+## 28. Rollback and deployment checklist
+
+### Disable provider resilience instantly
 
 ```python
 AurexConfig(resilience={"enabled": False})
 ```
 
-Or remove `resilience` key entirely. Behavior matches pre-feature SDK.
+### Disable cloud sync only
 
-### Backend rollback
+```python
+AurexConfig(cloud_sync=False)  # or local_only=True
+```
 
-Columns are nullable; old code ignores new fields. No destructive migration required.
+### Backend migrations
 
-### Deploy checklist
+1. `migrate_001_extend_event_schema` (if needed) — status, latency, finish_reason, …  
+2. `migrate_002_reliability_fields` — projected_cost, recovery_provider, attempt_index  
 
-1. Deploy backend with ORM + ingest mapping.
-2. Run `python -m scripts.migrate_002_reliability_fields` on target DB.
-3. Ship SDK with `resilience.enabled=false` default.
-4. Customer enables `mode: observe` → validate dashboard metrics.
-5. Customer enables `mode: enforce` with caps.
+### Serverless checklist
+
+- `AUREX_LEDGER_PATH=/tmp/.aurex/ledger.jsonl`  
+- `per_process_ledger=true` for multi-worker  
+- `await flushAndWait()` before handler return  
 
 ---
 
-## 24. Known limitations and future work
+## 29. Known limitations and honest gaps
 
-| Limitation | Reason | Possible follow-up |
+| Gap | Impact | Mitigation today |
 | :--- | :--- | :--- |
-| Classifier is heuristic | Provider response shapes evolve | `classify_response_override` hook; golden tests per provider |
-| Counterfactual is estimated | No ground truth without proof window | Proof-window sampling; manual reconciliation jobs |
-| No hosted fallback routing | Product boundary | Document patterns for LiteLLM router + Aurex observe |
-| Async Python timeout uses thread pool | Sync client compatibility | Native async timeout when all patch paths async |
-| `AurexRecovered` not raised on all paths | Informational exception optional | Document as hook/callback primary signal |
-| Dashboard UI may not surface all new metrics yet | Backend/API first | Frontend widgets for `billed_but_failed_cost` |
-| `llms.txt` / `docs-nav.ts` manual sync | No codegen yet | Optional build step to generate routing table |
+| Classifier heuristics | May mis-label unusual provider responses | `classify_response_override` hook |
+| Client vs server pricing drift | Cost may differ slightly | Backend recalculates on ingest; company overrides |
+| Two tenancy models | Legacy sessions vs project keys | Docs + gradual migration |
+| Dashboard UI lag | Not all API metrics have widgets | API ready first |
+| Google patch Node missing | Node apps using Gemini natively | Use LiteLLM or Python SDK |
+| `llms.txt` manual sync with nav | Drift possible | Comment in both files; optional codegen later |
+| SSE not true push | 5s poll latency | Acceptable for MVP dashboard |
+| Counterfactual is estimated | Not invoice-grade | Proof-window sampling; directional ROI only |
 
 ---
 
-## 25. File index (what changed where)
+## 30. File index
 
-### SDK Python
+### SDK Python (`sdk/python/aurex_sdk/`)
 
-| File | Change |
+| File | Role |
 | :--- | :--- |
-| `sdk/python/aurex_sdk/resilience.py` | **New** — policy, classify, execute, counterfactual math |
-| `sdk/python/aurex_sdk/auditor.py` | Wire resilience at choke points; `register_fallback`; extended `log_event` |
-| `sdk/python/aurex_sdk/exceptions.py` | `AurexRecovered`, `AurexResilienceExhausted` |
-| `sdk/python/aurex_sdk/__init__.py` | Export resilience types |
-| `sdk/python/test_resilience.py` | **New** unit tests |
-| `sdk/python/test_cloud_integration.py` | Singleton reset in tests |
+| `auditor.py` | Singleton orchestrator, patch, wrap, guards, log_event |
+| `resilience.py` | Classify, retry, fallback, counterfactual math |
+| `decisions.py` | Decision types, apply to call params |
+| `ledger_utils.py` | Path resolution, writable probes, fallbacks |
+| `cloud_sync.py` | HTTP batch upload with retries |
+| `hook.py` | Auto-hook on import |
+| `heuristics.py` | Offline audit engine |
+| `cli.py` | install-hook, audit, ci |
+| `semantic.py` | Jaccard similarity for loops/cache |
+| `exceptions.py` | Typed errors |
 
-### SDK Node
+### SDK Node (`sdk/node/src/`)
 
-| File | Change |
+| File | Role |
 | :--- | :--- |
-| `sdk/node/src/resilience.ts` | **New** — parity module |
-| `sdk/node/src/index.ts` | `callWithResilience`, `registerFallback`, patch wiring, `flushAndWait` fix |
-| `sdk/node/src/exceptions.ts` | New exception classes |
-| `frontend/tests/unit/sdk-node-resilience.test.ts` | **New** tests |
+| `index.ts` | Main auditor, patch, wrap, sync |
+| `resilience.ts` | Parity resilience module |
+| `cloud_sync.ts` | HTTP retry |
+| `ledger_utils.ts` | Path + fallback |
+| `hook.ts` | Auto-hook |
+| `exceptions.ts` | Typed errors |
 
-### Backend
+### Backend (`backend/src/`)
 
-| File | Change |
+| Area | Role |
 | :--- | :--- |
-| `backend/src/models/llm_event.py` | Enums + columns |
-| `backend/scripts/migrate_002_reliability_fields.py` | **New** migration |
-| `backend/src/services/ledger.py` | Ingest mapping |
-| `backend/src/api/dashboard.py` | Reliability metrics |
-| `backend/src/api/routes.py` | `reliability_savings` category |
-| `backend/tests/unit/test_resilience_ingest.py` | **New** |
-| `backend/tests/unit/test_dashboard_reliability.py` | **New** |
+| `api/ledger.py` | v1 ingest route |
+| `services/ledger.py` | Persist events |
+| `models/llm_event.py` | Schema + enums |
+| `api/dashboard.py` | Overview + reliability metrics |
+| `api/routes.py` | Legacy audit + savings timeline |
+| `api/auth.py` | JWT + API keys |
+| `scripts/migrate_002_*.py` | DB migration |
 
-### Docs / frontend
+### Docs (`frontend/`)
 
-| File | Change |
+| Path | Role |
 | :--- | :--- |
-| `frontend/app/docs/reference/*` | 11 sub-pages + hub |
-| `frontend/app/docs/reliability/*` | 6 sub-pages + hub |
-| `frontend/app/docs/deployment/*` | 4 sub-pages + slim hub |
-| `frontend/app/docs/installation/env-vars/` | Canonical env reference |
-| `frontend/app/docs/harness/decision-matrix/` | Harness matrix extracted |
-| `frontend/components/docs/doc-*.tsx` | Shared doc components |
-| `frontend/components/docs/docs-nav.ts` | Sub-route nav + Reliability group |
-| `frontend/public/llms.txt` | Agent routing rewrite |
-| `frontend/next.config.mjs` | Legacy path redirects |
-| `frontend/app/docs/page.tsx` | Overview cards + agent banner |
+| `app/docs/**` | Split documentation pages |
+| `public/llms.txt` | Agent routing table |
+| `components/docs/*` | DocPageShell, nav, hash redirect |
 
 ---
 
-## Closing note
+## How to read this document
 
-This implementation prioritizes **trust** (observe before enforce), **safety** (fail-open, bounded caps, idempotency), **auditability** (append-only per-attempt events), and **measurable ROI** (counterfactual accounting) over **magic** (hosted gateway, silent reroute, key custody). The documentation structure matches that philosophy: small, truthful pages so humans and agents integrate without context rot.
+- **Integrating the SDK?** Start with [§6 Three ways to integrate](#6-three-ways-to-integrate) and [§9 step by step](#9-what-happens-on-every-llm-call-step-by-step).  
+- **Debugging missing events?** [§13 Local ledger](#13-the-local-ledger) and [§14 Cloud sync](#14-cloud-sync-sdk--backend).  
+- **Turning on retry/fallback?** [§17 Provider resilience](#17-provider-resilience-retry--fallbacks) — start in **observe** mode.  
+- **AI agent loading docs?** `/llms.txt` first, then **one** sub-page URL per task.  
+- **Changing ingest schema?** [§21 Two ways events enter](#21-two-ways-events-enter-the-database) and migration scripts.
 
-For doc routing, start at `/llms.txt`. For behavioral truth, start at `sdk/python/aurex_sdk/resilience.py` and `sdk/node/src/resilience.ts`.
+---
+
+*Last updated to reflect branch `aa` through commit `17779a9` (SDK resilience, loss accounting, agent-optimized docs). Update this file when you change invariants, defaults, or public contracts.*
