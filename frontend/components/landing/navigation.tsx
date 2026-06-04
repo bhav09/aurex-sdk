@@ -9,10 +9,11 @@ import { AuthModal } from "./auth-modal";
 import { UserDropdown } from "@/components/app/user-dropdown";
 
 const navLinks = [
-  { name: "Features", href: "/#features" },
+  { name: "Features", href: "/#pillars" },
   { name: "How It Works", href: "/#how-it-works" },
   { name: "Pricing", href: "/#pricing" },
   { name: "Docs", href: "/docs" },
+  { name: "Changelog", href: "/changelog" },
 ];
 
 export function Navigation() {

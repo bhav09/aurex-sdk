@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Cpu, Cloud, Layers, BookOpen, ArrowRight, Bot, Shield } from "lucide-react";
+import { Cpu, Cloud, Layers, BookOpen, ArrowRight, Bot, Rocket, Shield } from "lucide-react";
 
 export const metadata = {
   title: "Aurex SDK Documentation",
   description:
-    "Track LLM cost locally, sync metadata to your project, and recover from billed-but-failed provider responses.",
+    "Token waste prevention SDK. Install, auto-patch all providers, and start preventing wasted tokens in under two minutes.",
 };
 
 const cards = [
@@ -43,17 +43,91 @@ const cards = [
 export default function DocsOverviewPage() {
   return (
     <div className="space-y-10">
+      {/* Quickstart block */}
+      <div id="quickstart" className="scroll-mt-32">
+        <div className="flex items-center gap-2 mb-4">
+          <Rocket className="w-5 h-5 text-amber-400" />
+          <h2 className="text-2xl font-display font-bold text-white">Quickstart</h2>
+          <span className="ml-2 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 rounded text-amber-400">
+            2 minutes
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
+          <div className="p-5 sm:p-6 font-mono text-sm leading-relaxed">
+            <div className="text-white/30 mb-3"># Step 1: Install</div>
+            <div className="text-white/70 mb-4">
+              <span className="text-emerald-400">$</span> pip install aurex-sdk
+            </div>
+
+            <div className="text-white/30 mb-3"># Step 2: Initialise and auto-patch all providers</div>
+            <div className="text-white/70">
+              <span className="text-indigo-300">from</span> aurex_sdk <span className="text-indigo-300">import</span> AurexClient, patch_all
+            </div>
+            <div className="text-white/70 mt-1">
+              client = <span className="text-amber-300">AurexClient</span>(<span className="text-white/40">api_key=</span><span className="text-emerald-300">&quot;ax-...&quot;</span>)
+              <span className="text-white/25 ml-2"># or set AUREX_API_KEY env var</span>
+            </div>
+            <div className="text-white/70 mb-4">
+              <span className="text-amber-300">patch_all</span>(client)
+            </div>
+
+            <div className="text-white/30 mb-3"># Step 3: Use your LLM library exactly as before</div>
+            <div className="text-white/70">
+              <span className="text-indigo-300">import</span> openai
+            </div>
+            <div className="text-white/70">
+              response = openai.<span className="text-amber-300">OpenAI</span>().chat.completions.<span className="text-amber-300">create</span>(
+            </div>
+            <div className="text-white/70 pl-4">
+              model=<span className="text-emerald-300">&quot;gpt-4o&quot;</span>,
+            </div>
+            <div className="text-white/70 pl-4">
+              messages=[{`{`}<span className="text-emerald-300">&quot;role&quot;</span>: <span className="text-emerald-300">&quot;user&quot;</span>, <span className="text-emerald-300">&quot;content&quot;</span>: <span className="text-emerald-300">&quot;Explain quantum entanglement.&quot;</span>{`}`}]
+            </div>
+            <div className="text-white/70 mb-4">)</div>
+
+            <div className="text-white/30 mb-3"># Step 4: Check your Token Credit Score</div>
+            <div className="text-white/70">
+              score = client.<span className="text-amber-300">score</span>()
+            </div>
+            <div className="text-white/70">
+              <span className="text-amber-300">print</span>(<span className="text-emerald-300">f&quot;Token Credit Score: {`{`}score.value{`}`}/100&quot;</span>)
+            </div>
+            <div className="text-emerald-400/60 mt-2">
+              # =&gt; Token Credit Score: 84/100
+            </div>
+            <div className="text-emerald-400/60">
+              {`# => Flags: ['cache_opportunity: $12.40/month saving on system prompt']`}
+            </div>
+          </div>
+        </div>
+
+        {/* Privacy note */}
+        <div className="flex items-start gap-3 mt-4 p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02]">
+          <Shield className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm text-white/50">
+              <span className="text-white/70 font-medium">No data leaves your machine by default.</span>{" "}
+              Cloud sync is opt-in. The ledger file at <code className="text-emerald-400/70 text-xs">~/.aurex/ledger.jsonl</code> is
+              human-readable JSON and can be inspected at any time. It contains only numeric metadata — never raw prompt text.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">SDK v0.2 Parity</span>
+          <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">SDK v0.3</span>
         </div>
         <h1 className="text-4xl font-display font-bold tracking-tight text-white mb-3">
           Aurex SDK Documentation
         </h1>
         <p className="text-white/50 max-w-2xl leading-relaxed">
-          Aurex watches LLM calls locally, hashes prompts for zero-PII telemetry, and optionally syncs metadata to
-          your Aurex project. Budget guards and provider resilience run in-process without adding latency to every call.
+          Aurex is a token waste prevention platform. The SDK sits in-process between your application code and LLM provider APIs,
+          intercepting and preventing the four root causes of AI token waste before a single wasted token is billed.
+          Budget guards and detection heuristics run locally without adding network latency.
         </p>
       </div>
 

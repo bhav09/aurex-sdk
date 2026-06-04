@@ -5,25 +5,25 @@ import { FALLBACK_SHOWCASE_MODELS } from "@/lib/showcase-models-fallback";
 
 const metrics = [
   {
-    value: 100,
-    suffix: "%",
-    prefix: "",
-    label: "Local SDK Ledger",
-    sublabel: "Sync is strictly opt-in and project-scoped",
+    value: 72,
+    suffix: "",
+    prefix: "F1 0.",
+    label: "Loop Detection Accuracy",
+    sublabel: "arXiv:2511.10650 — hybrid structural + semantic",
   },
   {
-    value: 5,
+    value: 4,
     suffix: "",
     prefix: "",
-    label: "Detection Algorithms",
-    sublabel: "identifying cost inefficiencies",
+    label: "Prevention Pillars",
+    sublabel: "LoopGuard · PromptIQ · CascadeRouter · ProviderShield",
   },
   {
-    value: 10,
-    suffix: "+",
-    prefix: "",
-    label: "LLM Providers",
-    sublabel: "supported out of the box",
+    value: 2,
+    suffix: "ms",
+    prefix: "<",
+    label: "Hot-Path Latency",
+    sublabel: "zero network hop overhead",
   },
 ];
 
@@ -303,10 +303,10 @@ export function MetricsSection() {
 
             <h2 className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.95] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}>
-              Built for <span className="text-muted-foreground">control.</span>
+              Built for <span className="text-muted-foreground">prevention.</span>
             </h2>
             <p className="mt-6 text-xl text-muted-foreground max-w-2xl">
-              Enforce prompt caching, intercept infinite runaway loops, and govern your model usage in real-time. Privacy is a default: cloud sync is strictly opt-in.
+              In-process detection and prevention. Sub-millisecond overhead. No data leaves your machine by default — cloud sync is strictly opt-in.
             </p>
           </div>
         </div>

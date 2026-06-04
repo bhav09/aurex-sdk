@@ -622,6 +622,8 @@ class AurexAuditor:
         status: Optional[str] = None,
         error_code: Optional[str] = None,
         finish_reason: Optional[str] = None,
+        similarity_score: Optional[float] = None,
+        has_cache_header: bool = False,
     ):
         """
         Record an LLM call to the ledger completely asynchronously.
@@ -688,6 +690,8 @@ class AurexAuditor:
             "status": status,
             "error_code": error_code,
             "finish_reason": finish_reason,
+            "similarity_score": similarity_score,
+            "has_cache_header": has_cache_header,
         }
 
         # Optional OpenTelemetry Export

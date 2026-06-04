@@ -141,7 +141,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6 sm:mb-8 md:mb-12"
           >
             <span className="w-6 sm:w-8 h-px bg-white/30" />
-            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">AI Runtime Cost Control Plane</span>
+            <span className="text-xs sm:text-sm text-white/60 tracking-wide font-mono">Token waste prevention platform</span>
             <span className="w-6 sm:w-8 h-px bg-white/30" />
           </motion.div>
 
@@ -152,14 +152,14 @@ export function HeroSection() {
           >
             <h1 className="text-[2rem] sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mt-4 sm:mt-6 mb-8 sm:mb-10 md:mb-12 tracking-tight leading-[1.1] text-balance pb-1">
               <span className="block bg-clip-text text-transparent bg-gradient-to-b from-white to-white/80">
-                measure, control, and verify
+                Stop the token waste
               </span>
               <span
                 className={cn(
                   "block bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300"
                 )}
               >
-                every dollar your AI spends.
+                before it fires.
               </span>
             </h1>
           </motion.div>
@@ -169,8 +169,8 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.7 }}
           >
-            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/40 mb-8 sm:mb-10 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-2 sm:px-4">
-              Intercept and prevent LLM cost runaways in real-time, enforce budget policies at the SDK level, and optimize system prompt redundancy.
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/40 mb-8 sm:mb-10 leading-relaxed font-light tracking-wide max-w-3xl mx-auto px-2 sm:px-4">
+              Helicone shows you what burned. Langfuse traces how it happened. Aurex prevents it — an in-process SDK that detects loops, compresses prompts, routes to cheaper models, and fails over between providers before a single wasted token reaches your API bill.
             </p>
           </motion.div>
 
@@ -185,18 +185,18 @@ export function HeroSection() {
                 Run Free Audit
               </Button>
             </a>
-            <a href="/docs">
+            <a href="#pillars">
               <Button
-                id="hero-link-docs"
+                id="hero-link-pillars"
                 variant="outline"
                 className="rounded-full border border-white/20 hover:border-white/40 text-white bg-transparent hover:bg-white/5 px-6 sm:px-8 h-11 sm:h-12 text-sm sm:text-base font-medium transition-all"
               >
-                SDK Docs
+                See how it works
               </Button>
             </a>
           </motion.div>
 
-          {/* Stats */}
+          {/* Stats — research-backed */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -205,14 +205,17 @@ export function HeroSection() {
           >
             <div className="flex items-start justify-center gap-6 sm:gap-8 md:gap-10 lg:gap-20 flex-wrap">
               {[
-                { value: "30%", label: "avg tokens wasted" },
-                { value: "$2.4k", label: "potential monthly savings" },
-                { value: "<30s", label: "time to audit" },
+                { value: "F1 0.72", label: "loop detection accuracy", source: "arXiv:2511.10650" },
+                { value: "20×", label: "prompt compression", source: "Microsoft LLMLingua-2" },
+                { value: "98%", label: "cost reduction via cascade routing", source: "Stanford FrugalGPT" },
               ].map((stat) => (
                 <div key={stat.label} className="flex flex-col gap-1 sm:gap-2 text-center">
                   <span className="text-2xl sm:text-3xl lg:text-4xl font-display text-white">{stat.value}</span>
                   <span className="text-[10px] sm:text-xs text-white/50 leading-tight">
                     {stat.label}
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] text-white/25 font-mono leading-tight">
+                    {stat.source}
                   </span>
                 </div>
               ))}
@@ -225,5 +228,3 @@ export function HeroSection() {
     </div>
   )
 }
-
-

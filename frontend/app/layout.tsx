@@ -20,8 +20,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Aurex - LLM Cost Intelligence & Control',
-  description: 'Real-time cost control and audit insights. Local SDK ledger by default. Cloud sync is opt-in and project-scoped.',
+  title: 'Aurex — Token Waste Prevention Platform',
+  description: 'Stop AI token waste before it fires. In-process SDK that detects loops, compresses prompts, routes to cheaper models, and fails over between providers.',
   generator: 'v0.app',
 }
 
