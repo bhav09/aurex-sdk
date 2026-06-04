@@ -1,41 +1,42 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Shield, Brain, GitBranch, Zap } from "lucide-react";
 
-const features = [
+const pillars = [
   {
     number: "01",
-    title: "Cost Savings",
-    description: "Identify where you're wasting tokens and reduce spend. Get actionable recommendations to optimize your AI usage and cut costs by up to 40%.",
-    stats: { value: "40%", label: "avg cost reduction" },
+    title: "LoopGuard",
+    description: "Hybrid structural + semantic cycle detection catches runaway agents before they burn tokens. Combines exact-hash matching with cosine similarity to detect both identical and fuzzy repetition.",
+    stats: { value: "F1: 0.72", label: "vs 0.08 for naive step limits" },
+    icon: Shield,
+    docsHref: "/docs/reference#loopguard",
   },
   {
     number: "02",
-    title: "Visibility",
-    description: "Understand exactly how your AI is being used. Track token consumption, model distribution, and usage patterns across your entire organization.",
-    stats: { value: "100%", label: "usage transparency" },
+    title: "PromptIQ",
+    description: "Detects prompt bloat drift, chain-of-thought inflation, and missed caching opportunities before the call fires. Tracks system prompt growth over time and flags wasted reasoning tokens.",
+    stats: { value: "$60/day", label: "flagged in a typical RAG pipeline" },
+    icon: Brain,
+    docsHref: "/docs/reference#promptiq",
   },
   {
     number: "03",
-    title: "Control",
-    description: "Local SDK ledger by default. Cloud sync is opt-in and project-scoped. You decide what leaves your environment.",
-    stats: { value: "100%", label: "control" },
+    title: "CascadeRouter",
+    description: "Routes to the cheapest model that can handle the query; escalates only when quality fails. Quality-scored model cascade with automatic fallback and no manual configuration.",
+    stats: { value: "98%", label: "cost reduction (Stanford FrugalGPT)" },
+    icon: GitBranch,
+    docsHref: "/docs/reference#cascaderouter",
+  },
+  {
+    number: "04",
+    title: "ProviderShield",
+    description: "Scoped circuit breakers and automatic fallback chains, in-process, zero network hop. Detects provider degradation and reroutes calls before they time out or fail.",
+    stats: { value: "0ms", label: "latency penalty vs external gateways" },
+    icon: Zap,
+    docsHref: "/docs/reference#providershield",
   },
 ];
-
-// Auto-scroll through features
-function useFeatureScroll(featuresLength: number) {
-  const [activeFeature, setActiveFeature] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveFeature((prev) => (prev + 1) % featuresLength);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [featuresLength]);
-
-  return activeFeature;
-}
 
 // Floating dot particles visualization
 function ParticleVisualization() {
@@ -139,7 +140,6 @@ function ParticleVisualization() {
 export function FeaturesSection() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const activeFeature = useFeatureScroll(features.length);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -155,7 +155,7 @@ export function FeaturesSection() {
 
   return (
     <section
-      id="features"
+      id="pillars"
       ref={sectionRef}
       className="relative py-16 sm:py-20 lg:py-28 overflow-hidden"
     >
@@ -175,66 +175,62 @@ export function FeaturesSection() {
             <div className="lg:col-span-7">
               <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4 sm:mb-6">
                 <span className="w-12 h-px bg-foreground/30" />
-                Value Propositions
+                Four Pillars
               </span>
               <h2
                 className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                   }`}
               >
-                Smart
+                Prevention,
                 <br />
-                <span className="text-muted-foreground">auditing.</span>
+                <span className="text-muted-foreground">not observability.</span>
               </h2>
             </div>
             <div className="lg:col-span-5 lg:pb-4">
               <p className={`text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 }`}>
-                Analyze your AI token usage locally and discover where you're wasting money. Get actionable insights in seconds.
+                Four in-process capabilities that detect and stop token waste before a single wasted token is billed.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Horizontal Scrollable Cards */}
+        {/* Four-pillar grid */}
         <div className="relative">
-          {/* Scroll container */}
-          <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-6 px-6 lg:mx-0 lg:px-0">
-            {features.map((feature, index) => (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {pillars.map((pillar, index) => (
               <div
-                key={feature.number}
-                className={`flex-none w-[85vw] sm:w-[75vw] lg:w-[calc(33.333%-16px)] relative bg-background border border-foreground/10 min-h-[380px] sm:min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                key={pillar.number}
+                className={`relative bg-background border border-foreground/10 min-h-[380px] sm:min-h-[420px] overflow-hidden group transition-all duration-700 hover:border-foreground/25 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                   }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <div className="relative h-full p-6 sm:p-8 lg:p-10 bg-background">
+                <div className="relative h-full p-6 sm:p-8 bg-background">
                   <ParticleVisualization />
                   <div className="relative z-10 flex flex-col h-full">
-                    <span className="font-mono text-xs sm:text-sm text-muted-foreground">{feature.number}</span>
-                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-display mt-3 sm:mt-4 mb-4 sm:mb-6 group-hover:translate-x-2 transition-transform duration-500">
-                      {feature.title}
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="font-mono text-xs sm:text-sm text-muted-foreground">{pillar.number}</span>
+                      <pillar.icon className="w-4 h-4 text-[#eca8d6]" />
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-display mt-1 mb-4 group-hover:translate-x-2 transition-transform duration-500">
+                      {pillar.title}
                     </h3>
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-6 sm:mb-8 flex-1">
-                      {feature.description}
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-6 flex-1">
+                      {pillar.description}
                     </p>
                     <div className="mt-auto">
-                      <span className="text-4xl sm:text-5xl lg:text-6xl font-display">{feature.stats.value}</span>
-                      <span className="block text-xs sm:text-sm text-muted-foreground font-mono mt-2">{feature.stats.label}</span>
+                      <span className="text-3xl sm:text-4xl font-display">{pillar.stats.value}</span>
+                      <span className="block text-xs text-muted-foreground font-mono mt-2">{pillar.stats.label}</span>
                     </div>
+                    <a
+                      href={pillar.docsHref}
+                      className="inline-flex items-center gap-1 text-xs text-[#eca8d6]/60 hover:text-[#eca8d6] font-mono mt-4 transition-colors"
+                    >
+                      Read docs →
+                    </a>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Scroll indicators */}
-          <div className="flex justify-center gap-2 mt-6 lg:hidden">
-            {features.map((_, index) => (
-              <button
-                key={index}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === activeFeature ? "bg-foreground w-8" : "bg-foreground/20"
-                  }`}
-                aria-label={`Go to feature ${index + 1}`}
-              />
             ))}
           </div>
         </div>

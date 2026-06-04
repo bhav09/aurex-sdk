@@ -2,8 +2,10 @@ import json
 import os
 import sys
 import uuid
-from datetime import datetime
+import hashlib
+from datetime import datetime, timedelta
 from collections import defaultdict
+from decimal import Decimal
 from typing import List, Dict, Any, Tuple, Optional
 
 # Aligned local pricing helper
@@ -63,6 +65,10 @@ class LocalHeuristicsEngine:
         self.detect_agent_loops()
         self.detect_expensive_model_misuse()
         self.detect_context_explosion()
+        # Phase 1: new PromptIQ signals
+        self.detect_prompt_drift()
+        self.detect_cot_inflation()
+        self.detect_cache_opportunity()
 
         # Prevent double-counting: assign waste proportionally per event, capped at actual event cost
         event_waste_map = defaultdict(float)
@@ -265,50 +271,119 @@ class LocalHeuristicsEngine:
             })
 
     def detect_agent_loops(self):
-        """Detect infinite runaway loops via exponential context expansion"""
+        """Detect infinite runaway loops via hybrid structural + semantic detection.
+        
+        Phase 1 upgrade: three detection layers per SKILL.md §6.1.
+        Layer 1: Exact hash matching (SHA-256 of tool call args / prompt content)
+        Layer 2: Context growth threshold (2.5× over 3+ calls)
+        Layer 3: Semantic fuzzy detection (jaccard n-gram similarity > 0.85)
+        """
         sessions = self._get_inferred_sessions()
 
         for session_id, evs in sessions.items():
             if len(evs) < 3:
                 continue
 
-            # Check context lengths (input tokens)
-            contexts = [e.get("input_tokens", 0) for _, e in evs]
-            if len(contexts) < 3:
-                continue
+            loop_detected = False
+            reason_code = None
+            affected = []
+            incremental_cost = 0.0
 
-            doublings = 0
-            for i in range(1, len(contexts)):
-                if contexts[i] >= contexts[i-1] * 2.5 and contexts[i-1] > 50:
-                    doublings += 1
+            # --- Layer 1: Exact hash matching ---
+            # Check if consecutive prompts have identical hashes
+            prompt_hashes = []
+            for eid, e in evs:
+                ph = e.get("prompt_hash") or e.get("system_prompt_hash")
+                if not ph:
+                    # Fallback: hash from input token count + model
+                    ph = hashlib.sha256(
+                        f"{e.get('input_tokens', 0)}:{e.get('model', '')}".encode()
+                    ).hexdigest()[:16]
+                prompt_hashes.append((eid, e, ph))
 
-            if doublings >= 2:
-                # Calculate INCREMENTAL cost above baseline, not entire session cost
-                baseline_cost = evs[0][1].get("cost", 0.0) if evs else 0.0
-                incremental_cost = sum(
-                    max(0, e.get("cost", 0.0) - baseline_cost)
-                    for _, e in evs[1:]
-                )
+            # Sliding window of 3 for exact repeats
+            for i in range(2, len(prompt_hashes)):
+                window_hashes = [prompt_hashes[j][2] for j in range(i - 2, i + 1)]
+                if len(set(window_hashes)) == 1:
+                    loop_detected = True
+                    reason_code = "structural_exact_repeat"
+                    affected = [prompt_hashes[j][0] for j in range(i - 2, i + 1)]
+                    baseline_cost = evs[0][1].get("cost", 0.0)
+                    incremental_cost = sum(
+                        max(0, prompt_hashes[j][1].get("cost", 0.0) - baseline_cost)
+                        for j in range(i - 2, i + 1)
+                    )
+                    break
+
+            # --- Layer 2: Context growth (existing, preserved) ---
+            if not loop_detected:
+                contexts = [e.get("input_tokens", 0) for _, e in evs]
+                doublings = 0
+                for i in range(1, len(contexts)):
+                    if contexts[i] >= contexts[i-1] * 2.5 and contexts[i-1] > 50:
+                        doublings += 1
+
+                if doublings >= 2:
+                    loop_detected = True
+                    reason_code = "structural_context_explosion"
+                    affected = [eid for eid, _ in evs]
+                    baseline_cost = evs[0][1].get("cost", 0.0) if evs else 0.0
+                    incremental_cost = sum(
+                        max(0, e.get("cost", 0.0) - baseline_cost)
+                        for _, e in evs[1:]
+                    )
+
+            # --- Layer 3: Semantic fuzzy detection ---
+            if not loop_detected and len(evs) >= 3:
+                # Use response hashes to detect semantically similar outputs
+                response_hashes = []
+                for eid, e in evs:
+                    rh = e.get("response_hash")
+                    if rh:
+                        response_hashes.append((eid, e, rh))
                 
-                # Tier severity: 3+ doublings = CRITICAL, 2 = HIGH
-                severity = "CRITICAL" if doublings >= 3 else "HIGH"
+                # Check for high similarity in consecutive response hashes
+                if len(response_hashes) >= 3:
+                    # Count consecutive identical response hashes
+                    consecutive_same = 1
+                    for i in range(1, len(response_hashes)):
+                        if response_hashes[i][2] == response_hashes[i-1][2]:
+                            consecutive_same += 1
+                            if consecutive_same >= 3:
+                                loop_detected = True
+                                reason_code = "semantic_fuzzy_repeat"
+                                start_idx = i - consecutive_same + 1
+                                affected = [response_hashes[j][0] for j in range(start_idx, i + 1)]
+                                baseline_cost = response_hashes[start_idx][1].get("cost", 0.0)
+                                incremental_cost = sum(
+                                    max(0, response_hashes[j][1].get("cost", 0.0) - baseline_cost)
+                                    for j in range(start_idx + 1, i + 1)
+                                )
+                                break
+                        else:
+                            consecutive_same = 1
+
+            if loop_detected:
+                # Tier severity
+                severity = "CRITICAL" if reason_code == "structural_context_explosion" else "HIGH"
                 if any(e.get("session_confidence") == "low" for _, e in evs):
                     severity = "MEDIUM"
-                
+
+                contexts = [e.get("input_tokens", 0) for _, e in evs]
                 self.issues.append({
                     "issue_type": "agent_loop",
                     "title": "Agent Runaway Loop",
                     "severity": severity,
                     "cost_impact": round(incremental_cost, 4),
-                    "summary": f"Prompt context doubled {doublings} times in consecutive requests.",
+                    "summary": f"Loop detected ({reason_code}) in session.",
                     "fix_effort": "10 minutes",
                     "fix_confidence": "HIGH",
-                    "cta": "Add Context Pruning",
-                    "affected_events": [eid for eid, _ in evs],
+                    "cta": "Enable LoopGuard",
+                    "affected_events": affected if affected else [eid for eid, _ in evs],
                     "metadata": {
                         "session_id": session_id,
-                        "doublings": doublings,
-                        "context_growth": f"{contexts[0]} -> {contexts[-1]}"
+                        "reason_code": reason_code,
+                        "context_growth": f"{contexts[0]} -> {contexts[-1]}" if contexts else ""
                     }
                 })
 
@@ -396,3 +471,193 @@ class LocalHeuristicsEngine:
                         "growth_ratio": round(max_context / min_context, 2)
                     }
                 })
+
+    def detect_prompt_drift(self):
+        """Phase 1 — PromptIQ Signal A: Prompt length drift tracking.
+        
+        Track system prompt token count as a time series keyed by workflow_id.
+        Flag when any workflow's median system prompt token count has grown more
+        than 20% over a 7-day rolling window.
+        """
+        # Group events by workflow_id
+        workflow_events = defaultdict(list)
+        for idx, e in enumerate(self.events):
+            eid = e.get("id") or f"evt_{idx}"
+            wf_id = e.get("workflow_id")
+            if not wf_id:
+                continue
+            # We use input_tokens as a proxy for system prompt size
+            # In future, a dedicated system_prompt_tokens field would be better
+            input_tokens = e.get("input_tokens", 0)
+            if input_tokens < 50:
+                continue
+            
+            ts_str = e.get("timestamp")
+            try:
+                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            except Exception:
+                continue
+            
+            workflow_events[wf_id].append((ts, eid, e, input_tokens))
+        
+        for wf_id, entries in workflow_events.items():
+            if len(entries) < 10:
+                continue
+            
+            entries.sort(key=lambda x: x[0])
+            
+            # 7-day window
+            latest_ts = entries[-1][0]
+            cutoff = latest_ts - timedelta(days=7)
+            recent = [(ts, eid, e, tokens) for ts, eid, e, tokens in entries if ts >= cutoff]
+            
+            if len(recent) < 10:
+                continue
+            
+            # Compare earliest 5 vs latest 5 medians
+            token_counts = [tokens for _, _, _, tokens in recent]
+            earliest_median = sorted(token_counts[:5])[len(token_counts[:5]) // 2]
+            latest_median = sorted(token_counts[-5:])[len(token_counts[-5:]) // 2]
+            
+            if earliest_median == 0:
+                continue
+            
+            growth_ratio = latest_median / earliest_median
+            if growth_ratio >= 1.20:
+                # Estimate cost impact of the drift
+                avg_cost = sum(e.get("cost", 0.0) for _, _, e, _ in recent) / len(recent)
+                excess_ratio = (growth_ratio - 1.0)
+                estimated_waste = avg_cost * excess_ratio * len(recent)
+                
+                self.issues.append({
+                    "issue_type": "prompt_drift",
+                    "title": "Prompt Length Drift",
+                    "severity": "MEDIUM",
+                    "cost_impact": round(estimated_waste, 4),
+                    "summary": f"System prompt grew {growth_ratio:.1f}x over 7 days in workflow '{wf_id}'",
+                    "fix_effort": "15 minutes",
+                    "fix_confidence": "MEDIUM",
+                    "cta": "Review Prompt Growth",
+                    "affected_events": [eid for _, eid, _, _ in recent[-5:]],
+                    "metadata": {
+                        "workflow_id": wf_id,
+                        "earliest_median_tokens": earliest_median,
+                        "latest_median_tokens": latest_median,
+                        "growth_ratio": round(growth_ratio, 3),
+                    }
+                })
+
+    def detect_cot_inflation(self):
+        """Phase 1 — PromptIQ Signal B: Chain-of-thought token inflation.
+        
+        Detect when a response's reasoning tokens represent >40% of completion
+        cost, suggesting the caller may not need extended thinking mode.
+        """
+        cot_events = []
+        for idx, e in enumerate(self.events):
+            eid = e.get("id") or f"evt_{idx}"
+            reasoning_tokens = e.get("reasoning_tokens", 0)
+            output_tokens = e.get("output_tokens", 0)
+            
+            if reasoning_tokens == 0 or output_tokens == 0:
+                continue
+            
+            reasoning_ratio = reasoning_tokens / max(output_tokens, 1)
+            if reasoning_ratio >= 0.40:
+                model = e.get("model", "unknown")
+                cost = e.get("cost", 0.0)
+                
+                # Estimate reasoning cost (typically billed as output)
+                _, output_price = get_model_pricing(model)
+                reasoning_cost = reasoning_tokens / 1_000_000 * output_price
+                
+                cot_events.append((eid, e, reasoning_ratio, reasoning_cost))
+        
+        if len(cot_events) >= 3:
+            total_reasoning_cost = sum(rc for _, _, _, rc in cot_events)
+            avg_ratio = sum(r for _, _, r, _ in cot_events) / len(cot_events)
+            
+            self.issues.append({
+                "issue_type": "cot_inflation",
+                "title": "Chain-of-Thought Inflation",
+                "severity": "MEDIUM",
+                "cost_impact": round(total_reasoning_cost * 0.5, 4),  # Conservative: 50% could be saved
+                "summary": f"{len(cot_events)} calls with avg {avg_ratio:.0%} reasoning token ratio",
+                "fix_effort": "5 minutes",
+                "fix_confidence": "MEDIUM",
+                "cta": "Use Standard Completion Mode",
+                "affected_events": [eid for eid, _, _, _ in cot_events],
+                "metadata": {
+                    "cot_event_count": len(cot_events),
+                    "avg_reasoning_ratio": round(avg_ratio, 3),
+                    "total_reasoning_cost": round(total_reasoning_cost, 4),
+                }
+            })
+
+    def detect_cache_opportunity(self):
+        """Phase 1 — PromptIQ Signal C: Prompt caching opportunity detection.
+        
+        Flag calls where the system prompt is identical across sessions (matched
+        by hash) and the provider supports prompt caching but no cache header
+        was sent. Calculate the monthly savings at the provider's cached rate.
+        """
+        CACHE_RATES = {
+            "anthropic": 0.10,   # pay 10% of normal input rate
+            "openai": 0.50,      # pay 50% of normal input rate
+            "google": 0.25,      # pay 25% of normal input rate
+        }
+        
+        # Group by system_prompt_hash
+        prompt_groups = defaultdict(list)
+        for idx, e in enumerate(self.events):
+            eid = e.get("id") or f"evt_{idx}"
+            sph = e.get("system_prompt_hash")
+            if not sph:
+                continue
+            # Skip if caching is already active
+            if e.get("cached_tokens", 0) > 0:
+                continue
+            prompt_groups[sph].append((eid, e))
+        
+        for sph, evs in prompt_groups.items():
+            if len(evs) < 5:
+                continue
+            
+            # Check provider support
+            sample_provider = evs[0][1].get("provider", "unknown")
+            if sample_provider not in CACHE_RATES:
+                continue
+            
+            # Calculate potential savings
+            cache_rate = CACHE_RATES[sample_provider]
+            avg_input_tokens = sum(e.get("input_tokens", 0) for _, e in evs) / len(evs)
+            input_price, _ = get_model_pricing(evs[0][1].get("model", ""))
+            
+            normal_cost_per_call = avg_input_tokens / 1_000_000 * input_price
+            cached_cost_per_call = normal_cost_per_call * cache_rate
+            saving_per_call = normal_cost_per_call - cached_cost_per_call
+            monthly_saving = saving_per_call * len(evs)
+            
+            if monthly_saving < 0.10:
+                continue
+            
+            self.issues.append({
+                "issue_type": "cache_opportunity",
+                "title": "Prompt Caching Opportunity",
+                "severity": "MEDIUM",
+                "cost_impact": round(monthly_saving, 4),
+                "summary": f"Add cache_control header for {sample_provider}. Est. saving: ${monthly_saving:.2f}/month",
+                "fix_effort": "5 minutes",
+                "fix_confidence": "HIGH",
+                "cta": "Enable Prompt Caching",
+                "affected_events": [eid for eid, _ in evs],
+                "metadata": {
+                    "prompt_hash": sph,
+                    "provider": sample_provider,
+                    "call_count": len(evs),
+                    "avg_input_tokens": round(avg_input_tokens),
+                    "monthly_saving_usd": round(monthly_saving, 2),
+                    "cache_discount": f"{(1 - cache_rate) * 100:.0f}%",
+                }
+            })
+

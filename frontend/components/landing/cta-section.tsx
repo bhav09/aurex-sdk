@@ -47,11 +47,11 @@ export function CtaSection() {
 
           <div className="relative z-10 px-8 lg:px-16 py-12 lg:py-16 text-center">
             <h2 className="text-5xl md:text-6xl lg:text-7xl font-display tracking-tight mb-6 leading-[0.95]">
-              Start auditing for free.
+              Start preventing waste today.
             </h2>
 
             <p className="text-lg text-muted-foreground mb-6 leading-relaxed max-w-2xl mx-auto">
-              Upload your CSV or JSON logs and get instant insights. Download your free audit report immediately.
+              Two lines of code. All four pillars running in-process. No data leaves your machine by default. See your Token Credit Score in seconds.
             </p>
 
             <div className="mb-8 p-4 border border-foreground/10 bg-foreground/[0.02] rounded-lg max-w-2xl mx-auto">
@@ -67,7 +67,7 @@ export function CtaSection() {
                 className="bg-foreground hover:bg-foreground/90 text-background px-8 h-12 text-base group"
               >
                 <a href="/audit">
-                  Try free audit now
+                  Run Free Audit
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                 </a>
               </Button>
@@ -84,7 +84,7 @@ export function CtaSection() {
             </div>
 
             <p className="text-xs text-muted-foreground mt-6 font-mono">
-              No credit card required • 100% local processing
+              No credit card required • 100% local processing • Cloud sync is opt-in
             </p>
           </div>
 

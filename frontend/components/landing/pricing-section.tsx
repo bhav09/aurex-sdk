@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowRight, Check, Zap } from "lucide-react";
+import { ArrowRight, Check, X, Zap } from "lucide-react";
 
 const plans = [
   {
@@ -10,41 +10,46 @@ const plans = [
     priceDisplay: "$0",
     billingDisplay: "forever free",
     features: [
-      "1 audit per month",
-      "Up to 10K tokens analyzed",
-      "Basic recommendations",
-      "CSV/JSON export",
-      "Community support",
+      { text: "1 audit per month", included: true },
+      { text: "Up to 10K tokens analyzed", included: true },
+      { text: "Basic recommendations", included: true },
+      { text: "CSV/JSON export", included: true },
+      { text: "Community support", included: true },
+      { text: "Cloud dashboard", included: false },
+      { text: "CascadeRouter", included: false },
+      { text: "ProviderShield circuit breakers", included: false },
     ],
     highlight: false,
   },
   {
-    name: "Control Plan",
-    description: "For production platforms needing real-time cost control and guardrails",
-    priceDisplay: "$500",
-    billingDisplay: "/month + 10% of realized savings",
+    name: "Team",
+    description: "For production platforms needing cloud insights, cascade routing, and team governance",
+    priceDisplay: "$299",
+    billingDisplay: "/month",
     features: [
-      "No latency overhead (<0.1ms)",
-      "Real-time cost control plane",
-      "Zero-latency SDK ledger sync (opt-in)",
-      "Pre-call warning & block guards",
-      "Team cost governance dashboards",
-      "Priority Slack & email support",
+      { text: "Everything in Developer", included: true },
+      { text: "Cloud dashboard with trace trees", included: true },
+      { text: "CascadeRouter (Phase 2)", included: true },
+      { text: "ProviderShield circuit breakers", included: true },
+      { text: "Team cost governance", included: true },
+      { text: "OpenTelemetry export", included: true },
+      { text: "Slack/email alerts", included: true },
+      { text: "Priority support", included: true },
     ],
     highlight: true,
   },
   {
-    name: "Enterprise Plan",
+    name: "Enterprise",
     description: "For large scale workloads requiring custom SLA, dedicated hosting, and advanced compliance",
     priceDisplay: "Custom",
     billingDisplay: "contact sales",
     features: [
-      "Everything in Control Plan",
-      "Self-hosted control plane & DB option",
-      "Custom pre-call validation logic",
-      "Dedicated account engineer",
-      "Enterprise SLA & custom contracts",
-      "SSO/SAML login integration",
+      { text: "Everything in Team", included: true },
+      { text: "Self-hosted control plane & DB option", included: true },
+      { text: "Custom pre-call validation logic", included: true },
+      { text: "Dedicated customer success engineer", included: true },
+      { text: "Enterprise SLA & custom contracts", included: true },
+      { text: "SSO/SAML login integration", included: true },
     ],
     highlight: false,
   },
@@ -77,9 +82,9 @@ export function PricingSection() {
           </span>
           <h2 className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}>
-            Simple
+            Simple,
             <br />
-            <span className="text-stroke">pricing...</span>
+            <span className="text-stroke">flat-rate.</span>
           </h2>
         </div>
 
@@ -130,9 +135,15 @@ export function PricingSection() {
                   {/* Features */}
                   <ul className="space-y-3 mb-10">
                     {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3">
-                        <Check className="w-4 h-4 text-[#eca8d6] mt-0.5 shrink-0" />
-                        <span className="text-sm text-muted-foreground">{feature}</span>
+                      <li key={feature.text} className="flex items-start gap-3">
+                        {feature.included ? (
+                          <Check className="w-4 h-4 text-[#eca8d6] mt-0.5 shrink-0" />
+                        ) : (
+                          <X className="w-4 h-4 text-muted-foreground/30 mt-0.5 shrink-0" />
+                        )}
+                        <span className={`text-sm ${feature.included ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
+                          {feature.text}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -144,28 +155,6 @@ export function PricingSection() {
             ))}
           </div>
         </div>
-
-        {/* Bottom note with icons */}
-        {/* <div className={`mt-20 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 pt-12 border-t border-foreground/10 transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"
-          }`}>
-          <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#eca8d6]" />
-              100% local processing
-            </span>
-            <span className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#eca8d6]" />
-              No data retention
-            </span>
-            <span className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#eca8d6]" />
-              Cancel anytime
-            </span>
-          </div>
-          <a href="#" className="text-sm underline underline-offset-4 hover:text-foreground transition-colors">
-            Compare all features
-          </a>
-        </div> */}
       </div>
 
       <style jsx>{`
