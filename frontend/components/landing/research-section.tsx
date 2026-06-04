@@ -9,21 +9,21 @@ const papers = [
     institution: "Stanford University",
     finding: "Cascade routing achieves up to 98% cost reduction at matched accuracy",
     link: "https://arxiv.org/abs/2305.05176",
-    pillar: "CascadeRouter",
+    pillar: "Routing",
   },
   {
     title: "LLMLingua-2",
     institution: "Microsoft Research",
     finding: "Token classification compression runs 3–6× faster with minimal quality loss",
     link: "https://arxiv.org/abs/2403.12968",
-    pillar: "PromptIQ",
+    pillar: "Optimization",
   },
   {
     title: "Unsupervised Cycle Detection in Agentic Applications",
     institution: "arXiv:2511.10650",
     finding: "Hybrid structural + semantic detection achieves F1 0.72 vs 0.08 for structural-only",
     link: "https://arxiv.org/abs/2511.10650",
-    pillar: "LoopGuard",
+    pillar: "Loop Detection",
   },
 ];
 
