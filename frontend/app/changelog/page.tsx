@@ -12,10 +12,10 @@ const entries = [
   {
     date: "2026-06-04",
     version: "v0.3.0",
-    title: "LoopGuard upgrade — F1 0.08 → 0.72",
+    title: "Infinite loop detection upgrade — F1 0.08 → 0.72",
     category: "SDK",
     description:
-      "Upgraded LoopGuard from structural-only heuristic (F1 ≈ 0.08) to hybrid structural + semantic detection (F1 ≈ 0.72). The new implementation adds three detection layers: exact hash matching for identical tool calls, context growth threshold for runaway expansion, and semantic fuzzy detection using cosine similarity for rephrased repetition. Based on techniques from arXiv:2511.10650.",
+      "Upgraded infinite loop detection from structural-only heuristic (F1 ≈ 0.08) to hybrid structural + semantic detection (F1 ≈ 0.72). The new implementation adds three detection layers: exact hash matching for identical tool calls, context growth threshold for runaway expansion, and semantic fuzzy detection using cosine similarity for rephrased repetition. Based on techniques from arXiv:2511.10650.",
     highlights: [
       "3-layer detection: exact hash, context growth, semantic similarity",
       "30-second cooldown after loop detection to prevent double-tripping",
@@ -40,10 +40,10 @@ const entries = [
   {
     date: "2026-06-04",
     version: "v0.3.0",
-    title: "PromptIQ — caching opportunity detection",
+    title: "Prompt optimization — caching opportunity detection",
     category: "SDK",
     description:
-      "New PromptIQ signal detects calls where the system prompt is identical across sessions (matched by token count + SHA-256 hash) and the provider supports prompt caching but no cache header was sent. Calculates estimated monthly savings at the provider's cached rate.",
+      "New prompt optimization signal detects calls where the system prompt is identical across sessions (matched by token count + SHA-256 hash) and the provider supports prompt caching but no cache header was sent. Calculates estimated monthly savings at the provider's cached rate.",
     highlights: [
       "Supports Anthropic (90% savings), OpenAI (50% savings), Google (75% savings)",
       "Only flags prompts appearing 5+ times in 30 days",

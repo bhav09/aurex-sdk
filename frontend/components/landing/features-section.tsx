@@ -1,40 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Shield, Brain, GitBranch, Zap } from "lucide-react";
+import { RotateCcw, BrainCircuit, ArrowDownUp, ShieldAlert } from "lucide-react";
 
 const pillars = [
   {
     number: "01",
-    title: "LoopGuard",
-    description: "Hybrid structural + semantic cycle detection catches runaway agents before they burn tokens. Combines exact-hash matching with cosine similarity to detect both identical and fuzzy repetition.",
+    title: "Infinite Loop Detection",
+    description: "Multi-layered detection matching exact tool calls, context window explosions, and semantic fuzzy repetitions.",
     stats: { value: "F1: 0.72", label: "vs 0.08 for naive step limits" },
-    icon: Shield,
-    docsHref: "/docs/reference#loopguard",
+    icon: RotateCcw,
+    docsHref: "/docs/reference#infinite-loop-detection",
   },
   {
     number: "02",
-    title: "PromptIQ",
-    description: "Detects prompt bloat drift, chain-of-thought inflation, and missed caching opportunities before the call fires. Tracks system prompt growth over time and flags wasted reasoning tokens.",
+    title: "Prompt Optimization",
+    description: "Flags prompt drift, chain-of-thought inflation, and caching opportunities without reading raw prompt text.",
     stats: { value: "$60/day", label: "flagged in a typical RAG pipeline" },
-    icon: Brain,
-    docsHref: "/docs/reference#promptiq",
+    icon: BrainCircuit,
+    docsHref: "/docs/reference#prompt-optimization",
   },
   {
     number: "03",
-    title: "CascadeRouter",
-    description: "Routes to the cheapest model that can handle the query; escalates only when quality fails. Quality-scored model cascade with automatic fallback and no manual configuration.",
+    title: "Cost-Based Routing",
+    description: "Downgrade simple queries to cheaper models dynamically using token credit scores and query complexity.",
     stats: { value: "98%", label: "cost reduction (Stanford FrugalGPT)" },
-    icon: GitBranch,
-    docsHref: "/docs/reference#cascaderouter",
+    icon: ArrowDownUp,
+    docsHref: "/docs/reference#cost-based-routing",
   },
   {
     number: "04",
-    title: "ProviderShield",
-    description: "Scoped circuit breakers and automatic fallback chains, in-process, zero network hop. Detects provider degradation and reroutes calls before they time out or fail.",
+    title: "Resilience & Fallbacks",
+    description: "Circuit breakers for provider outages. Automatically falls back to secondary providers if latency spikes.",
     stats: { value: "0ms", label: "latency penalty vs external gateways" },
-    icon: Zap,
-    docsHref: "/docs/reference#providershield",
+    icon: ShieldAlert,
+    docsHref: "/docs/reference#resilience-fallbacks",
   },
 ];
 

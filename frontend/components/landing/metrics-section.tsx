@@ -16,7 +16,7 @@ const metrics = [
     suffix: "",
     prefix: "",
     label: "Prevention Pillars",
-    sublabel: "LoopGuard · PromptIQ · CascadeRouter · ProviderShield",
+    sublabel: "Infinite Loop Detection · Prompt Optimization · Cost-Based Routing · Resilience",
   },
   {
     value: 2,
