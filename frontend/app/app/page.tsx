@@ -261,7 +261,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           {selectedProject && (
             <Badge variant="outline" className="border-white/10 text-white/50 bg-white/[0.02]">
-              Environment: <span className="text-indigo-400 ml-1 font-mono uppercase text-[10px]">{selectedProject.environment}</span>
+              Environment: <span className="text-teal-400 ml-1 font-mono uppercase text-[10px]">{selectedProject.environment}</span>
             </Badge>
           )}
           {projects.length > 0 ? (
@@ -380,14 +380,14 @@ export default function DashboardPage() {
                   <Card className="bg-surface border-white/[0.06] hover:border-white/10 transition-all duration-300">
                     <CardHeader className="pb-2 space-y-1">
                       <CardTitle className="text-[10px] font-semibold text-white/40 uppercase tracking-widest flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-indigo-400/70" /> Cached Tokens
+                        <Zap className="w-3.5 h-3.5 text-teal-400/70" /> Cached Tokens
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-serif text-indigo-400">
+                      <div className="text-2xl font-serif text-teal-400">
                         {totalCachedTokens ? totalCachedTokens.toLocaleString() : "0"}
                       </div>
-                      <p className="text-[10px] text-indigo-400/60 mt-1">
+                      <p className="text-[10px] text-teal-400/60 mt-1">
                         {stats?.total_tokens && totalCachedTokens 
                           ? `${((totalCachedTokens / stats.total_tokens) * 100).toFixed(1)}% cache hit rate` 
                           : "0.0% hit rate"}
@@ -487,7 +487,7 @@ export default function DashboardPage() {
                           {savings.map((s) => (
                             <div key={s.workflow_id} className="flex justify-between items-start border-b border-white/[0.04] pb-3 last:border-0 last:pb-0">
                               <div className="space-y-0.5">
-                                <p className="text-xs font-mono text-indigo-300 font-semibold">{s.workflow_id}</p>
+                                <p className="text-xs font-mono text-teal-300 font-semibold">{s.workflow_id}</p>
                                 <p className="text-[10px] text-white/40">
                                   Baseline: ${s.baseline_cost_per_success.toFixed(4)}/run → Current: ${s.current_cost_per_success.toFixed(4)}/run
                                 </p>
@@ -587,14 +587,14 @@ export default function DashboardPage() {
                                 <TableCell className="py-3 font-mono text-xs">
                                   {e.model}
                                 </TableCell>
-                                <TableCell className="py-3 font-mono text-[10px] text-indigo-300">
+                                <TableCell className="py-3 font-mono text-[10px] text-teal-300">
                                   {e.workflow_id || "—"}
                                 </TableCell>
                                 <TableCell className="py-3 text-xs">
                                   <div className="flex items-center gap-1.5">
                                     <span>{e.total_tokens || (e.input_tokens + e.output_tokens)}</span>
                                     {isCached && (
-                                      <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[9px] py-0 px-1 font-mono">
+                                      <Badge className="bg-teal-500/10 text-teal-400 border-teal-500/20 text-[9px] py-0 px-1 font-mono">
                                         ⚡ cached
                                       </Badge>
                                     )}
@@ -652,7 +652,7 @@ export default function DashboardPage() {
                       <TableBody>
                         {overview.workflow_breakdown.map((w) => (
                           <TableRow key={w.workflow_id} className="border-white/[0.04] hover:bg-white/[0.01]">
-                            <TableCell className="font-mono text-xs text-indigo-300">{w.workflow_id}</TableCell>
+                            <TableCell className="font-mono text-xs text-teal-300">{w.workflow_id}</TableCell>
                             <TableCell className="text-xs font-mono">${w.cost_7d.toFixed(2)}</TableCell>
                             <TableCell className="text-xs">{w.success_count}</TableCell>
                             <TableCell className="text-xs font-mono text-white/70">
@@ -750,7 +750,7 @@ export default function DashboardPage() {
                   {selectedEvent.workflow_id && (
                     <div className="flex justify-between items-center border-b border-white/[0.04] pb-2">
                       <span className="text-white/40">Workflow</span>
-                      <span className="font-mono text-indigo-300">{selectedEvent.workflow_id}</span>
+                      <span className="font-mono text-teal-300">{selectedEvent.workflow_id}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center border-b border-white/[0.04] pb-2">

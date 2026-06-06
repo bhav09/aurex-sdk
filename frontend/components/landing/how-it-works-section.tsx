@@ -63,18 +63,18 @@ export function HowItWorksSection() {
               <div className="max-w-xl mx-auto mb-8 text-left">
                 <div className="bg-white/[0.03] border border-white/[0.08] rounded-lg p-5 font-mono text-sm">
                   <div className="text-white/30 mb-2"># That&apos;s it. Two lines.</div>
-                  <div><span className="text-indigo-300">from</span> <span className="text-white/70">aurex_sdk</span> <span className="text-indigo-300">import</span> <span className="text-white/70">AurexClient, patch_all</span></div>
-                  <div className="mt-1"><span className="text-white/70">client = </span><span className="text-amber-300">AurexClient</span><span className="text-white/40">()</span></div>
-                  <div><span className="text-amber-300">patch_all</span><span className="text-white/40">(client)</span></div>
+                  <div><span className="text-teal-300">from</span> <span className="text-white/70">aurex_sdk</span> <span className="text-teal-300">import</span> <span className="text-white/70">AurexAuditor, patch_all</span></div>
+                  <div className="mt-1"><span className="text-white/70">auditor = </span><span className="text-amber-300">AurexAuditor</span><span className="text-white/40">()</span></div>
+                  <div><span className="text-amber-300">patch_all</span><span className="text-white/40">()</span></div>
                 </div>
               </div>
 
-              <a href="/audit">
+              <a href="/docs#quickstart">
                 <Button
                   size="lg"
-                  className="relative text-base font-medium rounded-full h-14 px-8 bg-white text-black hover:bg-white/90 transition-all duration-300 group"
+                  className="relative text-base font-medium rounded-full h-14 px-8 bg-teal-500 hover:bg-teal-400 text-white transition-all duration-300 group shadow-[0_4px_12px_rgba(20,184,166,0.3)] border-none"
                 >
-                  <span className="relative z-10">Run Free Audit</span>
+                  <span className="relative z-10">Start Building</span>
                   <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </a>

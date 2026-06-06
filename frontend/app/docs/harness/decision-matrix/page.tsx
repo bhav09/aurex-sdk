@@ -57,12 +57,12 @@ export default function DocsHarnessMatrixPage() {
             <tr>
               <td className="p-3 text-white/80">None — raw SDK calls</td>
               <td className="p-3">Auto-hook or patch_all()</td>
-              <td className="p-3 text-emerald-400/80">Low</td>
+              <td className="p-3 text-teal-400/80">Low</td>
             </tr>
             <tr>
               <td className="p-3 text-white/80">Partial — custom retry/logging wrapper</td>
               <td className="p-3">Manual log_event at wrapper boundary</td>
-              <td className="p-3 text-emerald-400/80">Low if patch disabled</td>
+              <td className="p-3 text-teal-400/80">Low if patch disabled</td>
             </tr>
             <tr>
               <td className="p-3 text-white/80">Full — LangChain/LiteLLM + OTel</td>
@@ -80,7 +80,7 @@ export default function DocsHarnessMatrixPage() {
       <DualCodeBlock pythonCode={pythonPartial} nodeCode={nodePartial} pythonId="partial-py" nodeId="partial-node" />
 
       <p className="text-sm text-white/50">
-        Call <code className="text-indigo-400">get_health()</code> for <code>patch_status</code>. In tests, call{" "}
+        Call <code className="text-teal-400">get_health()</code> for <code>patch_status</code>. In tests, call{" "}
         <code>AurexAuditor.reset()</code> before re-configuring.
       </p>
 

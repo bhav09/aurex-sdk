@@ -17,11 +17,11 @@ export default function DocsRateLimitsPage() {
     >
       <ul className="space-y-2 text-sm text-white/50 list-disc list-inside">
         <li>
-          <code className="text-indigo-400">POST /api/v1/ledger/events</code> — ~600 events/minute per API key (default).
+          <code className="text-teal-400">POST /api/v1/ledger/events</code> — ~600 events/minute per API key (default).
         </li>
         <li>SDK respects <code>Retry-After</code> and applies exponential backoff with jitter.</li>
         <li>
-          <code className="text-indigo-400">POST /api/v1/escalations</code> accepts dashboard JWTs or SDK keys (
+          <code className="text-teal-400">POST /api/v1/escalations</code> accepts dashboard JWTs or SDK keys (
           <code>aux_*</code>).
         </li>
       </ul>

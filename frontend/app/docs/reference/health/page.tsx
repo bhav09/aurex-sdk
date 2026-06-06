@@ -25,7 +25,7 @@ export default function DocsHealthPage() {
       scopeOut={["Cloud sync retry config — see Cloud Sync Resilience", "Serverless flush — see Serverless Flush"]}
     >
       <p className="text-white/50 text-sm">
-        On unclean shutdown, events spill to <code className="text-indigo-400">pending.jsonl</code> and replay on next
+        On unclean shutdown, events spill to <code className="text-teal-400">pending.jsonl</code> and replay on next
         startup.
       </p>
 

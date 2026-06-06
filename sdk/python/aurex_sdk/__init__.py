@@ -75,4 +75,10 @@ __all__ = [
     "parse_resilience_config",
     "patch_all",
     "patch_openai",
+    "AurexCompressor",
+    "create_self_diagnostics_tool",
+    "handle_self_diagnostics_call"
 ]
+
+from aurex_sdk.compressor import AurexCompressor
+from aurex_sdk.diagnostics import create_self_diagnostics_tool, handle_self_diagnostics_call

@@ -20,7 +20,7 @@ export default function DocsCloudSyncPage() {
       <div className="p-4 rounded-xl border border-white/[0.06] bg-white/[0.01] text-sm text-white/50">
         This is <strong className="text-white">cloud sync resilience</strong> (SDK → Aurex backend). Provider-call
         resilience (OpenAI → fallback model) is documented under{" "}
-        <Link href="/docs/reliability/overview" className="text-indigo-400">
+        <Link href="/docs/reliability/overview" className="text-teal-400">
           Reliability & Loss Recovery
         </Link>
         .

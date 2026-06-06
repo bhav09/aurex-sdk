@@ -4,10 +4,11 @@ import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 const footerLinks = {
-  Product: [
-    { name: "Features", href: "/#features" },
-    { name: "How it works", href: "/#how-it-works" },
-    { name: "Pricing", href: "/#pricing" },
+  Pillars: [
+    { name: "LoopGuard", href: "/#pillars" },
+    { name: "PromptIQ", href: "/#pillars" },
+    { name: "CascadeRouter", href: "/#pillars" },
+    { name: "ProviderShield", href: "/#pillars" },
   ],
   Resources: [
     { name: "Documentation", href: "/docs" },
@@ -109,8 +110,8 @@ export function FooterSection() {
                 <span className="text-xs text-white/40 font-mono">TM</span>
               </a>
 
-              <p className="text-white/50 leading-relaxed mb-8 max-w-xs text-sm">
-                AI cost optimization through intelligent auditing. Reduce your LLM expenses instantly.
+              <p className="text-white/50 leading-relaxed mb-8 max-w-xs text-sm font-mono">
+                Token waste prevention platform
               </p>
 
               {/* Social Links */}
@@ -147,6 +148,16 @@ export function FooterSection() {
                 </ul>
               </div>
             ))}
+            
+            {/* Install block */}
+            <div className="col-span-2 md:col-span-2">
+              <h3 className="text-sm font-medium text-white mb-6">Install SDK</h3>
+              <div className="bg-white/[0.03] border border-white/10 rounded-lg p-3 font-mono text-sm text-white/70 flex items-center justify-between group cursor-pointer hover:bg-white/[0.05] transition-colors"
+                onClick={() => navigator.clipboard.writeText('pip install aurex-sdk')}>
+                <span><span className="text-emerald-400">$</span> pip install aurex-sdk</span>
+                <span className="text-xs text-white/30 opacity-0 group-hover:opacity-100 transition-opacity">Copy</span>
+              </div>
+            </div>
           </div>
         </div>
 

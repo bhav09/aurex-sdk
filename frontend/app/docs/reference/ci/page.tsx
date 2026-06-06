@@ -26,27 +26,27 @@ export default function DocsCiPage() {
           </thead>
           <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
             <tr>
-              <td className="p-3 text-indigo-400">--mode warn</td>
+              <td className="p-3 text-teal-400">--mode warn</td>
               <td className="p-3 font-sans">Default</td>
               <td className="p-3 font-sans">Print report; exit 0.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">--mode block</td>
+              <td className="p-3 text-teal-400">--mode block</td>
               <td className="p-3">—</td>
               <td className="p-3 font-sans">Exit 1 when policies violated.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">--github-comment</td>
+              <td className="p-3 text-teal-400">--github-comment</td>
               <td className="p-3">—</td>
               <td className="p-3 font-sans">Markdown suitable for PR comments (Node).</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">--fail-under</td>
+              <td className="p-3 text-teal-400">--fail-under</td>
               <td className="p-3 font-sans">Python</td>
               <td className="p-3 font-sans">Minimum efficiency score.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">--max-waste-usd</td>
+              <td className="p-3 text-teal-400">--max-waste-usd</td>
               <td className="p-3 font-sans">Python</td>
               <td className="p-3 font-sans">Maximum detected waste USD.</td>
             </tr>

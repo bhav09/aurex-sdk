@@ -16,7 +16,7 @@ export default function DocsObserveEnforcePage() {
       scopeOut={["Fallback registration — see Fallbacks", "Event fields — see Loss Accounting"]}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-        <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+        <div className="p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
           <h2 className="font-semibold text-white mb-2">observe (default when enabled)</h2>
           <ul className="space-y-1 text-white/50 list-disc list-inside">
             <li>Single provider call — no automatic retry</li>
@@ -25,7 +25,7 @@ export default function DocsObserveEnforcePage() {
             <li>Safe for production shadow mode before enforce</li>
           </ul>
         </div>
-        <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
+        <div className="p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
           <h2 className="font-semibold text-white mb-2">enforce</h2>
           <ul className="space-y-1 text-white/50 list-disc list-inside">
             <li>Retries on retry_on kinds up to max_attempts</li>

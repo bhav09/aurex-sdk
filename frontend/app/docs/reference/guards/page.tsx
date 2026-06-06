@@ -51,7 +51,7 @@ export default function DocsGuardsPage() {
           { action: "block", desc: "Halt call when budget or policy violated." },
         ].map((row) => (
           <div key={row.action} className="p-3 rounded-lg border border-white/[0.06] bg-white/[0.01]">
-            <code className="text-emerald-400 font-mono">{row.action}</code>
+            <code className="text-teal-400 font-mono">{row.action}</code>
             <p className="text-white/45 text-xs mt-1">{row.desc}</p>
           </div>
         ))}

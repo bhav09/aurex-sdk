@@ -94,7 +94,7 @@ export function CalendlyWidget() {
                                 className={cn(
                                     "p-4 border transition-all duration-200 text-left",
                                     selectedDate === date
-                                        ? "border-[#eca8d6] bg-[#eca8d6]/10"
+                                        ? "border-[#2dd4bf] bg-[#2dd4bf]/10"
                                         : "border-white/10 bg-black/40 hover:border-white/30"
                                 )}
                             >
@@ -123,7 +123,7 @@ export function CalendlyWidget() {
                                 className={cn(
                                     "p-3 border transition-all duration-200 text-sm font-mono",
                                     selectedTime === time
-                                        ? "border-[#eca8d6] bg-[#eca8d6]/10"
+                                        ? "border-[#2dd4bf] bg-[#2dd4bf]/10"
                                         : "border-white/10 bg-black/40 hover:border-white/30",
                                     !selectedDate && "opacity-30 cursor-not-allowed"
                                 )}
@@ -139,7 +139,7 @@ export function CalendlyWidget() {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label htmlFor="name" className="block text-sm font-mono text-white/60 mb-2">
-                        Full Name <span className="text-[#eca8d6]">*</span>
+                        Full Name <span className="text-[#2dd4bf]">*</span>
                     </label>
                     <input
                         type="text"
@@ -147,14 +147,14 @@ export function CalendlyWidget() {
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#eca8d6] focus:outline-none transition-colors"
+                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#2dd4bf] focus:outline-none transition-colors"
                         placeholder="John Doe"
                     />
                 </div>
 
                 <div>
                     <label htmlFor="email" className="block text-sm font-mono text-white/60 mb-2">
-                        Email Address <span className="text-[#eca8d6]">*</span>
+                        Email Address <span className="text-[#2dd4bf]">*</span>
                     </label>
                     <input
                         type="email"
@@ -162,7 +162,7 @@ export function CalendlyWidget() {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#eca8d6] focus:outline-none transition-colors"
+                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#2dd4bf] focus:outline-none transition-colors"
                         placeholder="john@company.com"
                     />
                 </div>
@@ -176,7 +176,7 @@ export function CalendlyWidget() {
                         id="company"
                         value={formData.company}
                         onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#eca8d6] focus:outline-none transition-colors"
+                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#2dd4bf] focus:outline-none transition-colors"
                         placeholder="Acme Inc."
                     />
                 </div>
@@ -190,7 +190,7 @@ export function CalendlyWidget() {
                         rows={4}
                         value={formData.message}
                         onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#eca8d6] focus:outline-none transition-colors resize-none"
+                        className="w-full px-4 py-3 bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-[#2dd4bf] focus:outline-none transition-colors resize-none"
                         placeholder="Tell us about your AI infrastructure and optimization goals..."
                     />
                 </div>

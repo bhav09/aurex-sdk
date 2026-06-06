@@ -96,7 +96,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="space-y-1">
                         <h2 className="text-base font-semibold text-white/90">{username}</h2>
-                        <Badge variant="outline" className="bg-indigo-500/10 border-indigo-500/20 text-indigo-400 text-[10px] px-2.5 py-0.5 font-sans uppercase font-semibold">
+                        <Badge variant="outline" className="bg-teal-500/10 border-teal-500/20 text-teal-400 text-[10px] px-2.5 py-0.5 font-sans uppercase font-semibold">
                             Workspace Owner
                         </Badge>
                     </div>

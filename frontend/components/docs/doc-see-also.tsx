@@ -16,7 +16,7 @@ export function DocSeeAlso({ links }: { links: SeeAlsoLink[] }) {
           <li key={link.href}>
             <Link
               href={link.href}
-              className="inline-flex px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] bg-white/[0.02] text-indigo-400 hover:bg-white/[0.04] transition-colors"
+              className="inline-flex px-3 py-1.5 text-sm rounded-lg border border-white/[0.08] bg-white/[0.02] text-teal-400 hover:bg-white/[0.04] transition-colors"
             >
               {link.label}
             </Link>

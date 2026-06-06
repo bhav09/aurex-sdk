@@ -28,32 +28,32 @@ export default function DocsProvidersPage() {
           <tbody className="divide-y divide-white/[0.04] text-xs">
             <tr>
               <td className="p-3 text-white font-medium">OpenAI (v1+)</td>
-              <td className="p-3 text-emerald-400">Yes</td>
-              <td className="p-3 text-emerald-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
               <td className="p-3 font-sans text-white/50">Reasoning tokens and cache metadata.</td>
             </tr>
             <tr>
               <td className="p-3 text-white font-medium">Anthropic (v0.18+)</td>
-              <td className="p-3 text-emerald-400">Yes</td>
-              <td className="p-3 text-emerald-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
               <td className="p-3 font-sans text-white/50">System prompt and token counts.</td>
             </tr>
             <tr>
               <td className="p-3 text-white font-medium">Google Gemini</td>
-              <td className="p-3 text-emerald-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
               <td className="p-3 text-rose-400">No</td>
               <td className="p-3 font-sans text-white/50">google-genai / google-generativeai (Python).</td>
             </tr>
             <tr>
               <td className="p-3 text-white font-medium">LiteLLM / Portkey</td>
-              <td className="p-3 text-emerald-400">Yes</td>
-              <td className="p-3 text-emerald-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
               <td className="p-3 font-sans text-white/50">Multi-provider routing.</td>
             </tr>
             <tr>
               <td className="p-3 text-white font-medium">Hugging Face</td>
-              <td className="p-3 text-emerald-400">Yes</td>
-              <td className="p-3 text-emerald-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
+              <td className="p-3 text-teal-400">Yes</td>
               <td className="p-3 font-sans text-white/50">huggingface_hub / @huggingface/inference.</td>
             </tr>
             <tr>

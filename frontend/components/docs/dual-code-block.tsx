@@ -47,7 +47,7 @@ export function DualCodeBlock({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
       <div className="relative group rounded-xl border border-white/[0.08] bg-surface-sunken overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.05] bg-white/[0.02] text-xs font-mono text-white/40">
-          <span className="text-emerald-400 font-semibold">{pythonTitle}</span>
+          <span className="text-teal-400 font-semibold">{pythonTitle}</span>
           <button
             id={pythonId}
             onClick={handleCopyPy}
@@ -55,8 +55,8 @@ export function DualCodeBlock({
           >
             {copiedPy ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
+                <Check className="w-3.5 h-3.5 text-teal-400" />
+                <span className="text-teal-400">Copied!</span>
               </>
             ) : (
               <>
@@ -75,7 +75,7 @@ export function DualCodeBlock({
 
       <div className="relative group rounded-xl border border-white/[0.08] bg-surface-sunken overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.05] bg-white/[0.02] text-xs font-mono text-white/40">
-          <span className="text-indigo-400 font-semibold">{nodeTitle}</span>
+          <span className="text-teal-400 font-semibold">{nodeTitle}</span>
           <button
             id={nodeId}
             onClick={handleCopyNode}
@@ -83,8 +83,8 @@ export function DualCodeBlock({
           >
             {copiedNode ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
+                <Check className="w-3.5 h-3.5 text-teal-400" />
+                <span className="text-teal-400">Copied!</span>
               </>
             ) : (
               <>

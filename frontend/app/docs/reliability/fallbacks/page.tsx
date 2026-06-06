@@ -68,7 +68,7 @@ export default function DocsFallbacksPage() {
 
       <ul className="space-y-2 text-sm text-white/50 list-disc list-inside">
         <li>
-          <code className="text-indigo-400">idempotency: require_key</code> — skips retry/fallback without a stable
+          <code className="text-teal-400">idempotency: require_key</code> — skips retry/fallback without a stable
           idempotency key (safe for non-idempotent tools).
         </li>
         <li>

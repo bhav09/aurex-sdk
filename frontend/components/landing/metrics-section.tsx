@@ -292,8 +292,8 @@ export function MetricsSection() {
         <div className="grid lg:grid-cols-12 gap-8 mb-20 lg:mb-32">
           <div className="lg:col-span-8 lg:col-start-1">
             <div className="flex items-center gap-4 mb-6">
-              <span className="flex items-center gap-2 px-3 py-1 bg-[#eca8d6]/10 text-[#eca8d6] text-xs font-mono">
-                <span className="w-2 h-2 rounded-full bg-[#eca8d6] animate-pulse" />
+              <span className="flex items-center gap-2 px-3 py-1 bg-[#2dd4bf]/10 text-[#2dd4bf] text-xs font-mono">
+                <span className="w-2 h-2 rounded-full bg-[#2dd4bf] animate-pulse" />
                 BETA
               </span>
               <span className="text-sm font-mono text-muted-foreground">
@@ -358,7 +358,19 @@ export function MetricsSection() {
         {/* Bottom ticker - Sliding marquee */}
         <div className={`mt-16 pt-8 border-t border-foreground/10 overflow-hidden transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"
           }`}>
-          <div className="relative h-8 flex items-center">
+          <div className="flex flex-col items-center mb-6 text-center">
+            <span className="text-sm text-foreground mb-1">Aurex intercepts calls to all major providers</span>
+            <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-2">
+              <span>0.5–2ms overhead</span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span>12+ providers auto-patched</span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span className="text-emerald-400/80">SHA-256 only — zero prompt egress</span>
+            </span>
+          </div>
+          <div className="relative h-8 flex items-center mt-2">
+            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10" />
+            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10" />
             <div className="animate-marquee whitespace-nowrap flex items-center gap-8 text-sm font-mono text-muted-foreground">
               <MarqueeModels models={showcaseModels} />
             </div>

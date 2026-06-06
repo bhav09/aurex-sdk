@@ -112,7 +112,7 @@ export function InfrastructureSection() {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               className={`relative p-8 lg:p-12 border-2 border-dashed transition-all duration-300 ${isDragging
-                  ? "border-[#eca8d6] bg-[#eca8d6]/5"
+                  ? "border-[#2dd4bf] bg-[#2dd4bf]/5"
                   : "border-foreground/20 bg-foreground/[0.02] hover:border-foreground/30"
                 }`}
             >
@@ -148,14 +148,14 @@ export function InfrastructureSection() {
               ) : (
                 <div className="py-12">
                   <div className="flex flex-col items-center justify-center">
-                    <FileText className="w-16 h-16 text-[#eca8d6] mb-6 animate-pulse" />
+                    <FileText className="w-16 h-16 text-[#2dd4bf] mb-6 animate-pulse" />
                     <h3 className="text-2xl font-display mb-3">
                       {uploadProgress < 100 ? "Processing..." : "Complete!"}
                     </h3>
                     <div className="w-full max-w-md">
                       <div className="h-2 bg-foreground/10 rounded-full overflow-hidden mb-3">
                         <div
-                          className="h-full bg-[#eca8d6] transition-all duration-300"
+                          className="h-full bg-[#2dd4bf] transition-all duration-300"
                           style={{ width: `${uploadProgress}%` }}
                         />
                       </div>
