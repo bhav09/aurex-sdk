@@ -6,8 +6,8 @@ export default function PrivacyPolicy() {
                 <p className="text-sm text-muted-foreground mb-8">Last updated: May 2026</p>
 
                 {/* TL;DR Callout */}
-                <div className="mb-12 rounded-2xl border border-violet-500/20 bg-violet-500/5 p-6">
-                    <h2 className="text-lg font-bold text-violet-300 mb-3">TL;DR: The Short Version</h2>
+                <div className="mb-12 rounded-2xl border border-teal-500/20 bg-teal-500/5 p-6">
+                    <h2 className="text-lg font-bold text-teal-300 mb-3">TL;DR: The Short Version</h2>
                     <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
                         <li><strong>We do NOT store your prompt text or generated responses</strong> at rest.</li>
                         <li><strong>We do NOT train models</strong> on your data.</li>

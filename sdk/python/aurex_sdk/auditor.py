@@ -431,6 +431,15 @@ class AurexAuditor:
 
         self._thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._thread.start()
+        
+        # Task 2.3: Asynchronous Cloud-Tethered Policy Sync
+        self._policy_sync_thread = None
+        if self.config.cloud_sync and self.config.api_key and not self.config.local_only:
+            from aurex_sdk.policy_sync import PolicySyncThread
+            sync_endpoint = self.config.cloud_endpoint.replace("/ledger/events", "/policies")
+            self._policy_sync_thread = PolicySyncThread(self, sync_endpoint, self.config.api_key)
+            self._policy_sync_thread.start()
+
         self._register_fork_handler()
         self._initialized = True
 
@@ -649,6 +658,32 @@ class AurexAuditor:
         response_hash = None
         if response:
             response_hash = hashlib.sha256(response.encode('utf-8')).hexdigest()
+            
+        # Task 2.2: Client-Side Encryption (CSE)
+        enc_key = os.getenv("AUREX_ENCRYPTION_KEY")
+        encrypted_prompt = None
+        encrypted_system_prompt = None
+        encrypted_response = None
+        
+        if enc_key:
+            try:
+                from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                import base64
+                key_bytes = hashlib.sha256(enc_key.encode('utf-8')).digest()
+                aesgcm = AESGCM(key_bytes)
+                
+                def encrypt_text(text: str) -> Optional[str]:
+                    if not text:
+                        return None
+                    iv = os.urandom(12)
+                    ct = aesgcm.encrypt(iv, text.encode('utf-8'), None)
+                    return base64.b64encode(iv + ct).decode('utf-8')
+                    
+                encrypted_prompt = encrypt_text(prompt)
+                encrypted_system_prompt = encrypt_text(system_prompt)
+                encrypted_response = encrypt_text(response)
+            except ImportError:
+                print("[Aurex SDK] AUREX_ENCRYPTION_KEY is set but 'cryptography' package is missing. Install with 'pip install cryptography'.", file=sys.stderr)
  
         # Cache-aware local cost calculation
         cost = calculate_cost(
@@ -675,6 +710,9 @@ class AurexAuditor:
             "system_prompt_hash": system_prompt_hash,
             "prompt_hash": prompt_hash,
             "response_hash": response_hash,
+            "encrypted_prompt": encrypted_prompt,
+            "encrypted_system_prompt": encrypted_system_prompt,
+            "encrypted_response": encrypted_response,
             "extra_metadata": extra_metadata or {},
             "retry_count": retry_count,
             "outcome": outcome,
@@ -1446,13 +1484,32 @@ class AurexAuditor:
                         original_model=model
                     )
 
-            if loop_score >= loop_similarity_threshold:
+            # In-Process Hybrid Loop Guard (Task 2.1)
+            # 1. Structural Check: Tool call sequences
+            if messages:
+                tool_sequence = []
+                for m in messages:
+                    if m.get("role") == "assistant" and m.get("tool_calls"):
+                        for tc in m["tool_calls"]:
+                            if "function" in tc:
+                                tool_sequence.append(tc["function"]["name"])
+                
+                if len(tool_sequence) >= 3:
+                    # Check for A->A->A or A->B->A->B
+                    last_three = tool_sequence[-3:]
+                    if last_three[0] == last_three[1] == last_three[2] or (len(tool_sequence) >= 4 and tool_sequence[-4:-2] == tool_sequence[-2:]):
+                        decision = AurexDecision(
+                            action="block",
+                            reason=f"In-Process Loop Guard triggered: Structural repetition of tool calls {last_three}",
+                            original_model=model
+                        )
+
+            # 2. Semantic Check
+            if loop_score >= loop_similarity_threshold and decision.action == "proceed":
                 decision = AurexDecision(
-                    action="compress",
-                    reason=f"Semantic loop detected (score {loop_score:.2f})",
+                    action="block",
+                    reason=f"In-Process Loop Guard triggered: Semantic loop detected (score {loop_score:.2f})",
                     loop_score=loop_score,
-                    inject_system_instruction="You appear to be repeating yourself. Summarize your current state and try a different approach.",
-                    compressed_messages=compress_messages(messages) if messages else None,
                     original_model=model
                 )
 

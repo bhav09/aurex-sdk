@@ -37,17 +37,17 @@ export default function DocsHarnessHubPage() {
       <DocHashRedirect />
       <div>
         <h1 className="text-3xl font-display font-bold text-white flex items-center gap-2">
-          <Layers className="w-7 h-7 text-emerald-400" />
+          <Layers className="w-7 h-7 text-teal-400" />
           Harness Integration
         </h1>
         <p className="text-white/50 mt-2">Match integration depth to your existing LLM wrapper or observability stack.</p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <p className="text-sm text-white/60">
           Avoid double-counting: never patch and wrap the same call path. Check{" "}
-          <Link href="/docs/reference/health" className="text-indigo-400">
+          <Link href="/docs/reference/health" className="text-teal-400">
             patch_status
           </Link>{" "}
           in health output.

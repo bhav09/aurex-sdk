@@ -23,7 +23,7 @@ export default function DocsReliabilityOverviewPage() {
           <strong className="text-white">customer-registered callables</strong>.
         </p>
         <p>
-          By default <code className="text-indigo-400">resilience.enabled=false</code> — no behavior change until you
+          By default <code className="text-teal-400">resilience.enabled=false</code> — no behavior change until you
           opt in. Recommended rollout:
         </p>
         <ol className="list-decimal list-inside space-y-1">

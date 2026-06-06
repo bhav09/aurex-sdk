@@ -19,7 +19,7 @@ export default function DocsBudgetGuardPage() {
       <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-sm text-white/60 mb-4">
         <strong className="text-white">Not provider resilience.</strong> BudgetGuard blocks overspend before calls.
         Provider-call retry and fallbacks live under{" "}
-        <Link href="/docs/reliability/overview" className="text-indigo-400">
+        <Link href="/docs/reliability/overview" className="text-teal-400">
           Reliability & Loss Recovery
         </Link>
         .
@@ -37,44 +37,44 @@ export default function DocsBudgetGuardPage() {
           </thead>
           <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
             <tr>
-              <td className="p-3 text-indigo-400">max_cost_per_minute</td>
-              <td className="p-3 text-indigo-400">maxCostPerMinute</td>
+              <td className="p-3 text-teal-400">max_cost_per_minute</td>
+              <td className="p-3 text-teal-400">maxCostPerMinute</td>
               <td className="p-3">float</td>
               <td className="p-3 font-sans">Max USD spend per rolling 60s.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">max_cost_per_session</td>
-              <td className="p-3 text-indigo-400">maxCostPerSession</td>
+              <td className="p-3 text-teal-400">max_cost_per_session</td>
+              <td className="p-3 text-teal-400">maxCostPerSession</td>
               <td className="p-3">float</td>
               <td className="p-3 font-sans">Max USD per workflow_id.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">max_requests_per_minute</td>
-              <td className="p-3 text-indigo-400">maxRequestsPerMinute</td>
+              <td className="p-3 text-teal-400">max_requests_per_minute</td>
+              <td className="p-3 text-teal-400">maxRequestsPerMinute</td>
               <td className="p-3">integer</td>
               <td className="p-3 font-sans">Request count cap per minute.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">max_context_tokens</td>
-              <td className="p-3 text-indigo-400">maxContextTokens</td>
+              <td className="p-3 text-teal-400">max_context_tokens</td>
+              <td className="p-3 text-teal-400">maxContextTokens</td>
               <td className="p-3">integer</td>
               <td className="p-3 font-sans">Estimated input token cap.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">on_budget_exceeded</td>
-              <td className="p-3 text-indigo-400">onBudgetExceeded</td>
+              <td className="p-3 text-teal-400">on_budget_exceeded</td>
+              <td className="p-3 text-teal-400">onBudgetExceeded</td>
               <td className="p-3">string</td>
               <td className="p-3 font-sans">throw | warn | webhook</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">webhook_url</td>
-              <td className="p-3 text-indigo-400">webhookUrl</td>
+              <td className="p-3 text-teal-400">webhook_url</td>
+              <td className="p-3 text-teal-400">webhookUrl</td>
               <td className="p-3">string</td>
               <td className="p-3 font-sans">Webhook destination when configured.</td>
             </tr>
             <tr>
-              <td className="p-3 text-indigo-400">dry_run</td>
-              <td className="p-3 text-indigo-400">dryRun</td>
+              <td className="p-3 text-teal-400">dry_run</td>
+              <td className="p-3 text-teal-400">dryRun</td>
               <td className="p-3">boolean</td>
               <td className="p-3 font-sans">Evaluate without blocking.</td>
             </tr>

@@ -277,7 +277,7 @@ await client.trackLLMCall({
         <div className="space-y-8 max-w-5xl mx-auto">
             <div className="flex flex-col gap-2 border-b border-white/5 pb-5">
                 <h2 className="font-display text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                    <Coins className="h-6 w-6 text-violet-400" />
+                    <Coins className="h-6 w-6 text-teal-400" />
                     System & Integration Settings
                 </h2>
                 <p className="text-xs text-white/40 font-mono">
@@ -286,9 +286,9 @@ await client.trackLLMCall({
             </div>
 
             {/* Pricing Overrides Info Banner */}
-            <Card className="border-violet-500/20 bg-gradient-to-br from-surface-raised/90 to-[#222228]/50 p-5 backdrop-blur-md relative overflow-hidden rounded-xl">
+            <Card className="border-teal-500/20 bg-gradient-to-br from-surface-raised/90 to-surface/50 p-5 backdrop-blur-md relative overflow-hidden rounded-xl">
                 <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0 text-violet-400">
+                    <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0 text-teal-400">
                         <Coins className="h-5 w-5" />
                     </div>
                     <div className="space-y-2 flex-1">
@@ -342,7 +342,7 @@ await client.trackLLMCall({
                             onDragLeave={handleDrag}
                             onDrop={handleDrop}
                             className={`border border-dashed rounded-xl px-6 py-7 text-center transition-all duration-200 ${dragActive
-                                ? "border-violet-500 bg-violet-500/10"
+                                ? "border-teal-500 bg-teal-500/10"
                                 : "border-white/10 hover:border-white/20 bg-white/[0.01]"
                                 }`}
                         >
@@ -357,7 +357,7 @@ await client.trackLLMCall({
                                 htmlFor="pricing-json-file"
                                 className="cursor-pointer flex flex-col items-center justify-center gap-2"
                             >
-                                <div className="h-9 w-9 rounded-lg bg-violet-500/10 flex items-center justify-center mb-1 text-violet-400 border border-violet-500/20">
+                                <div className="h-9 w-9 rounded-lg bg-teal-500/10 flex items-center justify-center mb-1 text-teal-400 border border-teal-500/20">
                                     <Upload className="h-4 w-4" />
                                 </div>
                                 <span className="text-xs font-semibold text-white">
@@ -387,7 +387,7 @@ await client.trackLLMCall({
 
                         {uploading && (
                             <div className="flex items-center gap-2 text-xs text-white/50 justify-center font-mono">
-                                <RefreshCw className="h-4 w-4 animate-spin text-violet-400" />
+                                <RefreshCw className="h-4 w-4 animate-spin text-teal-400" />
                                 <span>Ingesting custom pricing override...</span>
                             </div>
                         )}
@@ -399,7 +399,7 @@ await client.trackLLMCall({
                     <div className="space-y-4">
                         <div className="flex items-center justify-between border-b border-white/5 pb-3">
                             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                                <Coins className="h-4 w-4 text-violet-400" />
+                                <Coins className="h-4 w-4 text-teal-400" />
                                 Active Overrides
                             </h3>
                             {overrides.length > 0 && (
@@ -417,7 +417,7 @@ await client.trackLLMCall({
 
                         {loading ? (
                             <div className="py-12 text-center text-xs text-white/40 flex flex-col items-center gap-2 font-mono">
-                                <RefreshCw className="h-6 w-6 animate-spin text-violet-400" />
+                                <RefreshCw className="h-6 w-6 animate-spin text-teal-400" />
                                 <span>Loading catalog overrides...</span>
                             </div>
                         ) : overrides.length === 0 ? (
@@ -468,7 +468,7 @@ await client.trackLLMCall({
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 mb-6">
                     <div className="space-y-1">
                         <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50 flex items-center gap-2">
-                            <KeyRound className="h-4.5 w-4.5 text-violet-400" />
+                            <KeyRound className="h-4.5 w-4.5 text-teal-400" />
                             Direct SDK API Authentication
                         </h3>
                         <p className="text-xs text-white/40 font-mono">
@@ -478,10 +478,10 @@ await client.trackLLMCall({
                 </div>
 
                 {generatedKey && (
-                    <div className="rounded-xl border border-violet-500/20 bg-violet-500/10 p-4 mb-6 flex flex-col gap-3">
+                    <div className="rounded-xl border border-teal-500/20 bg-teal-500/10 p-4 mb-6 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-violet-300 font-mono">COPY YOUR API KEY</span>
-                            <span className="text-[9px] text-violet-400 font-mono">Copy now — this key will not be displayed again!</span>
+                            <span className="text-xs font-semibold text-teal-300 font-mono">COPY YOUR API KEY</span>
+                            <span className="text-[9px] text-teal-400 font-mono">Copy now — this key will not be displayed again!</span>
                         </div>
                         <div className="flex items-center gap-2 bg-black/40 rounded-lg p-2.5 border border-white/5 font-mono text-xs text-white">
                             <span className="flex-1 select-all break-all">{generatedKey}</span>
@@ -489,7 +489,7 @@ await client.trackLLMCall({
                                 size="sm"
                                 variant="ghost"
                                 onClick={handleCopyKey}
-                                className="h-8 w-8 p-0 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 rounded"
+                                className="h-8 w-8 p-0 text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 rounded"
                             >
                                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                             </Button>
@@ -507,12 +507,12 @@ await client.trackLLMCall({
                                 placeholder="Key name (e.g. Prod API)"
                                 value={newKeyName}
                                 onChange={(e) => setNewKeyName(e.target.value)}
-                                className="w-full rounded-lg border border-white/10 bg-surface-sunken px-3 py-2 text-xs text-white placeholder-white/30 focus:border-violet-500/50 focus:outline-none font-mono"
+                                className="w-full rounded-lg border border-white/10 bg-surface-sunken px-3 py-2 text-xs text-white placeholder-white/30 focus:border-teal-500/50 focus:outline-none font-mono"
                             />
                             <Button
                                 type="submit"
                                 disabled={keyLoading || !newKeyName.trim()}
-                                className="w-full h-9 bg-violet-600 hover:bg-violet-500 text-xs font-mono font-bold text-white shadow-lg hover:shadow-violet-600/10 transition-all flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/30"
+                                className="w-full h-9 bg-teal-600 hover:bg-teal-500 text-xs font-mono font-bold text-white shadow-lg hover:shadow-teal-600/10 transition-all flex items-center justify-center gap-1.5 rounded-lg border border-teal-500/30"
                             >
                                 <Plus className="h-4 w-4" />
                                 Ingest New Key
@@ -525,7 +525,7 @@ await client.trackLLMCall({
                         <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-white/40">Active Credentials</h4>
                         {keyLoading && keys.length === 0 ? (
                             <div className="py-8 text-center text-xs text-white/40 flex flex-col items-center gap-2 font-mono">
-                                <RefreshCw className="h-6 w-6 animate-spin text-violet-400" />
+                                <RefreshCw className="h-6 w-6 animate-spin text-teal-400" />
                                 <span>Syncing active keys...</span>
                             </div>
                         ) : keys.length === 0 ? (
@@ -548,7 +548,7 @@ await client.trackLLMCall({
                                         {keys.map((k) => (
                                             <TableRow key={k.id} className="border-white/5 hover:bg-white/[0.01]">
                                                 <TableCell className="text-xs text-white/80 py-2.5 font-semibold font-mono">{k.name}</TableCell>
-                                                <TableCell className="font-mono text-xs text-violet-400 py-2.5">{k.prefix}...</TableCell>
+                                                <TableCell className="font-mono text-xs text-teal-400 py-2.5">{k.prefix}...</TableCell>
                                                 <TableCell className="text-xs text-white/40 py-2.5 font-mono">
                                                     {new Date(k.created_at).toLocaleDateString()}
                                                 </TableCell>
@@ -574,7 +574,7 @@ await client.trackLLMCall({
                 {/* SDK Integration Examples */}
                 <div className="mt-6 rounded-xl border border-white/5 bg-white/[0.01] p-5 space-y-4">
                     <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                        <FileText className="h-4 w-4 text-violet-400" />
+                        <FileText className="h-4 w-4 text-teal-400" />
                         SDK Tunnel Setup
                     </h4>
                     <p className="text-xs text-white/50 leading-relaxed font-mono">

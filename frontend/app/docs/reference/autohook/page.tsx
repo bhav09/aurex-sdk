@@ -42,8 +42,8 @@ export default function DocsAutohookPage() {
       />
 
       <p className="text-xs text-white/40 italic">
-        To deactivate run <code className="text-indigo-400">aurex uninstall-hook</code> (Python) or{" "}
-        <code className="text-indigo-400">npx aurex uninstall-hook</code> (Node.js).
+        To deactivate run <code className="text-teal-400">aurex uninstall-hook</code> (Python) or{" "}
+        <code className="text-teal-400">npx aurex uninstall-hook</code> (Node.js).
       </p>
 
       <DocSeeAlso

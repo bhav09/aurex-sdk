@@ -1,0 +1,482 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{padding:1rem 0;font-size:13px}
+h2.section{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);padding:1.75rem 0 0.6rem;border-top:0.5px solid var(--color-border-tertiary);margin-top:0.5rem}
+h2.section:first-child{border-top:none;padding-top:0}
+table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:0.5rem}
+th{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-align:left;padding:6px 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+td{padding:9px 8px;vertical-align:top;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);font-size:12.5px;line-height:1.55}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--color-background-secondary)}
+.c1{width:13%}.c2{width:12%}.c3{width:22%}.c4{width:26%}.c5{width:14%}.c6{width:13%}
+.badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.rm{background:#FAECE7;color:#712B13}
+.mod{background:#FAEEDA;color:#633806}
+.add{background:#E1F5EE;color:#085041}
+.del{background:#FCEBEB;color:#791F1F}
+.keep{background:#F1EFE8;color:#444441}
+.p1{background:#FAECE7;color:#712B13}
+.p2{background:#FAEEDA;color:#633806}
+.p3{background:#E6F1FB;color:#0C447C}
+.p4{background:#F1EFE8;color:#444441}
+.ref{font-size:10px;color:var(--color-text-tertiary);font-style:italic}
+.note{font-size:11px;color:var(--color-text-secondary);margin-top:3px}
+.pg{display:inline-block;font-size:10px;font-weight:500;padding:2px 6px;border-radius:3px;background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-tertiary)}
+.dead{text-decoration:line-through;color:var(--color-text-tertiary)}
+</style>
+
+<div class="wrap">
+<h2 class="sr-only">Aurex UI change specification — page-by-page for AI Engineers, AIOps, and Startups</h2>
+
+<h2 class="section">🗑 Pages to delete entirely</h2>
+<table>
+<thead><tr><th>Route</th><th>Current purpose</th><th>Why delete</th><th>What replaces it</th></tr></thead>
+<tbody>
+<tr>
+<td><span class="dead">/audit</span><br><span class="badge del">Delete</span></td>
+<td>Drag-and-drop CSV/JSON log upload form. Google SSO + email/name/company fields before analysis.</td>
+<td>Teaches the wrong mental model — Aurex as a batch log analyser. Requires sign-up before delivering any value. No AI Engineer starts their workflow by exporting CSVs. Raindrop, Langfuse, Arize — none make you upload a file as the first touch. This page is a conversion killer.</td>
+<td>The quickstart on /docs replaces the "first value" moment. Users get value by running <code>pip install aurex-sdk</code> and seeing their first detection in their terminal — not by uploading a file.</td>
+</tr>
+<tr>
+<td><span class="dead">/book</span><br><span class="badge del">Delete</span></td>
+<td>CTA from homepage footer: "Book optimization call" — presumably a Calendly link.</td>
+<td>Consultant framing. AI Engineers don't want to book a call to use a developer tool. This signals a services business, not a product. Langfuse, Arize, Braintrust all use "Talk to sales" only for enterprise tier, never as a primary CTA.</td>
+<td>Replace with /enterprise contact form (simple name + company + use-case textarea + submit). No Calendly embed.</td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: navigation bar</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Nav links</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Features · How It Works · Pricing · Docs</td>
+<td>Pillars (dropdown: LoopGuard / PromptIQ / CascadeRouter / ProviderShield) · Docs · Pricing · Changelog<br><span class="note">Remove "How It Works" anchor-link — replace with a real /how-it-works page or fold into homepage. Remove "Features" anchor in favour of Pillars dropdown.</span></td>
+<td class="ref">Langfuse: Products dropdown. Arize: Solutions menu. Braintrust: top nav with docs prominent.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>"Sign In" button</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Single "Sign In" text link, right-aligned</td>
+<td>Two buttons: "Sign in" (ghost) + "Get started free" (filled, teal accent). The CTA button is the most important element in the nav — it should be visually distinct and say what happens when you click it.</td>
+<td class="ref">Langfuse, Raindrop, Maxim all have dual nav buttons</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Logo + brand name</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"AUREX" in caps next to logo PNG</td>
+<td>Keep logo, change to sentence-case "Aurex". Add a 12px badge/pill next to the logo reading "beta" in amber — signals honesty and sets expectations for an early-stage tool. Remove when out of beta.</td>
+<td class="ref">Raindrop uses beta badge</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>Sticky behaviour</td>
+<td><span class="badge add">Add</span></td>
+<td>No sticky nav</td>
+<td>Add sticky top nav with a very subtle backdrop blur and border-bottom on scroll. AI Engineers scroll docs-style — they need the nav reachable at all times.</td>
+<td class="ref">All six reference platforms use sticky nav</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: hero section</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Eyebrow label</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"AI Runtime Cost Control Plane"</td>
+<td>"Token waste prevention platform" — a pill/badge with a subtle border, not plain text. Sentence case.</td>
+<td class="ref">Langfuse, Braintrust use eyebrow category pills</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>H1 headline</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"measure, control, and verify every dollar your AI spends."</td>
+<td>"Stop the token waste before it fires." — Short, active, prevention-first. Max 8 words. No line breaks mid-sentence. This is what every AI Engineer reading a $40K invoice at 9am needs to see.</td>
+<td class="ref">Raindrop: punchy single-line H1. Arize: action verbs.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Subheadline</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"Intercept and prevent LLM cost runaways in real-time, enforce budget policies at the SDK level, and optimize system prompt redundancy."</td>
+<td>"Helicone shows you what burned. Langfuse traces how. Aurex prevents it — an in-process SDK with zero proxy latency, zero PII egress, and four active prevention layers." Max 2 lines. Name the competitors explicitly — it orients the buyer instantly.</td>
+<td class="ref">Braintrust names competitors in hero copy</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Hero CTAs</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"Run Free Audit" (primary) + "SDK Docs" (secondary)</td>
+<td>"Start Building" (primary → /docs#quickstart) + "See how it works" (secondary → smooth scroll). Remove "Audit" from CTA entirely — it anchors the wrong mental model.</td>
+<td class="ref">Langfuse: "Get started" primary. Arize: "Start for free"</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Hero stats bar (3 numbers)</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"30% avg tokens wasted · $2.4k potential monthly savings · &lt;30s time to audit"</td>
+<td>Replace with three sourced stats with citations: "F1 0.72 loop detection accuracy (arXiv:2511.10650)" · "Up to 20× prompt compression (Microsoft LLMLingua-2)" · "Up to 98% cost reduction via cascade routing (Stanford FrugalGPT)". Each stat links to the source paper. This signals credibility to AI Engineers who distrust marketing claims.</td>
+<td class="ref">Arize, Braintrust both cite research in hero</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Hero visual / illustration</td>
+<td><span class="badge mod">Modify</span></td>
+<td>No hero visual (just text + stats)</td>
+<td>Add a terminal/code block as the hero visual (right column on desktop, below text on mobile). Show a 6-line quickstart: pip install, patch_all(), one LLM call, then a coloured terminal output showing "⚠ LoopGuard: loop detected — session cost $0.14, blocked at $0.15 ceiling." This is the "aha" moment visualised. AI Engineers read code, not marketing illustrations.</td>
+<td class="ref">Raindrop hero shows live trace UI. Langfuse shows code snippet.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: four-pillar section (replaces "Smart auditing" + "01/02/03" value props)</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>"Smart auditing" heading + 3 value props</td>
+<td><span class="badge rm">Remove</span></td>
+<td>Heading "Smart auditing." + 3 numbered cards: Cost Savings / Visibility / Control</td>
+<td>Replace entirely. "Visibility" and "Control" are generic — every SaaS tool says this. Remove these three cards completely.</td>
+<td class="ref">—</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Four-pillar grid</td>
+<td><span class="badge add">Add</span></td>
+<td>Does not exist</td>
+<td>2×2 card grid. Each card: pillar icon (Tabler outline, 24px) + pillar name in teal/coral/amber/blue + one-line mechanism + one concrete stat with source. Cards link to the dedicated pillar page (/loopguard, /promptiq etc). This is how Arize Phoenix presents its product surface — named capabilities, not generic features.</td>
+<td class="ref">Arize feature cards. Langfuse capability grid.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Research backing strip</td>
+<td><span class="badge add">Add</span></td>
+<td>Does not exist</td>
+<td>Below the pillar grid: a horizontal strip with three paper citations. Grey background, 12px text, paper name + institution + key finding + arXiv link. Signals to AI Engineers that the detection algorithms are peer-reviewed, not heuristic guesses.</td>
+<td class="ref">Braintrust cites academic work</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: "Upload. Analyze. Optimize." section</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Entire "Upload → Analyze → Optimize" section</td>
+<td><span class="badge rm">Remove</span></td>
+<td>Three-step flow diagram showing file upload as the product workflow</td>
+<td>Delete this section entirely. Replace with "Install. Intercept. Prevent." — a horizontal three-step showing: (1) pip install aurex-sdk (2) patch_all() wraps your client (3) LoopGuard fires before the call. This rewires the mental model from "batch tool" to "live interceptor."</td>
+<td class="ref">Langfuse "How it works" uses SDK install flow</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: drag-comparison and "Built for control" sections</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Before/after drag slider image</td>
+<td><span class="badge rm">Remove</span></td>
+<td>Drag-to-compare image of two cost graphs</td>
+<td>Remove. The graphs are generic and contain no real data. Replace with a Token Credit Score animated widget — shows score rising from 42 → 87 as each pillar activates in sequence. Teaches the product concept in 8 seconds without any copy.</td>
+<td class="ref">Maxim uses animated product demo in place of static screenshots</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>"Built for control" section — animated provider ticker</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Scrolling ticker of provider logos with stat badges (Local SDK Ledger / Detection Algorithms / LLM Providers)</td>
+<td>Keep provider ticker but reframe: add a small label above it reading "Aurex intercepts calls to all major providers — zero proxy, zero latency." Change the three stat badges to: "0.5–2ms hot-path overhead" / "12+ providers auto-patched" / "SHA-256 only — zero prompt egress." These stats speak to the AIOps persona specifically.</td>
+<td class="ref">Langfuse uses provider logo strip with context</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: case study section</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Case study attribution</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"TX · Engineering Lead · Team X · AI Infrastructure & Platforms"</td>
+<td>Name the company or give specific anonymised context: "8-person AI infra team, Series B SaaS, customer support agent workload." "Team X" reads as fabricated. AI Engineers are deeply sceptical of social proof — specificity is the only thing that makes a testimonial believable.</td>
+<td class="ref">Braintrust uses named companies or specific team descriptors</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Single case study</td>
+<td><span class="badge mod">Modify</span></td>
+<td>One case study covering loop detection only</td>
+<td>Expand to three case study cards in a horizontal scroll or tab: (1) LoopGuard — runaway agent, $650/month saved (current). (2) PromptIQ — RAG pipeline prompt drift, system prompt grew from 400 to 1,800 tokens over 3 months, $340/month recovered. (3) CascadeRouter (coming soon badge) — classification task rerouted from GPT-4o to GPT-4o-mini, 91% cost reduction. The "coming soon" card signals roadmap without overpromising.</td>
+<td class="ref">Raindrop uses tabbed case studies by use case</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: pricing section</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Tier names</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Audit Edition · Control Plan · Enterprise Plan</td>
+<td>Developer · Team · Enterprise. "Audit Edition" anchors the wrong category. "Control Plan" sounds like a telecom package. Use persona-based names that match the three buyer types: individual AI Engineer, team/startup, large org.</td>
+<td class="ref">Langfuse: Hobby/Pro/Team/Enterprise. Braintrust: Free/Team/Enterprise.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Free tier restrictions</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"1 audit per month · Up to 10K tokens analyzed"</td>
+<td>"Unlimited local SDK · All four heuristics · No account required for 30 days · Community support." Remove the 1-audit cap entirely — it prevents developers from experiencing the product. The rate limit on cloud sync (10K events/month) can stay, but local SDK must be unrestricted.</td>
+<td class="ref">Langfuse free: 50K observations/month. Helicone free: 10K requests. Both far more generous.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Pricing model</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"$500/month + 10% of realized savings"</td>
+<td>"$299/month" flat. Drop the 10% success fee — it creates distrust ("how do they calculate realized savings?") and signals a consultancy, not a product. Flat-rate pricing is the norm for every developer tool in this space.</td>
+<td class="ref">Langfuse Team: $499/month flat. Braintrust: flat per seat.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Feature list per tier</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Generic bullet lists, no pillar-level gating visible</td>
+<td>Add a pillar-by-pillar feature matrix below the tier cards. Rows = pillars + features, columns = tiers. Checkmarks, dashes, "coming soon" badges. AI Engineers make tool decisions by scanning feature matrices — they want to see exactly what they get at each price point without reading marketing copy.</td>
+<td class="ref">Arize Phoenix pricing page uses full feature matrix</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>Footer CTAs ("Start auditing for free" section)</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"Upload your CSV or JSON logs…" + "Book optimization call"</td>
+<td>"Install in 60 seconds. No credit card. No proxy. No data leaves your machine." + single CTA "pip install aurex-sdk →". This closing section should be a conversion moment for the developer who scrolled the whole page — give them the install command right there.</td>
+<td class="ref">Langfuse: shows pip install in footer CTA</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/ — Homepage: footer</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Footer tagline</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"AI cost optimization through intelligent auditing."</td>
+<td>"Token waste prevention for AI teams. In-process, local-first, privacy-preserving." Removes "auditing" framing entirely.</td>
+<td class="ref">—</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>Footer nav columns</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Product / Resources / Legal</td>
+<td>Add a fourth column: "Pillars" with links to LoopGuard / PromptIQ / CascadeRouter / ProviderShield dedicated pages. Add GitHub repo link and /changelog to Resources. These are the two most important trust signals for AI Engineers.</td>
+<td class="ref">Langfuse, Langsmith both have GitHub in footer</td>
+<td><span class="badge p3">P3</span></td>
+</tr>
+<tr>
+<td>System status badge</td>
+<td><span class="badge keep">Keep</span></td>
+<td>"All systems operational" — bottom-right footer</td>
+<td>Keep. This is a good trust signal. Link it to a real /status page (Betterstack or similar). AIOps personas notice when status pages are fake.</td>
+<td class="ref">All production developer tools have live status</td>
+<td><span class="badge p3">P3</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">/docs — Documentation page</h2>
+<table>
+<thead><tr><th class="c1">Element</th><th class="c2">Action</th><th class="c3">Current</th><th class="c4">New</th><th class="c5">Reference</th><th class="c6">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>Page title and meta</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"Aurex - AI Token Usage Auditor"</td>
+<td>"Aurex SDK — Token waste prevention reference" — consistent with repositioning. The meta description should lead with the install command: "pip install aurex-sdk · Detect loops, prompt bloat, and wasted model spend in-process."</td>
+<td class="ref">—</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Docs layout: single-page scroll</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Everything on one scrolling page with a left-side nav menu</td>
+<td>Upgrade to a proper three-panel docs layout: left sidebar (full nav tree), centre content, right sidebar (on-page anchor links). This is the standard that AI Engineers expect — Langfuse, Langsmith, Arize all use it. A single scrolling page signals an immature product.</td>
+<td class="ref">Langfuse docs, Langsmith docs, Arize Phoenix docs</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Overview paragraph</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"Zero-trust, local-first cost tracking and credit score optimization for your LLM pipelines."</td>
+<td>"The Aurex SDK sits in-process between your code and your LLM provider. It intercepts, evaluates, and — when configured — blocks or reroutes calls before a single wasted token is billed. Zero proxy. Zero PII egress. Zero added latency on the hot path." Active language, three concrete differentiators in one paragraph.</td>
+<td class="ref">—</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>AI agent reference bar</td>
+<td><span class="badge keep">Keep</span></td>
+<td>"Using Cursor, Claude, or Gemini? Load our reference sheet directly into context. Open /llms.txt"</td>
+<td>Keep this — it is genuinely good and differentiated. No other platform in this space has an /llms.txt. Move it to a persistent banner just below the page header so it's visible immediately. Expand the list: "Cursor · Claude · Gemini · GitHub Copilot · Windsurf."</td>
+<td class="ref">Novel feature — keep and promote</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>Quickstart section position</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Quickstart is the second section, after Overview</td>
+<td>Make quickstart the first section — above Overview & Philosophy. AI Engineers do not read philosophy before running code. Show the install command and the first detection before anything else. Philosophy goes after the first working example.</td>
+<td class="ref">Langfuse docs: quickstart is page one. Langsmith: same.</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Method A: Manual event logging</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Listed first, with full code example including raw prompt text in auditor.log_event()</td>
+<td>Demote to an "Advanced" section. Also: the current example passes <code>prompt="Generate a response about pricing."</code> as a string directly to log_event() — this contradicts the zero-PII promise. Fix the example to never pass raw text; show token counts only. This is a trust-destroying inconsistency that any security-conscious AIOps engineer will catch immediately.</td>
+<td class="ref">Consistency with zero-PII invariant</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Method C: Auto-patching (patch_openai)</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Third option, shows patch_openai() for OpenAI only</td>
+<td>Rename to patch_all() and promote to Method A (first option, recommended). Show it auto-detecting all installed providers. Keep patch_openai() as a deprecated alias. This is the zero-friction path — lead with it.</td>
+<td class="ref">—</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Heuristics section heading</td>
+<td><span class="badge mod">Modify</span></td>
+<td>"Offline Heuristics Engine"</td>
+<td>Rename to "Detection pillars" with four subsections: LoopGuard / PromptIQ / BudgetGuard / ProviderShield. Each subsection has: a severity badge, the mechanism explained in one sentence, a config snippet, and a "what it catches / what it doesn't" two-column block. The current doc says LoopGuard "triggers when context grows >2.5x" — engineers need to know the F1 score and detection methodology, not just the trigger condition.</td>
+<td class="ref">Arize Phoenix docs explain detection methodology with accuracy metrics</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>CI/CD section</td>
+<td><span class="badge mod">Modify</span></td>
+<td>CLI example only, no full GitHub Actions YAML</td>
+<td>Add a complete GitHub Actions workflow YAML, a GitLab CI snippet, and a note about the Slack notification webhook. Frame this section with the heading "Token efficiency as a code quality gate" — the same framing as test coverage thresholds. This is the feature that makes Aurex mandatory infrastructure rather than an optional cost dashboard.</td>
+<td class="ref">—</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>Missing: Node.js tab</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Python/Node.js tabs shown but Node.js tab has no content</td>
+<td>Ship the Node.js quickstart or remove the tab. An empty tab is worse than no tab — it signals an unfinished product. AIOps teams building TypeScript inference servers will immediately click the Node tab.</td>
+<td class="ref">—</td>
+<td><span class="badge p1">P1</span></td>
+</tr>
+<tr>
+<td>Missing: /changelog page</td>
+<td><span class="badge add">Add</span></td>
+<td>Does not exist anywhere on the site</td>
+<td>Create /changelog as a first-class page linked from the docs sidebar and main nav. Ship at minimum three entries: LoopGuard F1 upgrade, patch_all() multi-provider support, prompt caching opportunity detection. A public changelog is the single strongest signal that a developer tool is actively maintained.</td>
+<td class="ref">Langfuse, Raindrop both have prominent changelogs</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">New pages to create</h2>
+<table>
+<thead><tr><th style="width:15%">Route</th><th style="width:20%">Purpose</th><th style="width:40%">What it contains</th><th style="width:13%">Reference</th><th style="width:12%">Priority</th></tr></thead>
+<tbody>
+<tr>
+<td>/loopguard<br>/promptiq<br>/cascaderouter<br>/providershield</td>
+<td><span class="badge add">Add</span> Four pillar landing pages</td>
+<td>Each page: pillar name + one-line mechanism + the peer-reviewed paper it's based on + a config snippet + a real-world scenario ("your agent called the same search tool 847 times") + link to the relevant docs section. SEO surface area + buyer education. These pages are what the Pillars nav dropdown links to.</td>
+<td class="ref">Arize has per-feature landing pages. Langfuse has per-integration pages.</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>/changelog</td>
+<td><span class="badge add">Add</span> Public changelog</td>
+<td>Reverse-chronological release notes. Each entry: version number + date + three sections (Added / Changed / Fixed). Keep entries short — bullet points only. Link each entry to the relevant docs section. Update on every release.</td>
+<td class="ref">Langfuse changelog is a model example</td>
+<td><span class="badge p2">P2</span></td>
+</tr>
+<tr>
+<td>/benchmark</td>
+<td><span class="badge add">Add</span> Public accuracy benchmark</td>
+<td>Reproduces the arXiv:2511.10650 loop detection results and the FrugalGPT cascade routing results using Aurex's implementation. Shows F1 scores, methodology, dataset used, and a link to the reproducible test suite on GitHub. This is the most important trust-building page for AI Engineers — it shows the claims are testable.</td>
+<td class="ref">Coral published 82-task benchmark. Raindrop publishes eval metrics.</td>
+<td><span class="badge p3">P3</span></td>
+</tr>
+<tr>
+<td>/enterprise</td>
+<td><span class="badge add">Add</span> Enterprise contact page</td>
+<td>Simple form: company name + team size + use case (dropdown: Fintech / Healthcare / SaaS / Other) + message textarea + submit. No Calendly embed. Explicitly call out the three enterprise-specific capabilities: self-hosted option, client-side encryption (CSE), custom SLA. Replace the deleted /book page.</td>
+<td class="ref">Braintrust enterprise page</td>
+<td><span class="badge p3">P3</span></td>
+</tr>
+<tr>
+<td>/status</td>
+<td><span class="badge add">Add</span> Live system status</td>
+<td>Real-time uptime for SDK cloud sync API, cloud dashboard, and docs. Use Betterstack or similar. Link from footer "All systems operational" badge. AIOps engineers will check this before approving production deployments.</td>
+<td class="ref">Standard for all production developer tools</td>
+<td><span class="badge p3">P3</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2 class="section">Cross-cutting UX changes (apply to all pages)</h2>
+<table>
+<thead><tr><th style="width:20%">Element</th><th style="width:12%">Action</th><th style="width:30%">Current</th><th style="width:38%">New</th></tr></thead>
+<tbody>
+<tr>
+<td>Code blocks</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Plain styled code blocks, no copy button visible on docs page</td>
+<td>Add a copy-to-clipboard button on every code block (top-right, shows "Copied!" for 2s on click). Add syntax highlighting with a dark theme (e.g. One Dark Pro palette). Add a language label (PYTHON · BASH · YAML) top-left. This is table stakes for developer tools in 2026 — its absence on the docs page right now is noticeable.</td>
+</tr>
+<tr>
+<td>Dark mode</td>
+<td><span class="badge add">Add</span></td>
+<td>Light mode only</td>
+<td>Implement system-preference dark mode with a manual toggle in the nav. AI Engineers and AIOps teams work in dark mode by default — Langfuse, Langsmith, Raindrop, Arize, Braintrust all support it. This is one of the strongest signals of "serious developer tool."</td>
+</tr>
+<tr>
+<td>Mobile responsiveness</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Nav collapses but content is not mobile-optimised</td>
+<td>Startups check tools on their phones during demos and investor meetings. The hero section, pricing cards, and docs quickstart must be fully readable on a 390px viewport. The code block should have horizontal scroll on mobile, not overflow the viewport.</td>
+</tr>
+<tr>
+<td>Page load performance</td>
+<td><span class="badge mod">Modify</span></td>
+<td>Built on v0.app — renders client-side</td>
+<td>Ensure hero and above-the-fold content is statically rendered (Next.js SSG or SSR). AI Engineers notice slow tools. A 3-second blank page before content loads undermines the credibility of a tool that claims &lt;0.1ms SDK overhead.</td>
+</tr>
+</tbody>
+</table>
+</div>

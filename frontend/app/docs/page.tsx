@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Cpu, Cloud, Layers, BookOpen, ArrowRight, Bot, Rocket, Shield } from "lucide-react";
+import { CodeBlock } from "@/components/ui/code-block";
 
 export const metadata = {
   title: "Aurex SDK Documentation",
@@ -53,63 +54,41 @@ export default function DocsOverviewPage() {
           </span>
         </div>
 
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
-          <div className="p-5 sm:p-6 font-mono text-sm leading-relaxed">
-            <div className="text-white/30 mb-3"># Step 1: Install</div>
-            <div className="text-white/70 mb-4">
-              <span className="text-emerald-400">$</span> pip install aurex-sdk
-            </div>
+        <CodeBlock
+          language="BASH"
+          code={"pip install aurex-sdk"}
+        />
+        
+        <CodeBlock
+          language="PYTHON"
+          code={`from aurex_sdk import AurexAuditor, patch_all
+import openai
 
-            <div className="text-white/30 mb-3"># Step 2: Initialise and auto-patch all providers</div>
-            <div className="text-white/70">
-              <span className="text-indigo-300">from</span> aurex_sdk <span className="text-indigo-300">import</span> AurexClient, patch_all
-            </div>
-            <div className="text-white/70 mt-1">
-              client = <span className="text-amber-300">AurexClient</span>(<span className="text-white/40">api_key=</span><span className="text-emerald-300">&quot;ax-...&quot;</span>)
-              <span className="text-white/25 ml-2"># or set AUREX_API_KEY env var</span>
-            </div>
-            <div className="text-white/70 mb-4">
-              <span className="text-amber-300">patch_all</span>(client)
-            </div>
+# 1. Initialize and patch (no manual logging required)
+auditor = AurexAuditor()
+patch_all()
 
-            <div className="text-white/30 mb-3"># Step 3: Use your LLM library exactly as before</div>
-            <div className="text-white/70">
-              <span className="text-indigo-300">import</span> openai
-            </div>
-            <div className="text-white/70">
-              response = openai.<span className="text-amber-300">OpenAI</span>().chat.completions.<span className="text-amber-300">create</span>(
-            </div>
-            <div className="text-white/70 pl-4">
-              model=<span className="text-emerald-300">&quot;gpt-4o&quot;</span>,
-            </div>
-            <div className="text-white/70 pl-4">
-              messages=[{`{`}<span className="text-emerald-300">&quot;role&quot;</span>: <span className="text-emerald-300">&quot;user&quot;</span>, <span className="text-emerald-300">&quot;content&quot;</span>: <span className="text-emerald-300">&quot;Explain quantum entanglement.&quot;</span>{`}`}]
-            </div>
-            <div className="text-white/70 mb-4">)</div>
+# 2. Use your LLM library exactly as before
+client = openai.OpenAI()
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Explain quantum entanglement."}]
+)
 
-            <div className="text-white/30 mb-3"># Step 4: Check your Token Credit Score</div>
-            <div className="text-white/70">
-              score = client.<span className="text-amber-300">score</span>()
-            </div>
-            <div className="text-white/70">
-              <span className="text-amber-300">print</span>(<span className="text-emerald-300">f&quot;Token Credit Score: {`{`}score.value{`}`}/100&quot;</span>)
-            </div>
-            <div className="text-emerald-400/60 mt-2">
-              # =&gt; Token Credit Score: 84/100
-            </div>
-            <div className="text-emerald-400/60">
-              {`# => Flags: ['cache_opportunity: $12.40/month saving on system prompt']`}
-            </div>
-          </div>
-        </div>
+# 3. Check your Token Credit Score
+score = auditor.get_score()
+print(f"Token Credit Score: {score.value}/100")
+# => Token Credit Score: 84/100
+# => Flags: ['cache_opportunity: $12.40/month saving on system prompt']`}
+        />
 
         {/* Privacy note */}
-        <div className="flex items-start gap-3 mt-4 p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02]">
-          <Shield className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-3 mt-4 p-4 rounded-xl border border-teal-500/10 bg-teal-500/[0.02]">
+          <Shield className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm text-white/50">
               <span className="text-white/70 font-medium">No data leaves your machine by default.</span>{" "}
-              Cloud sync is opt-in. The ledger file at <code className="text-emerald-400/70 text-xs">~/.aurex/ledger.jsonl</code> is
+              Cloud sync is opt-in. The ledger file at <code className="text-teal-400/70 text-xs">~/.aurex/ledger.jsonl</code> is
               human-readable JSON and can be inspected at any time. It contains only numeric metadata — never raw prompt text.
             </p>
           </div>
@@ -117,9 +96,9 @@ export default function DocsOverviewPage() {
       </div>
 
       <div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">SDK v0.3</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 mb-4">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-xs font-mono text-teal-400 uppercase tracking-wider">SDK v0.3</span>
         </div>
         <h1 className="text-4xl font-display font-bold tracking-tight text-white mb-3">
           Aurex SDK Documentation
@@ -132,20 +111,20 @@ export default function DocsOverviewPage() {
       </div>
 
       <div className="flex items-start gap-3 p-4 rounded-xl border border-white/[0.08] bg-white/[0.02]">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <div>
           <h2 className="text-sm font-semibold text-white">Agent-friendly docs</h2>
           <p className="text-xs text-white/40 mt-1">
             Start at{" "}
-            <Link href="/llms.txt" className="text-indigo-400 hover:text-indigo-300">
+            <Link href="/llms.txt" className="text-teal-400 hover:text-teal-300">
               /llms.txt
             </Link>{" "}
             for task → URL routing. Fetch one page per concern (e.g.{" "}
-            <Link href="/docs/reference/config" className="text-indigo-400 hover:text-indigo-300">
+            <Link href="/docs/reference/config" className="text-teal-400 hover:text-teal-300">
               /docs/reference/config
             </Link>
             ,{" "}
-            <Link href="/docs/reliability/policy" className="text-indigo-400 hover:text-indigo-300">
+            <Link href="/docs/reliability/policy" className="text-teal-400 hover:text-teal-300">
               /docs/reliability/policy
             </Link>
             ) — avoid loading hub pages for implementation detail.
@@ -160,10 +139,10 @@ export default function DocsOverviewPage() {
             href={card.href}
             className="group p-5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
           >
-            <card.icon className="w-5 h-5 text-emerald-400 mb-3" />
+            <card.icon className="w-5 h-5 text-teal-400 mb-3" />
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               {card.title}
-              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-teal-400" />
             </h2>
             <p className="text-sm text-white/45 mt-2 leading-relaxed">{card.description}</p>
           </Link>

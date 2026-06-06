@@ -3,7 +3,8 @@ import type { Metadata } from 'next'
 import { Inter, Outfit, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-
+import { ThemeProvider } from "@/components/theme-provider"
+import { Omnibar } from "@/components/ui/omnibar"
 const inter = Inter({
   subsets: ["latin"],
   variable: '--font-inter'
@@ -33,7 +34,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem={true}
+          disableTransitionOnChange
+        >
+          {children}
+          <Omnibar />
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

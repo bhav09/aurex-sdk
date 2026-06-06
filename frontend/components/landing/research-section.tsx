@@ -84,8 +84,8 @@ export function ResearchSection() {
             >
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-[#eca8d6]" />
-                  <span className="text-xs font-mono text-[#eca8d6]/60 uppercase tracking-wider">
+                  <GraduationCap className="w-4 h-4 text-[#2dd4bf]" />
+                  <span className="text-xs font-mono text-[#2dd4bf]/60 uppercase tracking-wider">
                     {paper.pillar}
                   </span>
                 </div>

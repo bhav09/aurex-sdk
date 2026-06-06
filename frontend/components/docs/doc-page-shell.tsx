@@ -25,10 +25,10 @@ export function DocPageShell({
         <p className="text-white/50 mt-2 leading-relaxed">{description}</p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <div>
-          <p className="text-xs font-mono text-indigo-400/80 uppercase tracking-wider mb-1">Agent hint</p>
+          <p className="text-xs font-mono text-teal-400/80 uppercase tracking-wider mb-1">Agent hint</p>
           <p className="text-sm text-white/60">{agentHint}</p>
         </div>
       </div>

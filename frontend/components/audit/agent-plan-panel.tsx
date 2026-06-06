@@ -75,8 +75,8 @@ export function AgentPlanPanel({
     return (
         <div className="mx-auto max-w-4xl space-y-4">
             <div className="flex items-center gap-3 px-1 border-b border-white/5 pb-4 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500/20 bg-violet-500/10">
-                    <ListOrdered className="h-5 w-5 text-violet-400" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-500/20 bg-teal-500/10">
+                    <ListOrdered className="h-5 w-5 text-teal-400" />
                 </div>
                 <div>
                     <h2 className="font-display text-xl font-bold text-white">Remediation Action Plan</h2>
@@ -101,7 +101,7 @@ export function AgentPlanPanel({
                         className={cn(
                             "overflow-hidden rounded-xl border transition-all duration-200",
                             isOpen
-                                ? "border-violet-500/30 bg-surface-raised/85 shadow-lg shadow-violet-500/5 ring-1 ring-violet-500/10"
+                                ? "border-teal-500/30 bg-surface-raised/85 shadow-lg shadow-teal-500/5 ring-1 ring-teal-500/10"
                                 : "border-white/[0.06] bg-surface-raised/50 hover:border-white/10 hover:bg-surface-raised/75"
                         )}
                     >
@@ -141,7 +141,7 @@ export function AgentPlanPanel({
                                 <ChevronDown
                                     className={cn(
                                         "h-4 w-4 text-white/30 transition-transform duration-200",
-                                        isOpen && "rotate-180 text-violet-400"
+                                        isOpen && "rotate-180 text-teal-400"
                                     )}
                                 />
                             </div>
@@ -201,7 +201,7 @@ export function AgentPlanPanel({
                                             <div className="flex flex-wrap gap-2 pt-2">
                                                 <Button
                                                     size="sm"
-                                                    className="gap-2 bg-violet-600 hover:bg-violet-500 text-xs font-mono font-bold px-3 py-1.5 rounded-lg border border-violet-500/30 shadow-lg shadow-violet-500/10"
+                                                    className="gap-2 bg-teal-600 hover:bg-teal-500 text-xs font-mono font-bold px-3 py-1.5 rounded-lg border border-teal-500/30 shadow-lg shadow-teal-500/10"
                                                     onClick={() =>
                                                         onOpenCopilot(issue)
                                                     }
@@ -224,7 +224,7 @@ export function AgentPlanPanel({
 
                                         <div className="space-y-2">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-400">
+                                                <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-teal-400">
                                                     <Code2 className="h-3.5 w-3.5" />
                                                     starter_patch.py
                                                 </div>

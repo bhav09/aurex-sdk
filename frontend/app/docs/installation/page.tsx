@@ -52,7 +52,7 @@ export default function DocsInstallationPage() {
       <DocHashRedirect />
       <div>
         <h1 className="text-3xl font-display font-bold text-white flex items-center gap-2">
-          <Terminal className="w-7 h-7 text-emerald-400" />
+          <Terminal className="w-7 h-7 text-teal-400" />
           Installation & Quick Start
         </h1>
         <p className="text-white/50 mt-2">
@@ -74,11 +74,11 @@ export default function DocsInstallationPage() {
         <h2 className="text-xl font-semibold text-white">Zero-code auto-hook</h2>
         <p className="text-white/50 text-sm">
           The install-hook command patches provider modules before your app imports them. See{" "}
-          <a href="/docs/reference/autohook" className="text-indigo-400">
+          <a href="/docs/reference/autohook" className="text-teal-400">
             auto-hook reference
           </a>{" "}
           for provider coverage. Environment variables are documented on{" "}
-          <a href="/docs/installation/env-vars" className="text-indigo-400">
+          <a href="/docs/installation/env-vars" className="text-teal-400">
             /docs/installation/env-vars
           </a>
           .
@@ -105,7 +105,7 @@ export default function DocsInstallationPage() {
         <h2 className="text-xl font-semibold text-white">Environment variables</h2>
         <p className="text-white/50 text-sm">
           Full <code>AUREX_*</code> reference:{" "}
-          <a href="/docs/installation/env-vars" className="text-indigo-400">
+          <a href="/docs/installation/env-vars" className="text-teal-400">
             /docs/installation/env-vars
           </a>
         </p>

@@ -126,12 +126,12 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                     transition={{ type: "spring", stiffness: 320, damping: 32 }}
                     className={cn(
                         "fixed bottom-6 right-6 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15",
-                        "bg-[oklch(0.1_0.02_260)]/95 shadow-2xl shadow-violet-500/10 backdrop-blur-xl"
+                        "bg-[oklch(0.1_0.02_260)]/95 shadow-2xl shadow-teal-500/10 backdrop-blur-xl"
                     )}
                 >
                     <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                         <div className="flex items-center gap-2">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/40 to-sky-500/30">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500/40 to-sky-500/30">
                                 <Bot className="h-5 w-5 text-white" />
                             </div>
                             <div className="flex flex-col">
@@ -166,7 +166,7 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                                     "flex flex-col space-y-1 max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
                                     msg.role === "assistant"
                                         ? "mr-auto border border-white/15 bg-white/[0.04] text-white/90"
-                                        : "ml-auto border border-violet-500/20 bg-violet-600/30 text-white"
+                                        : "ml-auto border border-teal-500/20 bg-teal-600/30 text-white"
                                 )}
                             >
                                 <span className="text-[9px] font-semibold tracking-wider uppercase text-white/30">
@@ -198,13 +198,13 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Ask a question or request code..."
                             disabled={loading}
-                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 disabled:opacity-50"
+                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/30 disabled:opacity-50"
                         />
                         <Button
                             type="submit"
                             size="icon"
                             disabled={loading || !input.trim()}
-                            className="bg-violet-600 hover:bg-violet-500 text-white rounded-xl h-9 w-9 shrink-0 shadow-md shadow-violet-500/10 disabled:opacity-50"
+                            className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl h-9 w-9 shrink-0 shadow-md shadow-teal-500/10 disabled:opacity-50"
                         >
                             <Send className="h-4 w-4" />
                         </Button>

@@ -42,7 +42,7 @@ export default function DocsClassificationPage() {
           <tbody className="divide-y divide-white/[0.04] text-white/50 text-xs">
             {defaultKinds.map((row) => (
               <tr key={row.kind}>
-                <td className="p-3 font-mono text-indigo-400">{row.kind}</td>
+                <td className="p-3 font-mono text-teal-400">{row.kind}</td>
                 <td className="p-3">{row.retry}</td>
                 <td className="p-3 font-sans">{row.desc}</td>
               </tr>
@@ -53,7 +53,7 @@ export default function DocsClassificationPage() {
 
       <p className="text-sm text-white/50">
         Empty and content-filter responses are often still billed — observe mode records them as{" "}
-        <code className="text-indigo-400">UNFULFILLED_SPEND</code> for dashboard analytics.
+        <code className="text-teal-400">UNFULFILLED_SPEND</code> for dashboard analytics.
       </p>
 
       <DocSeeAlso

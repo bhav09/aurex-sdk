@@ -52,24 +52,24 @@ export default function DocsReliabilityHubPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-display font-bold text-white flex items-center gap-2">
-          <Shield className="w-7 h-7 text-emerald-400" />
+          <Shield className="w-7 h-7 text-teal-400" />
           Reliability & Loss Recovery
         </h1>
         <p className="text-white/50 mt-2">
           Provider-call resilience — retry, fallback, and counterfactual loss accounting. Default off until{" "}
-          <code className="text-indigo-400">resilience.enabled=true</code>.
+          <code className="text-teal-400">resilience.enabled=true</code>.
         </p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <p className="text-sm text-white/60">
           Not cloud sync retry — see{" "}
-          <Link href="/docs/deployment/cloud-sync" className="text-indigo-400">
+          <Link href="/docs/deployment/cloud-sync" className="text-teal-400">
             Cloud Sync Resilience
           </Link>
           . Not BudgetGuard — see{" "}
-          <Link href="/docs/reference/budget-guard" className="text-indigo-400">
+          <Link href="/docs/reference/budget-guard" className="text-teal-400">
             BudgetGuard
           </Link>
           .

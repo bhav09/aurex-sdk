@@ -210,7 +210,7 @@ export function FeaturesSection() {
                   <div className="relative z-10 flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-4">
                       <span className="font-mono text-xs sm:text-sm text-muted-foreground">{pillar.number}</span>
-                      <pillar.icon className="w-4 h-4 text-[#eca8d6]" />
+                      <pillar.icon className="w-4 h-4 text-[#2dd4bf]" />
                     </div>
                     <h3 className="text-2xl sm:text-3xl font-display mt-1 mb-4 group-hover:translate-x-2 transition-transform duration-500">
                       {pillar.title}
@@ -224,7 +224,7 @@ export function FeaturesSection() {
                     </div>
                     <a
                       href={pillar.docsHref}
-                      className="inline-flex items-center gap-1 text-xs text-[#eca8d6]/60 hover:text-[#eca8d6] font-mono mt-4 transition-colors"
+                      className="inline-flex items-center gap-1 text-xs text-[#2dd4bf]/60 hover:text-[#2dd4bf] font-mono mt-4 transition-colors"
                     >
                       Read docs →
                     </a>
@@ -232,6 +232,40 @@ export function FeaturesSection() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Research backing strip */}
+        <div className="mt-8 border border-foreground/10 bg-foreground/[0.02] rounded-xl p-4 sm:p-6 overflow-hidden">
+          <div className="flex flex-col md:flex-row items-center gap-6 justify-between opacity-80 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground whitespace-nowrap">Peer-Reviewed</span>
+              <div className="h-px w-8 bg-foreground/20" />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+              <a href="https://arxiv.org/abs/2511.10650" target="_blank" rel="noreferrer" className="flex flex-col gap-1 group">
+                <span className="text-xs font-medium text-foreground group-hover:text-[#2dd4bf] transition-colors">Loop Detection via Temporal Stacks</span>
+                <span className="text-[10px] text-muted-foreground flex justify-between">
+                  <span>arXiv:2511.10650</span>
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                </span>
+              </a>
+              <a href="https://www.microsoft.com/en-us/research/project/llmlingua/" target="_blank" rel="noreferrer" className="flex flex-col gap-1 group">
+                <span className="text-xs font-medium text-foreground group-hover:text-[#2dd4bf] transition-colors">LLMLingua-2: Prompt Compression</span>
+                <span className="text-[10px] text-muted-foreground flex justify-between">
+                  <span>Microsoft Research</span>
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                </span>
+              </a>
+              <a href="https://arxiv.org/abs/2305.05176" target="_blank" rel="noreferrer" className="flex flex-col gap-1 group">
+                <span className="text-xs font-medium text-foreground group-hover:text-[#2dd4bf] transition-colors">FrugalGPT: Cascade Routing</span>
+                <span className="text-[10px] text-muted-foreground flex justify-between">
+                  <span>Stanford University</span>
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                </span>
+              </a>
+            </div>
           </div>
         </div>
       </div>

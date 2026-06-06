@@ -71,7 +71,7 @@ export default function ChangelogPage() {
             Latest updates to the Aurex platform. Subscribe to releases on{" "}
             <a
               href="https://github.com/heyaurex/aurex-sdk"
-              className="text-[#eca8d6] hover:text-[#eca8d6]/80 transition-colors"
+              className="text-[#2dd4bf] hover:text-[#2dd4bf]/80 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -93,7 +93,7 @@ export default function ChangelogPage() {
               }`}
             >
               {/* Timeline dot */}
-              <div className="absolute left-0 top-0 -translate-x-1/2 w-3 h-3 rounded-full bg-[#eca8d6] border-4 border-background" />
+              <div className="absolute left-0 top-0 -translate-x-1/2 w-3 h-3 rounded-full bg-[#2dd4bf] border-4 border-background" />
 
               {/* Meta */}
               <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -103,7 +103,7 @@ export default function ChangelogPage() {
                 <span className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] border border-white/[0.08] rounded text-white/50">
                   {entry.version}
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-[#eca8d6]/10 border border-[#eca8d6]/20 rounded text-[#eca8d6]/70">
+                <span className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-[#2dd4bf]/10 border border-[#2dd4bf]/20 rounded text-[#2dd4bf]/70">
                   {entry.category}
                 </span>
               </div>
@@ -123,7 +123,7 @@ export default function ChangelogPage() {
                     key={highlight}
                     className="flex items-start gap-2 text-sm text-white/35"
                   >
-                    <span className="text-[#eca8d6]/50 mt-1 shrink-0">•</span>
+                    <span className="text-[#2dd4bf]/50 mt-1 shrink-0">•</span>
                     {highlight}
                   </li>
                 ))}

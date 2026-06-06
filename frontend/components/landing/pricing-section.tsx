@@ -5,19 +5,19 @@ import { ArrowRight, Check, X, Zap } from "lucide-react";
 
 const plans = [
   {
-    name: "Audit Edition",
-    description: "For teams getting started with cost optimization",
+    name: "Developer",
+    description: "For developers building locally with zero cloud dependencies",
     priceDisplay: "$0",
     billingDisplay: "forever free",
     features: [
-      { text: "1 audit per month", included: true },
-      { text: "Up to 10K tokens analyzed", included: true },
-      { text: "Basic recommendations", included: true },
-      { text: "CSV/JSON export", included: true },
+      { text: "Local infinite loop detection", included: true },
+      { text: "Local prompt optimization", included: true },
+      { text: "Local circuit breakers", included: true },
       { text: "Community support", included: true },
-      { text: "Cloud dashboard", included: false },
-      { text: "Cost-based routing", included: false },
-      { text: "Circuit breakers", included: false },
+      { text: "Cloud dashboard with trace trees", included: false },
+      { text: "Team cost governance", included: false },
+      { text: "OpenTelemetry export", included: false },
+      { text: "Priority support", included: false },
     ],
     highlight: false,
   },
@@ -137,7 +137,7 @@ export function PricingSection() {
                     {plan.features.map((feature) => (
                       <li key={feature.text} className="flex items-start gap-3">
                         {feature.included ? (
-                          <Check className="w-4 h-4 text-[#eca8d6] mt-0.5 shrink-0" />
+                          <Check className="w-4 h-4 text-[#2dd4bf] mt-0.5 shrink-0" />
                         ) : (
                           <X className="w-4 h-4 text-muted-foreground/30 mt-0.5 shrink-0" />
                         )}

@@ -610,7 +610,7 @@ export default function SettingsPage() {
                                                     <TableCell className="font-mono text-xs text-white/70">
                                                         {k.prefix}…{k.last4 || "----"}
                                                     </TableCell>
-                                                    <TableCell className="text-xs text-indigo-300 font-mono">{projectNameMapper(k.project_id)}</TableCell>
+                                                    <TableCell className="text-xs text-teal-300 font-mono">{projectNameMapper(k.project_id)}</TableCell>
                                                     <TableCell className="text-xs font-mono">{k.environment || "—"}</TableCell>
                                                     <TableCell className="text-xs text-white/40">
                                                         {new Date(k.created_at).toLocaleDateString()}

@@ -100,11 +100,11 @@ export default function DocsReferenceHubPage() {
         </p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <p className="text-sm text-white/60">
           Agents: use{" "}
-          <Link href="/llms.txt" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/llms.txt" className="text-teal-400 hover:text-teal-300">
             /llms.txt
           </Link>{" "}
           to route tasks to a single URL below.

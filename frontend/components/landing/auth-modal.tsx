@@ -162,7 +162,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         )}
 
         {infoMessage && (
-          <div className="p-3 text-xs text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+          <div className="p-3 text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-lg">
             {infoMessage}
           </div>
         )}
