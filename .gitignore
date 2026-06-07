@@ -8,6 +8,11 @@ venv/
 sample_data/
 aurex.db
 *.pyc
+aurex_colour_system_recommendation.html
+aurex_ui_change_specification.html
+SKILL.md
+UI-updated.md
+userexperience.md
 __pycache__/
 
 # Google service accounts
@@ -39,3 +44,4 @@ Features Aurex.pdf
 session.json
 summary.json
 upload_res.json
+

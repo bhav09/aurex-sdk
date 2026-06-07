@@ -114,7 +114,7 @@ export function ScoreGateStep({ data, onUnlock }: ScoreGateStepProps) {
                     {/* Blurred Content Behind Gate */}
                     <div className="opacity-30 blur-sm select-none pointer-events-none space-y-4">
                         <div className="flex items-center gap-2 mb-4">
-                            <Zap className="w-4 h-4 text-teal-400" />
+                            <Zap className="w-4 h-4 text-emerald-400" />
                             <span className="font-semibold text-white">Top Inefficiencies Found</span>
                         </div>
                         {[1, 2, 3].map(i => (

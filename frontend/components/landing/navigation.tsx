@@ -81,19 +81,7 @@ export function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <div className="relative group">
-              <button className={`text-sm flex items-center gap-1 transition-colors duration-300 ${isScrolled ? "text-foreground/70 hover:text-foreground" : "text-white/70 hover:text-white"}`}>
-                Pillars
-              </button>
-              <div className="absolute top-full -left-4 pt-4 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200">
-                <div className="bg-background/95 backdrop-blur-md border border-foreground/10 rounded-xl shadow-xl p-2 w-48 flex flex-col gap-1">
-                  <a href="/#loopguard" className="px-3 py-2 text-sm text-foreground/80 hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors">LoopGuard</a>
-                  <a href="/#promptiq" className="px-3 py-2 text-sm text-foreground/80 hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors">PromptIQ</a>
-                  <a href="/#cascaderouter" className="px-3 py-2 text-sm text-foreground/80 hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors">CascadeRouter</a>
-                  <a href="/#providershield" className="px-3 py-2 text-sm text-foreground/80 hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors">ProviderShield</a>
-                </div>
-              </div>
-            </div>
+
             {navLinks.map((link) => (
               <a
                 key={link.name}

@@ -926,7 +926,7 @@ async def create_audit_session(
         else:
             raise HTTPException(status_code=403, detail="Not authorized to create a session for this email")
             
-    if not is_authenticated:
+    if not is_authenticated and not email.startswith('anon-'):
         otp_raw = await redis_client.get(f"otp:{email}")
         
         if not otp_raw:

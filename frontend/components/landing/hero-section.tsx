@@ -132,7 +132,7 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-12">
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 md:px-8 pt-20 sm:pt-28 md:pt-36 pb-8 sm:pb-12">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center text-left">
           <div className="max-w-2xl">
             <motion.div
@@ -205,19 +205,16 @@ export function HeroSection() {
           >
             <div className="flex items-start gap-8 sm:gap-10 lg:gap-16 flex-wrap">
               {[
-                { value: "F1 0.72", label: "loop detection accuracy", source: "arXiv:2511.10650", href: "https://arxiv.org/abs/2511.10650" },
-                { value: "20×", label: "prompt compression", source: "Microsoft LLMLingua-2", href: "https://www.microsoft.com/en-us/research/project/llmlingua/" },
-                { value: "98%", label: "cost reduction via cascade routing", source: "Stanford FrugalGPT", href: "https://arxiv.org/abs/2305.05176" },
+                { value: "F1 0.72", label: "loop detection accuracy" },
+                { value: "20×", label: "prompt compression" },
+                { value: "98%", label: "cost reduction via cascade routing" },
               ].map((stat) => (
-                <a key={stat.label} href={stat.href} target="_blank" rel="noreferrer" className="flex flex-col gap-1 sm:gap-2 text-left group">
-                  <span className="text-2xl sm:text-3xl font-display text-white group-hover:text-emerald-400 transition-colors">{stat.value}</span>
-                  <span className="text-[10px] sm:text-xs text-white/50 leading-tight group-hover:text-white/70 transition-colors">
+                <div key={stat.label} className="flex flex-col gap-1 sm:gap-2 text-left group">
+                  <span className="text-2xl sm:text-3xl font-display text-white transition-colors">{stat.value}</span>
+                  <span className="text-[10px] sm:text-xs text-white/50 leading-tight transition-colors">
                     {stat.label}
                   </span>
-                  <span className="text-[9px] sm:text-[10px] text-white/25 font-mono leading-tight group-hover:text-white/40 transition-colors">
-                    {stat.source}
-                  </span>
-                </a>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -244,9 +241,12 @@ export function HeroSection() {
                   <span className="text-emerald-400">$</span> pip install aurex-sdk
                 </div>
                 <div className="mt-4 text-white/70">
-                  <span className="text-teal-400">from</span> aurex_sdk <span className="text-teal-400">import</span> patch_all
+                  <span className="text-teal-400">from</span> aurex_sdk <span className="text-teal-400">import</span> AurexAuditor, AurexConfig
                 </div>
-                <div className="text-amber-300">patch_all()</div>
+                <div className="text-white/70">
+                  auditor = <span className="text-amber-300">AurexAuditor</span>(<span className="text-amber-300">AurexConfig</span>(enable_loop_guard=<span className="text-teal-300">True</span>))
+                </div>
+                <div className="text-white/70">auditor.<span className="text-amber-300">patch_all</span>()</div>
                 
                 <div className="mt-4 text-teal-400">import <span className="text-white/70">openai</span></div>
                 <div className="text-white/70">client = openai.<span className="text-amber-300">OpenAI</span>()</div>

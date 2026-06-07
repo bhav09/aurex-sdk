@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Code2, Cpu, BrainCircuit, Globe, Bot, ShieldAlert, Sparkles, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+
 
 export function HowItWorksSection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -24,63 +26,120 @@ export function HowItWorksSection() {
     <section
       id="how-it-works"
       ref={sectionRef}
-      className="relative py-24 lg:py-32 bg-background text-white overflow-hidden"
+      className="relative py-24 lg:py-32 bg-background text-foreground overflow-hidden border-t border-border"
     >
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-white/[0.02] blur-[100px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-teal-500/5 blur-[120px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
+      <div className="relative z-10 max-w-[1200px] mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="relative mb-16 text-center">
-          <div className="overflow-hidden">
-            <div className={`transition-all duration-1000 ${isVisible ? "translate-x-0 opacity-100" : "-translate-x-12 opacity-0"}`}>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-white/40 mb-8">
-                <span className="w-12 h-px bg-white/20" />
-                How It Works
-                <span className="w-12 h-px bg-white/20" />
-              </span>
+        <div className={`text-center max-w-3xl mx-auto mb-20 transition-all duration-1000 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-12 opacity-0"}`}>
+          <p className="text-sm font-mono text-muted-foreground tracking-widest uppercase mb-6">
+            How You Integrate
+          </p>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-display tracking-tight mb-6">
+            Drop Aurex between <br />
+            <span className="text-teal-500">your application</span> and your LLMs.
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Aurex sits as a thin intelligence layer over the tools and SDKs you already run. 
+            You don&apos;t rebuild your stack. You add protection and visibility on top.
+          </p>
+        </div>
+
+        {/* Diagram */}
+        <div className={`relative w-full aspect-auto md:h-[400px] bg-surface-sunken border border-border rounded-2xl p-8 mb-16 overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 transition-all duration-1000 delay-300 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-12 opacity-0"}`}>
+          
+          {/* Animated Connecting Lines (Background of diagram) */}
+          <div className="absolute inset-0 pointer-events-none hidden md:block">
+            <svg className="w-full h-full text-border opacity-50" preserveAspectRatio="none">
+              <path d="M 220 200 L 320 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" className="animate-pulse" />
+              <path d="M 520 200 L 620 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" className="animate-pulse delay-75" />
+              <path d="M 850 200 L 980 90" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" className="animate-pulse delay-150" />
+              <path d="M 850 200 L 980 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" className="animate-pulse delay-150" />
+              <path d="M 850 200 L 980 310" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" className="animate-pulse delay-150" />
+            </svg>
+          </div>
+
+          {/* Column 1: Application */}
+          <div className="relative z-10 w-full md:w-52 space-y-4">
+            <div className="text-xs font-mono text-muted-foreground uppercase text-center mb-6 tracking-wider">Your Application</div>
+            <div className="bg-surface border border-border p-4 rounded-xl flex items-center gap-3 shadow-sm hover:border-teal-500/50 transition-colors">
+              <Globe className="w-5 h-5 text-teal-500" />
+              <span className="text-sm font-medium">Web App</span>
             </div>
+            <div className="bg-surface border border-border p-4 rounded-xl flex items-center gap-3 shadow-sm hover:border-teal-500/50 transition-colors">
+              <Database className="w-5 h-5 text-teal-500" />
+              <span className="text-sm font-medium">Workers</span>
+            </div>
+            <div className="text-center text-xs text-muted-foreground pt-4">Your infrastructure</div>
+          </div>
 
-            <h2 className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.85] transition-all duration-1000 delay-100 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-16 opacity-0"}`}>
-              <span className="block text-white/20">Install.</span>
-              <span className="block text-white/45">Intercept.</span>
-              <span className="block text-white drop-shadow-[0_0_48px_rgba(255,255,255,0.12)]">Prevent.</span>
-            </h2>
+          {/* Column 2: Frameworks */}
+          <div className="relative z-10 w-full md:w-48 space-y-4">
+            <div className="text-xs font-mono text-muted-foreground uppercase text-center mb-6 tracking-wider">AI Frameworks</div>
+            <div className="bg-surface border border-border p-4 rounded-xl flex items-center gap-3 shadow-sm hover:border-teal-500/50 transition-colors">
+              <Code2 className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">LangChain / AI SDK</span>
+            </div>
+            <div className="text-center text-xs text-muted-foreground pt-4">Routes each request</div>
+          </div>
 
-            <p className={`mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-mono transition-all duration-1000 delay-200 ${isVisible ? "opacity-100" : "opacity-0"}`}>
-              <span className="text-white/25">pip install</span>
-              <span className="text-white/15" aria-hidden="true">→</span>
-              <span className="text-white/45">patch_all()</span>
-              <span className="text-white/15" aria-hidden="true">→</span>
-              <span className="text-white font-medium">waste prevented</span>
-            </p>
-
-            <div className={`mt-12 transition-all duration-1000 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-              <p className="text-xl text-white/60 mb-8 max-w-2xl mx-auto">
-                Two lines of code. All four pillars activate automatically. No data leaves your machine by default.
-              </p>
-
-              {/* Code snippet preview */}
-              <div className="max-w-xl mx-auto mb-8 text-left">
-                <div className="bg-white/[0.03] border border-white/[0.08] rounded-lg p-5 font-mono text-sm">
-                  <div className="text-white/30 mb-2"># That&apos;s it. Two lines.</div>
-                  <div><span className="text-teal-300">from</span> <span className="text-white/70">aurex_sdk</span> <span className="text-teal-300">import</span> <span className="text-white/70">AurexAuditor, patch_all</span></div>
-                  <div className="mt-1"><span className="text-white/70">auditor = </span><span className="text-amber-300">AurexAuditor</span><span className="text-white/40">()</span></div>
-                  <div><span className="text-amber-300">patch_all</span><span className="text-white/40">()</span></div>
+          {/* Column 3: Aurex SDK */}
+          <div className="relative z-10 w-full md:w-64">
+            <div className="text-xs font-mono text-teal-500 uppercase text-center mb-6 font-semibold tracking-wider">Intelligence Layer</div>
+            <div className="bg-surface border-2 border-teal-500/50 p-5 rounded-xl shadow-[0_0_30px_rgba(20,184,166,0.15)] relative overflow-hidden group hover:border-teal-400 transition-colors">
+              <div className="absolute top-0 right-0 p-3">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
+                </span>
+              </div>
+              <div className="flex items-center gap-3 mb-5 border-b border-border pb-4">
+                <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                  <ShieldAlert className="w-5 h-5 text-teal-500" />
+                </div>
+                <span className="font-display font-semibold text-lg tracking-tight">AUREX SDK</span>
+              </div>
+              <div className="space-y-3">
+                <div className="text-xs flex items-center justify-between text-muted-foreground bg-muted/50 p-2 rounded-md">
+                  <span className="font-mono">LoopGuard</span>
+                  <span className="text-teal-500 text-[10px] uppercase font-bold tracking-wider">Active</span>
+                </div>
+                <div className="text-xs flex items-center justify-between text-muted-foreground bg-muted/50 p-2 rounded-md">
+                  <span className="font-mono">Compressor</span>
+                  <span className="text-teal-500 text-[10px] uppercase font-bold tracking-wider">Active</span>
+                </div>
+                <div className="text-xs flex items-center justify-between text-muted-foreground bg-muted/50 p-2 rounded-md">
+                  <span className="font-mono">Cost Auditor</span>
+                  <span className="text-teal-500 text-[10px] uppercase font-bold tracking-wider">Active</span>
                 </div>
               </div>
-
-              <a href="/docs#quickstart">
-                <Button
-                  size="lg"
-                  className="relative text-base font-medium rounded-full h-14 px-8 bg-teal-500 hover:bg-teal-400 text-white transition-all duration-300 group shadow-[0_4px_12px_rgba(20,184,166,0.3)] border-none"
-                >
-                  <span className="relative z-10">Start Building</span>
-                  <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </a>
             </div>
+            <div className="text-center text-xs text-muted-foreground pt-4">Runs in-process</div>
           </div>
+
+          {/* Column 4: Providers */}
+          <div className="relative z-10 w-full md:w-52 space-y-4">
+            <div className="text-xs font-mono text-muted-foreground uppercase text-center mb-6 tracking-wider">LLM Providers</div>
+            <div className="bg-surface border border-border p-3 rounded-xl flex items-center gap-3 shadow-sm hover:border-teal-500/50 transition-colors">
+              <BrainCircuit className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">OpenAI</span>
+            </div>
+            <div className="bg-surface border border-border p-3 rounded-xl flex items-center gap-3 shadow-sm hover:border-teal-500/50 transition-colors">
+              <Cpu className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Anthropic</span>
+            </div>
+            <div className="bg-surface border border-border p-3 rounded-xl flex items-center gap-3 shadow-sm hover:border-teal-500/50 transition-colors">
+              <Bot className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Gemini / Ollama</span>
+            </div>
+            <div className="text-center text-xs text-muted-foreground pt-4">Final execution</div>
+          </div>
+
         </div>
+
+
+
       </div>
     </section>
   );

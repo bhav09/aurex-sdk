@@ -4,12 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 const footerLinks = {
-  Pillars: [
-    { name: "LoopGuard", href: "/#pillars" },
-    { name: "PromptIQ", href: "/#pillars" },
-    { name: "CascadeRouter", href: "/#pillars" },
-    { name: "ProviderShield", href: "/#pillars" },
-  ],
+
   Resources: [
     { name: "Documentation", href: "/docs" },
     { name: "Support", href: "mailto:contact@heyaurex.com" },
