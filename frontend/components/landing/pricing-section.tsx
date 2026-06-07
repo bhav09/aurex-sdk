@@ -6,50 +6,53 @@ import { ArrowRight, Check, X, Zap } from "lucide-react";
 const plans = [
   {
     name: "Developer",
-    description: "For developers building locally with zero cloud dependencies",
+    description: "Solo Devs & Prototypes",
     priceDisplay: "$0",
     billingDisplay: "forever free",
     features: [
-      { text: "Local infinite loop detection", included: true },
-      { text: "Local prompt optimization", included: true },
-      { text: "Local circuit breakers", included: true },
+      { text: "Unlimited seats", included: true },
+      { text: "Local-only ledger for privacy", included: true },
+      { text: "Local loop detection", included: true },
       { text: "Community support", included: true },
-      { text: "Cloud dashboard with trace trees", included: false },
-      { text: "Team cost governance", included: false },
-      { text: "OpenTelemetry export", included: false },
-      { text: "Priority support", included: false },
     ],
     highlight: false,
   },
   {
-    name: "Team",
-    description: "For production platforms needing cloud insights, cascade routing, and team governance",
-    priceDisplay: "$299",
-    billingDisplay: "/month",
+    name: "Startup",
+    description: "Funded AI SaaS",
+    priceDisplay: "$49",
+    billingDisplay: "/month flat base",
     features: [
-      { text: "Everything in Developer", included: true },
-      { text: "Cloud dashboard with trace trees", included: true },
-      { text: "Cost-based routing (Phase 2)", included: true },
-      { text: "Circuit breakers", included: true },
-      { text: "Team cost governance", included: true },
-      { text: "OpenTelemetry export", included: true },
+      { text: "Unlimited seats", included: true },
+      { text: "500k cloud events", included: true },
+      { text: "Real-time BudgetGuard", included: true },
       { text: "Slack/email alerts", included: true },
+    ],
+    highlight: false,
+  },
+  {
+    name: "Scale",
+    description: "Production Agent Teams",
+    priceDisplay: "$199",
+    billingDisplay: "/mo + 5% ROI share",
+    features: [
+      { text: "Monetizing Loss Avoided", included: true },
+      { text: "Active loop blocks", included: true },
+      { text: "Prompt compression", included: true },
       { text: "Priority support", included: true },
     ],
     highlight: true,
   },
   {
     name: "Enterprise",
-    description: "For large scale workloads requiring custom SLA, dedicated hosting, and advanced compliance",
+    description: "Regulated Verticals",
     priceDisplay: "Custom",
     billingDisplay: "contact sales",
     features: [
-      { text: "Everything in Team", included: true },
-      { text: "Self-hosted control plane & DB option", included: true },
-      { text: "Custom pre-call validation logic", included: true },
-      { text: "Dedicated customer success engineer", included: true },
-      { text: "Enterprise SLA & custom contracts", included: true },
-      { text: "SSO/SAML login integration", included: true },
+      { text: "BYOC deployment", included: true },
+      { text: "SOC2/HIPAA compliance", included: true },
+      { text: "Air-gapped control plane", included: true },
+      { text: "Dedicated success engineer", included: true },
     ],
     highlight: false,
   },
@@ -82,21 +85,21 @@ export function PricingSection() {
           </span>
           <h2 className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}>
-            Simple,
+            Value-aligned
             <br />
-            <span className="text-stroke">flat-rate.</span>
+            <span className="text-stroke">pricing.</span>
           </h2>
         </div>
 
         {/* Pricing cards - Horizontal layout with overlap */}
         <div className="relative">
-          <div className="grid lg:grid-cols-3 gap-4 lg:gap-0">
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-0">
             {plans.map((plan, index) => (
               <div
                 key={plan.name}
                 className={`relative bg-background border transition-all duration-700 ${plan.highlight
-                  ? "border-foreground lg:-mx-2 lg:z-10 lg:scale-105"
-                  : "border-foreground/10 lg:first:-mr-2 lg:last:-ml-2"
+                  ? "border-foreground xl:-mx-2 xl:z-10 xl:scale-105"
+                  : "border-foreground/10 xl:first:-mr-2 xl:last:-ml-2"
                   } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
@@ -110,7 +113,7 @@ export function PricingSection() {
                   </div>
                 )}
 
-                <div className="p-8 lg:p-10">
+                <div className="p-6 lg:p-8">
                   {/* Plan header */}
                   <div className="mb-8 pb-8 border-b border-foreground/10">
                     <span className="font-mono text-xs text-muted-foreground">
@@ -123,7 +126,7 @@ export function PricingSection() {
                   {/* Price */}
                   <div className="mb-8">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-5xl lg:text-6xl font-display">
+                      <span className="text-4xl lg:text-5xl font-display">
                         {plan.priceDisplay}
                       </span>
                     </div>

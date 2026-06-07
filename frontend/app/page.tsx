@@ -4,7 +4,6 @@ import { FeaturesSection } from "@/components/landing/features-section";
 import { TokenCreditScoreWidget } from "@/components/landing/token-credit-score-widget";
 import { HowItWorksSection } from "@/components/landing/how-it-works-section";
 import { MetricsSection } from "@/components/landing/metrics-section";
-import { TestimonialsSection } from "@/components/landing/testimonials-section";
 import { PricingSection } from "@/components/landing/pricing-section";
 import { CtaSection } from "@/components/landing/cta-section";
 import { FooterSection } from "@/components/landing/footer-section";
@@ -18,7 +17,6 @@ export default function Home() {
       <TokenCreditScoreWidget />
       <HowItWorksSection />
       <MetricsSection />
-      <TestimonialsSection />
       <PricingSection />
       <CtaSection />
       <FooterSection />

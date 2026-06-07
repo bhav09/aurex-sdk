@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { FALLBACK_SHOWCASE_MODELS } from "@/lib/showcase-models-fallback";
+import { Sparkles } from "lucide-react";
+
+const TOOLS = [
+  "OpenAI", "Anthropic", "Google Gemini", "LiteLLM", 
+  "LangChain", "LlamaIndex", "Vercel AI SDK", "Ollama",
+  "HuggingFace", "AWS Bedrock", "CrewAI", "AutoGen"
+];
 
 const metrics = [
   {
@@ -9,7 +15,7 @@ const metrics = [
     suffix: "",
     prefix: "F1 0.",
     label: "Loop Detection Accuracy",
-    sublabel: "arXiv:2511.10650 — hybrid structural + semantic",
+    sublabel: "hybrid structural + semantic",
   },
   {
     value: 4,
@@ -27,19 +33,7 @@ const metrics = [
   },
 ];
 
-function MarqueeModels({ models }: { models: string[] }) {
-  const items = [...models, ...models];
-  return (
-    <>
-      {items.map((model, index) => (
-        <span key={`${model}-${index}`} className="inline-flex items-center gap-8">
-          <span>{model}</span>
-          <span>•</span>
-        </span>
-      ))}
-    </>
-  );
-}
+
 
 function AnimatedNumber({ end, suffix = "", prefix = "" }: { end: number; suffix?: string; prefix?: string }) {
   const [count, setCount] = useState(0);
@@ -246,25 +240,9 @@ function DotGraph({
 export function MetricsSection() {
   const [time, setTime] = useState<Date | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [showcaseModels, setShowcaseModels] = useState<string[]>(FALLBACK_SHOWCASE_MODELS);
   const sectionRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/showcase-models")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled && Array.isArray(data?.models) && data.models.length > 0) {
-          setShowcaseModels(data.models);
-        }
-      })
-      .catch(() => {
-        /* keep fallback list */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+
 
   useEffect(() => {
     setTime(new Date());
@@ -368,11 +346,26 @@ export function MetricsSection() {
               <span className="text-emerald-400/80">SHA-256 only — zero prompt egress</span>
             </span>
           </div>
-          <div className="relative h-8 flex items-center mt-2">
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10" />
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10" />
-            <div className="animate-marquee whitespace-nowrap flex items-center gap-8 text-sm font-mono text-muted-foreground">
-              <MarqueeModels models={showcaseModels} />
+
+          <div className="pt-6 flex flex-col md:flex-row items-stretch gap-6 relative">
+            <div className="flex flex-1 overflow-hidden relative order-2 md:order-1 items-center">
+              <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 hidden md:block" />
+              <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 hidden md:block" />
+              
+              <div className="flex gap-12 items-center w-max animate-[marquee_50s_linear_infinite]">
+                {[...TOOLS, ...TOOLS, ...TOOLS].map((tool, i) => (
+                  <div key={`${tool}-${i}`} className="flex items-center gap-2 text-muted-foreground/80 whitespace-nowrap hover:text-foreground transition-colors cursor-default">
+                    <Sparkles className="w-3.5 h-3.5 opacity-40 text-teal-500" />
+                    <span className="font-medium text-sm">{tool}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 z-20 md:pl-6 md:border-l border-border order-1 md:order-2 flex items-center">
+              <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest font-semibold">
+                Works with most tools
+              </span>
             </div>
           </div>
         </div>

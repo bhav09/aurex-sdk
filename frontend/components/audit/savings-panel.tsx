@@ -121,7 +121,7 @@ function SavingsSetupState({
                         className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 space-y-2"
                     >
                         <div className="flex items-center gap-2 text-[10px] font-mono text-white/30 uppercase tracking-wider">
-                            <span className="text-teal-400">0{idx + 1}</span>
+                            <span className="text-emerald-400">0{idx + 1}</span>
                             {step.icon}
                         </div>
                         <p className="text-sm font-semibold text-white/90">{step.title}</p>
@@ -214,7 +214,7 @@ export function SavingsPanel({
     if (loading && !data) {
         return (
             <div className="py-16 text-center flex flex-col items-center gap-3">
-                <RefreshCw className="h-7 w-7 animate-spin text-teal-400" />
+                <RefreshCw className="h-7 w-7 animate-spin text-emerald-400" />
                 <span className="text-[11px] font-mono text-muted-foreground">Loading savings realization...</span>
             </div>
         );
@@ -330,16 +330,16 @@ export function SavingsPanel({
             )}
 
             {viewMode === "projected" && (
-                <div className="rounded-lg border border-teal-500/20 bg-teal-500/5 px-4 py-3 text-[11px] font-mono text-teal-200/90">
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-[11px] font-mono text-teal-200/90">
                     Projected from your current audit analysis. Verified savings will replace these estimates after
                     follow-up audits.
                 </div>
             )}
 
-            <Card className="border-teal-500/20 bg-gradient-to-br from-teal-950/10 to-emerald-950/10 p-5 backdrop-blur-md relative overflow-hidden rounded-xl">
+            <Card className="border-emerald-500/20 bg-gradient-to-br from-teal-950/10 to-emerald-950/10 p-5 backdrop-blur-md relative overflow-hidden rounded-xl">
                 <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-5 w-5 text-teal-400" />
+                    <div className="h-10 w-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                     </div>
                     <div className="space-y-2 flex-1">
                         <h3 className="font-semibold text-white text-sm">Savings audit framework</h3>
@@ -370,7 +370,7 @@ export function SavingsPanel({
                         <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.12em] text-white/35">
                             Annualized run-rate
                         </p>
-                        <p className="text-2xl font-display font-bold text-teal-400 tabular-nums">
+                        <p className="text-2xl font-display font-bold text-emerald-400 tabular-nums">
                             $
                             {displayData.annualized_savings_run_rate.toLocaleString(undefined, {
                                 minimumFractionDigits: 0,
@@ -396,7 +396,7 @@ export function SavingsPanel({
             <Card className="border-white/[0.08] bg-surface-raised/80 p-6 backdrop-blur-md space-y-4 rounded-xl shadow-xl">
                 <div className="flex items-center justify-between border-b border-white/[0.05] pb-4">
                     <h3 className="text-[11px] font-mono font-semibold uppercase tracking-[0.1em] text-white/40 flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-teal-400/70" />
+                        <Calendar className="h-3.5 w-3.5 text-emerald-400/70" />
                         Savings vs leakage timeline
                     </h3>
                 </div>
@@ -478,7 +478,7 @@ export function SavingsPanel({
             <div className="grid gap-6 md:grid-cols-3">
                 <Card className="border-white/[0.08] bg-surface-raised/80 p-6 backdrop-blur-md md:col-span-2 space-y-4 rounded-xl shadow-xl">
                     <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white/50 flex items-center gap-2">
-                        <PieIcon className="h-4 w-4 text-teal-400" />
+                        <PieIcon className="h-4 w-4 text-emerald-400" />
                         Savings vector allocation
                     </h3>
                     <div className="h-60 w-full font-mono text-[9px]">
@@ -527,7 +527,7 @@ export function SavingsPanel({
                 <Card className="border-white/[0.08] bg-surface-raised/80 p-6 backdrop-blur-md md:col-span-1 space-y-4 rounded-xl shadow-xl flex flex-col justify-between">
                     <div>
                         <h3 className="text-[11px] font-mono font-semibold uppercase tracking-[0.1em] text-white/40 mb-4 flex items-center gap-1.5">
-                            <Cpu className="w-3.5 h-3.5 text-teal-400/70" />
+                            <Cpu className="w-3.5 h-3.5 text-emerald-400/70" />
                             Optimization vectors
                         </h3>
                         <div className="space-y-4">

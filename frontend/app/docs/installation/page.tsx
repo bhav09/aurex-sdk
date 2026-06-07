@@ -25,26 +25,18 @@ node your_app.js`;
 const pythonManual = `from aurex_sdk import AurexAuditor, AurexConfig
 
 auditor = AurexAuditor(AurexConfig(
-    api_key="aux_dev_yourkey",
-    project="my-project",
-    ledger_path=".aurex/ledger.jsonl",
-    per_process_ledger=False,
-    cloud_sync=True,
+    enable_loop_guard=True,
+    enable_compression=True
 ))
-auditor.log_event(model="gpt-4o-mini", input_tokens=120, output_tokens=40)
-auditor.flush()`;
+auditor.patch_all()`;
 
 const nodeManual = `import { AurexAuditor } from "aurex-sdk";
 
 const auditor = AurexAuditor.getInstance({
-  apiKey: "aux_dev_yourkey",
-  project: "my-project",
-  ledgerPath: ".aurex/ledger.jsonl",
-  perProcessLedger: false,
-  cloudSync: true,
+  enableLoopGuard: true,
+  enableCompression: true
 });
-auditor.logEvent({ model: "gpt-4o-mini", inputTokens: 120, outputTokens: 40 });
-auditor.flush();`;
+auditor.patchAll();`;
 
 export default function DocsInstallationPage() {
   return (

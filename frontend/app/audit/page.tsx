@@ -811,23 +811,23 @@ export default function AuditPage() {
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-8 space-y-6">
                     <div className="text-center">
-                        <div className="mx-auto h-14 w-14 rounded-full border border-teal-500/30 bg-teal-500/10 flex items-center justify-center mb-4">
-                            <Zap className="h-7 w-7 text-teal-400 animate-pulse" />
+                        <div className="mx-auto h-14 w-14 rounded-full border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center mb-4">
+                            <Zap className="h-7 w-7 text-emerald-400 animate-pulse" />
                         </div>
                         <h2 className="font-display text-lg font-bold text-white">Analyzing your file</h2>
                         <p className="text-[12px] text-muted-foreground mt-1">{Math.round(progress)}% complete</p>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-border">
-                        <div className="h-1.5 rounded-full bg-teal-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+                        <div className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                     </div>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                         {progressSteps.map((step, i) => (
                             <div key={i} className="flex items-center gap-2">
                                 {i === progressSteps.length - 1 && progress < 100
-                                    ? <div className="h-3.5 w-3.5 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+                                    ? <div className="h-3.5 w-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
                                     : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                                 }
-                                <span className={`text-[11px] font-mono ${i === progressSteps.length - 1 && progress < 100 ? "text-teal-300" : "text-muted-foreground"}`}>{step}</span>
+                                <span className={`text-[11px] font-mono ${i === progressSteps.length - 1 && progress < 100 ? "text-emerald-300" : "text-muted-foreground"}`}>{step}</span>
                             </div>
                         ))}
                     </div>
@@ -893,7 +893,7 @@ export default function AuditPage() {
                                 <p className="px-4 mb-2 text-[10px] font-mono font-semibold tracking-[0.15em] text-muted-foreground uppercase">
                                     {group.label}
                                 </p>
-                                <div className="space-y-0.5">
+                                <div className="space-y-1 flex flex-col">
                                     {group.items.map(item => {
                                         const Icon = item.icon;
                                         const isActive = activeTab === item.id;
@@ -902,20 +902,16 @@ export default function AuditPage() {
                                                 key={item.id}
                                                 type="button"
                                                 onClick={() => setActiveTab(item.id)}
-                                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors text-[13px] ${
+                                                className={`mx-3 flex items-center px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-[13px] group ${
                                                     isActive
-                                                        ? "bg-surface-raised text-white"
-                                                        : "text-muted-foreground hover:text-muted-foreground hover:bg-surface"
+                                                        ? "bg-emerald-500/15 text-emerald-50 border border-emerald-500/20 shadow-[0_0_15px_-3px_rgba(16,185,129,0.1)]"
+                                                        : "text-muted-foreground border border-transparent hover:text-white hover:bg-white/[0.04]"
                                                     }`}
                                             >
-                                                <div className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors ${
-                                                    isActive ? "border-muted-foreground bg-accent" : "border-border bg-transparent"
-                                                }`}>
-                                                    {isActive && <div className="h-2 w-2 rounded-sm bg-white/80" />}
-                                                </div>
-                                                <span className="flex-1 font-medium">{item.label}</span>
+                                                <Icon className={`h-4 w-4 shrink-0 transition-colors ${isActive ? "text-emerald-400" : "text-muted-foreground group-hover:text-white"}`} />
+                                                <span className="flex-1 font-medium ml-3">{item.label}</span>
                                                 {"badge" in item && item.badge && data.top_issues.length > 0 && (
-                                                    <span className="ml-auto text-[10px] font-mono bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full">
+                                                    <span className={`ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full ${isActive ? "bg-red-500 text-white font-bold" : "bg-red-500/20 text-red-400 border border-red-500/30"}`}>
                                                         {data.top_issues.length}
                                                     </span>
                                                 )}
@@ -973,7 +969,7 @@ export default function AuditPage() {
 
                                     {loadingEvents ? (
                                         <div className="py-16 text-center rounded-xl border border-border">
-                                            <Zap className="mx-auto h-8 w-8 text-teal-400 animate-pulse mb-3" />
+                                            <Zap className="mx-auto h-8 w-8 text-emerald-400 animate-pulse mb-3" />
                                             <p className="text-[11px] text-muted-foreground font-mono">Fetching trace pipelines...</p>
                                         </div>
                                     ) : (
@@ -994,7 +990,7 @@ export default function AuditPage() {
                                                         return (
                                                             <button key={wf} type="button"
                                                                 onClick={() => { setSelectedWorkflow(wf); setExpandedEventId(null); }}
-                                                                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2.5 rounded-lg border transition-all text-[11px] ${isActive ? "bg-[#2e2e34] border-border text-white" : "bg-transparent border-transparent text-muted-foreground hover:bg-surface-raised hover:text-muted-foreground"}`}
+                                                                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2.5 rounded-lg border transition-all text-[11px] ${isActive ? "bg-white/5 border-border text-white" : "bg-transparent border-transparent text-muted-foreground hover:bg-surface-raised hover:text-muted-foreground"}`}
                                                             >
                                                                 <div className="min-w-0">
                                                                     <p className="font-mono font-semibold truncate">{wf === "unknown" ? "Unlabeled" : wf}</p>
@@ -1020,7 +1016,7 @@ export default function AuditPage() {
                                                             {[
                                                                 { l: "Cost / Session", v: `$${(wb?.total_cost ?? 0).toFixed(4)}`, c: "text-emerald-400" },
                                                                 { l: "Spans", v: `${wb?.request_count ?? 0}`, c: "text-white" },
-                                                                { l: "Tokens", v: (wb?.total_tokens ?? 0).toLocaleString(), c: "text-teal-300" },
+                                                                { l: "Tokens", v: (wb?.total_tokens ?? 0).toLocaleString(), c: "text-emerald-300" },
                                                                 { l: "Cost / Span", v: `$${(wb?.cost_per_request ?? 0).toFixed(4)}`, c: "text-white" },
                                                             ].map(m => (
                                                                 <div key={m.l} className="rounded-lg border border-border bg-surface p-3">
@@ -1048,7 +1044,7 @@ export default function AuditPage() {
                                                                     <div><p className="text-[9px] font-mono text-muted-foreground">Annual Savings</p><p className="font-mono text-sm font-bold text-emerald-400">${(currentIssue.weekly_cost * 52).toLocaleString()}</p></div>
                                                                 </div>
                                                             </div>
-                                                            <Button onClick={() => openCopilot(currentIssue)} className="bg-teal-600 hover:bg-teal-500 text-[11px] font-mono shrink-0 h-8 px-3 rounded-lg">
+                                                            <Button onClick={() => openCopilot(currentIssue)} className="bg-emerald-600 hover:bg-emerald-500 text-[11px] font-mono shrink-0 h-8 px-3 rounded-lg">
                                                                 <Zap className="h-3 w-3 mr-1" /> Fix
                                                             </Button>
                                                         </div>
@@ -1059,9 +1055,9 @@ export default function AuditPage() {
                                                 <div className="rounded-xl border border-border bg-surface overflow-hidden">
                                                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                                                         <p className="text-[11px] font-mono font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                                                            <Sliders className="h-3.5 w-3.5 text-teal-400/70" /> Execution Spans
+                                                            <Sliders className="h-3.5 w-3.5 text-emerald-400/70" /> Execution Spans
                                                         </p>
-                                                        <span className="text-[10px] bg-[#2e2e34] border border-border px-2 py-0.5 rounded text-muted-foreground font-mono">{currentEvents.length} spans</span>
+                                                        <span className="text-[10px] bg-white/5 border border-border px-2 py-0.5 rounded text-muted-foreground font-mono">{currentEvents.length} spans</span>
                                                     </div>
                                                     <div className="divide-y divide-surface-raised">
                                                         {paginatedEvents.map((event, idx) => {
@@ -1084,12 +1080,12 @@ export default function AuditPage() {
                                                                                     <span className="font-mono text-[11px] font-semibold text-foreground/80">
                                                                                         {event.provider?.toUpperCase() || "LLM"} Call
                                                                                     </span>
-                                                                                    <span className="text-[9px] font-mono bg-[#2e2e34] border border-border px-1.5 py-0.5 rounded text-muted-foreground">{event.model}</span>
-                                                                                    {latency > 0 && <span className="text-[10px] font-mono text-teal-400">{latency.toFixed(0)}ms</span>}
+                                                                                    <span className="text-[9px] font-mono bg-white/5 border border-border px-1.5 py-0.5 rounded text-muted-foreground">{event.model}</span>
+                                                                                    {latency > 0 && <span className="text-[10px] font-mono text-emerald-400">{latency.toFixed(0)}ms</span>}
                                                                                 </div>
                                                                                 {latency > 0 && (
-                                                                                    <div className="w-32 h-1 rounded-full bg-[#2e2e34] mt-1.5 hidden sm:block overflow-hidden">
-                                                                                        <div className="h-full rounded-full bg-teal-500/60" style={{ width: `${barPct}%` }} />
+                                                                                    <div className="w-32 h-1 rounded-full bg-white/5 mt-1.5 hidden sm:block overflow-hidden">
+                                                                                        <div className="h-full rounded-full bg-emerald-500/60" style={{ width: `${barPct}%` }} />
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -1102,7 +1098,7 @@ export default function AuditPage() {
                                                                                 : hasIssue ? <span className="text-[9px] font-mono bg-amber-500/15 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">warn</span>
                                                                                     : <span className="text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">ok</span>
                                                                             }
-                                                                            {isExpanded ? <ChevronDown className="h-4 w-4 text-teal-400" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                                                            {isExpanded ? <ChevronDown className="h-4 w-4 text-emerald-400" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                                                                         </div>
                                                                     </div>
                                                                     {isExpanded && <PromptDiffPanel event={event} issue={currentIssue} />}
@@ -1155,14 +1151,14 @@ export default function AuditPage() {
                                         const issueB = getIssueForWorkflow(wB.workflow_id);
                                         return (
                                             <div className="grid gap-4 md:grid-cols-2">
-                                                {[{ w: wA, label: "Pipeline A", issue: issueA, color: "text-teal-400", badge: "Baseline" }, { w: wB, label: "Pipeline B", issue: issueB, color: "text-teal-400", badge: "Target" }].map(({ w, label, issue, color, badge }) => (
+                                                {[{ w: wA, label: "Pipeline A", issue: issueA, color: "text-emerald-400", badge: "Baseline" }, { w: wB, label: "Pipeline B", issue: issueB, color: "text-emerald-400", badge: "Target" }].map(({ w, label, issue, color, badge }) => (
                                                     <div key={label} className="rounded-xl border border-border bg-surface p-5 space-y-4">
                                                         <div className="flex justify-between items-start border-b border-border pb-3">
                                                             <div>
                                                                 <p className="text-[9px] font-mono text-muted-foreground">{label}</p>
                                                                 <p className={`text-[12px] font-bold font-mono truncate max-w-[180px] mt-0.5 ${color}`}>{w.workflow_id === "unknown" ? "Unlabeled" : w.workflow_id}</p>
                                                             </div>
-                                                            <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${color === "text-teal-400" ? "bg-teal-500/10 border-teal-500/20 text-teal-300" : "bg-teal-500/10 border-teal-500/20 text-teal-300"}`}>{badge}</span>
+                                                            <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${color === "text-emerald-400" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"}`}>{badge}</span>
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-3">
                                                             {[

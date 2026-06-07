@@ -21,6 +21,7 @@ from aurex_sdk.resilience import (
     execute_with_resilience,
     parse_resilience_config,
 )
+from aurex_sdk.loop_guard import LoopGuard
 
 # In-memory database of pricing
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
@@ -277,6 +278,8 @@ class AurexConfig:
         sync_max_retries: int = 3,
         per_process_ledger: bool = True,
         resilience: Optional[Dict[str, Any]] = None,
+        enable_loop_guard: bool = False,
+        enable_compression: bool = False,
     ):
         self.api_key = api_key or os.getenv("AUREX_API_KEY")
         self.project = project
@@ -314,6 +317,8 @@ class AurexConfig:
         self.sync_max_retries = sync_max_retries
         self.per_process_ledger = per_process_ledger
         self.resilience = resilience or {}
+        self.enable_loop_guard = enable_loop_guard
+        self.enable_compression = enable_compression
 
 
 class AurexAuditor:
@@ -367,6 +372,10 @@ class AurexAuditor:
         self._budget_config = self.config.budget_guard or {}
         self._resilience_policy = parse_resilience_config(getattr(self.config, "resilience", None))
         self._registered_fallbacks: Dict[str, Any] = {}
+        self._loop_guard = LoopGuard(
+            similarity_threshold=self.config.loop_similarity_threshold,
+            window_seconds=60.0
+        )
         
         # Assign downgrade map and default pricing for reference
         self.downgrade_map = self.config.downgrade_map or {}
@@ -1417,9 +1426,21 @@ class AurexAuditor:
 
         if decision.action != "block":
             retry_count_val = retry_count if retry_count is not None else self._session_retry_counts.get(workflow_id, 0)
+            
+            # Loop Guard logic
+            if self.config.enable_loop_guard and messages:
+                is_loop = self._loop_guard.check_for_loop(workflow_id, messages)
+                if is_loop:
+                    return AurexDecision(
+                        action="cache_suggest",
+                        reason=f"Loop Guard detected a structural/semantic loop in '{workflow_id}'",
+                        response="[Aurex LoopGuard] Error: Agent loop detected. Request blocked to prevent API waste.",
+                        original_model=model
+                    )
+            
             loop_score = self._compute_semantic_loop_score(workflow_id, prompt or "")
 
-            if sys_prompt_hash and len(workflow_requests) >= 2:
+            if self.config.enable_compression and sys_prompt_hash and len(workflow_requests) >= 2:
                 previous_sends = [r for r in workflow_requests[:-1] if r["system_prompt_hash"] == sys_prompt_hash]
                 if previous_sends and messages:
                     decision = AurexDecision(

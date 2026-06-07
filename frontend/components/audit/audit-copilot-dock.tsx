@@ -81,8 +81,8 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                 const lang = lines[0].replace("```", "").trim();
                 const code = lines.slice(1, -1).join("\n");
                 return (
-                    <pre key={index} className="my-3 overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-sky-200">
-                        <div className="flex justify-between text-[9px] text-white/40 mb-1 border-b border-white/5 pb-1">
+                    <pre key={index} className="my-3 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-3 font-mono text-[11px] leading-relaxed text-gray-800">
+                        <div className="flex justify-between text-[9px] text-gray-400 mb-1 border-b border-gray-200 pb-1">
                             <span>{lang || "code"}</span>
                         </div>
                         <code>{code}</code>
@@ -97,7 +97,7 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                     {inlineParts.map((subPart, subIdx) => {
                         if (subPart.startsWith("`") && subPart.endsWith("`")) {
                             return (
-                                <code key={subIdx} className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-xs text-pink-300">
+                                <code key={subIdx} className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-rose-600 border border-gray-200">
                                     {subPart.slice(1, -1)}
                                 </code>
                             );
@@ -106,7 +106,7 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                         const boldParts = subPart.split(/(\*\*[^*]+\*\*)/g);
                         return boldParts.map((chunk, chunkIdx) => {
                             if (chunk.startsWith("**") && chunk.endsWith("**")) {
-                                return <strong key={chunkIdx} className="font-semibold text-white">{chunk.slice(2, -2)}</strong>;
+                                return <strong key={chunkIdx} className="font-semibold text-gray-900">{chunk.slice(2, -2)}</strong>;
                             }
                             return <span key={chunkIdx}>{chunk}</span>;
                         });
@@ -125,25 +125,25 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                     exit={{ y: 120, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 320, damping: 32 }}
                     className={cn(
-                        "fixed bottom-6 right-6 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15",
-                        "bg-[oklch(0.1_0.02_260)]/95 shadow-2xl shadow-teal-500/10 backdrop-blur-xl"
+                        "fixed bottom-6 right-6 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200",
+                        "bg-white shadow-2xl shadow-gray-200/60"
                     )}
                 >
-                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-3">
                         <div className="flex items-center gap-2">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500/40 to-sky-500/30">
-                                <Bot className="h-5 w-5 text-white" />
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100">
+                                <Bot className="h-5 w-5 text-emerald-600" />
                             </div>
                             <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
-                                    <p className="text-sm font-semibold text-white">
+                                    <p className="text-sm font-semibold text-gray-900">
                                         Aurex agent
                                     </p>
-                                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30">
+                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200">
                                         Active
                                     </span>
                                 </div>
-                                <p className="text-[10px] text-white/45">
+                                <p className="text-[10px] text-gray-500">
                                     Remediation copilot
                                 </p>
                             </div>
@@ -151,25 +151,28 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-white/60 hover:bg-white/10 hover:text-white"
+                            className="h-8 w-8 text-gray-400 hover:bg-gray-200 hover:text-gray-900"
                             onClick={onClose}
                         >
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
 
-                    <div className="h-[350px] space-y-4 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/10">
+                    <div className="h-[350px] space-y-4 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-200 bg-white">
                         {messages.map((msg, i) => (
                             <div
                                 key={i}
                                 className={cn(
                                     "flex flex-col space-y-1 max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
                                     msg.role === "assistant"
-                                        ? "mr-auto border border-white/15 bg-white/[0.04] text-white/90"
-                                        : "ml-auto border border-teal-500/20 bg-teal-600/30 text-white"
+                                        ? "mr-auto border border-gray-100 bg-gray-50 text-gray-800"
+                                        : "ml-auto border border-emerald-100 bg-emerald-50 text-emerald-900"
                                 )}
                             >
-                                <span className="text-[9px] font-semibold tracking-wider uppercase text-white/30">
+                                <span className={cn(
+                                    "text-[9px] font-bold tracking-wider uppercase",
+                                    msg.role === "assistant" ? "text-gray-400" : "text-emerald-500/70"
+                                )}>
                                     {msg.role === "assistant" ? "Aurex Copilot" : "You"}
                                 </span>
                                 <div>
@@ -178,11 +181,11 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                             </div>
                         ))}
                         {loading && (
-                            <div className="flex flex-col space-y-1 max-w-[85%] mr-auto rounded-2xl px-4 py-2.5 text-sm border border-white/15 bg-white/[0.04] text-white/90 animate-pulse">
-                                <span className="text-[9px] font-semibold tracking-wider uppercase text-white/30">
+                            <div className="flex flex-col space-y-1 max-w-[85%] mr-auto rounded-2xl px-4 py-2.5 text-sm border border-gray-100 bg-gray-50 text-gray-800 animate-pulse">
+                                <span className="text-[9px] font-bold tracking-wider uppercase text-gray-400">
                                     Aurex Copilot
                                 </span>
-                                <div className="flex items-center gap-2 text-white/60 text-xs">
+                                <div className="flex items-center gap-2 text-gray-500 text-xs mt-1">
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                     Synthesizing code remediation...
                                 </div>
@@ -191,20 +194,20 @@ export function AuditCopilotDock({ open, issue, userEmail, onClose }: AuditCopil
                         <div ref={messagesEndRef} />
                     </div>
 
-                    <form onSubmit={handleSend} className="border-t border-white/10 p-3 bg-black/30 flex gap-2">
+                    <form onSubmit={handleSend} className="border-t border-gray-100 p-3 bg-white flex gap-2">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Ask a question or request code..."
                             disabled={loading}
-                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/30 disabled:opacity-50"
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 transition-colors"
                         />
                         <Button
                             type="submit"
                             size="icon"
                             disabled={loading || !input.trim()}
-                            className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl h-9 w-9 shrink-0 shadow-md shadow-teal-500/10 disabled:opacity-50"
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-9 w-9 shrink-0 shadow-sm disabled:opacity-50"
                         >
                             <Send className="h-4 w-4" />
                         </Button>
