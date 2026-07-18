@@ -101,8 +101,8 @@ Provide 3 bullet-point business insights and 2 concrete action items. Do not ask
           Client-Side CSV Insights
         </h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          Upload your data and let our local AI engine generate insights. 
-          Everything runs entirely in your browser—no data ever leaves your machine.
+          Upload your data and let our local AI engine generate insights.
+          Everything runs entirely in your browser-no data ever leaves your machine.
         </p>
 
         {/* Model Status Indicator */}
@@ -124,9 +124,9 @@ Provide 3 bullet-point business insights and 2 concrete action items. Do not ask
       <div className="flex flex-col gap-8 mt-4">
         {/* Upload Zone */}
         <div className="order-last lg:order-first">
-          <FileUpload 
-            onFileSelect={handleFileSelect} 
-            disabled={modelStatus !== "ready" || processingStatus === "parsing" || processingStatus === "generating"} 
+          <FileUpload
+            onFileSelect={handleFileSelect}
+            disabled={modelStatus !== "ready" || processingStatus === "parsing" || processingStatus === "generating"}
           />
         </div>
 
@@ -152,17 +152,17 @@ Provide 3 bullet-point business insights and 2 concrete action items. Do not ask
             {/* AI Insights (Top Section) */}
             <div className="p-6 md:p-8 bg-card border rounded-xl shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
-              
+
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <BrainCircuit className="w-5 h-5 text-primary" />
                 </div>
                 <h2 className="text-2xl font-semibold">AI Business Insights</h2>
               </div>
-              
+
               <div className="relative min-h-[150px]">
                 <Markdown content={insights} />
-                
+
                 {processingStatus === "generating" && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4 italic">
                     <Loader2 className="w-4 h-4 animate-spin" />

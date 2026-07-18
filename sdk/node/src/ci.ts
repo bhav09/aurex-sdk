@@ -1,5 +1,5 @@
 /**
- * CI gate — scan local ledger for waste heuristics.
+ * CI gate - scan local ledger for waste heuristics.
  */
 
 import * as fs from "fs";

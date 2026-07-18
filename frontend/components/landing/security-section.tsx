@@ -59,30 +59,27 @@ export function SecuritySection() {
   return (
     <section id="security" ref={sectionRef} className="relative py-32 lg:py-40 overflow-hidden">
       {/* Background accent removed */}
-      
+
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div className="mb-20">
-          <span className={`inline-flex items-center gap-4 text-sm font-mono text-muted-foreground mb-8 transition-all duration-700 ${
-            isVisible ? "opacity-100" : "opacity-0"
-          }`}>
+          <span className={`inline-flex items-center gap-4 text-sm font-mono text-muted-foreground mb-8 transition-all duration-700 ${isVisible ? "opacity-100" : "opacity-0"
+            }`}>
             <span className="w-12 h-px bg-foreground/20" />
             Security
           </span>
-          
-          {/* Title — full width */}
-          <h2 className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9] mb-12 transition-all duration-1000 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}>
+
+          {/* Title - full width */}
+          <h2 className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9] mb-12 transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}>
             Autonomous,
             <br />
             <span className="text-muted-foreground">not uncontrolled.</span>
           </h2>
-          
-          {/* Description — below title */}
-          <div className={`transition-all duration-1000 delay-100 ${
-            isVisible ? "opacity-100" : "opacity-0"
-          }`}>
+
+          {/* Description - below title */}
+          <div className={`transition-all duration-1000 delay-100 ${isVisible ? "opacity-100" : "opacity-0"
+            }`}>
             <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">
               Your agents are powerful but constrained. Enterprise-grade security ensures they only do what you allow.
             </p>
@@ -92,10 +89,9 @@ export function SecuritySection() {
         {/* Main content */}
         <div className="grid lg:grid-cols-12 gap-6">
           {/* Large visual card */}
-          <div className={`lg:col-span-7 relative p-8 lg:p-12 border border-foreground/10 min-h-[400px] overflow-hidden transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}>
-            {/* Dynamic feature image with cross-fade — desktop only */}
+          <div className={`lg:col-span-7 relative p-8 lg:p-12 border border-foreground/10 min-h-[400px] overflow-hidden transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}>
+            {/* Dynamic feature image with cross-fade - desktop only */}
             <div className="absolute inset-0 pointer-events-none items-center justify-end hidden lg:flex">
               {securityFeatures.map((feature, index) => (
                 <img
@@ -107,7 +103,7 @@ export function SecuritySection() {
                 />
               ))}
             </div>
-            
+
             <div className="relative z-10">
               <span className="font-mono text-sm text-muted-foreground">Active protection</span>
               <div className="mt-8">
@@ -115,15 +111,14 @@ export function SecuritySection() {
                 <span className="block text-muted-foreground mt-2">Security incidents this year</span>
               </div>
             </div>
-            
+
             {/* Certification badges */}
             <div className="absolute bottom-8 left-8 right-8 flex flex-wrap gap-2">
               {certifications.map((cert, index) => (
                 <span
                   key={cert}
-                  className={`px-3 py-1 border border-foreground/10 text-xs font-mono text-muted-foreground transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-                  }`}
+                  className={`px-3 py-1 border border-foreground/10 text-xs font-mono text-muted-foreground transition-all duration-500 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                    }`}
                   style={{ transitionDelay: `${index * 100 + 300}ms` }}
                 >
                   {cert}
@@ -137,21 +132,19 @@ export function SecuritySection() {
             {securityFeatures.map((feature, index) => (
               <div
                 key={feature.title}
-                className={`p-6 border transition-all duration-500 cursor-default ${
-                  activeFeature === index 
-                    ? "border-foreground/30 bg-foreground/[0.04]" 
+                className={`p-6 border transition-all duration-500 cursor-default ${activeFeature === index
+                    ? "border-foreground/30 bg-foreground/[0.04]"
                     : "border-foreground/10"
-                } ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
+                  } ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
                 style={{ transitionDelay: `${index * 80}ms` }}
                 onClick={() => setActiveFeature(index)}
                 onMouseEnter={() => setActiveFeature(index)}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`shrink-0 w-10 h-10 flex items-center justify-center border transition-colors ${
-                    activeFeature === index 
-                      ? "border-foreground bg-foreground text-background" 
+                  <div className={`shrink-0 w-10 h-10 flex items-center justify-center border transition-colors ${activeFeature === index
+                      ? "border-foreground bg-foreground text-background"
                       : "border-foreground/20"
-                  }`}>
+                    }`}>
                     <feature.icon className="w-5 h-5" />
                   </div>
                   <div>

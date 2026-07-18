@@ -180,7 +180,7 @@ async def send_escalation(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": reason or "Retry threshold exceeded — review before allowing more LLM calls.",
+                    "text": reason or "Retry threshold exceeded - review before allowing more LLM calls.",
                 },
             },
             {

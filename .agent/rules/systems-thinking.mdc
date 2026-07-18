@@ -1,5 +1,5 @@
 ---
-description: Use-case-agnostic systems thinking for humans and AI agents — start from reality not technology, model systems mathematically, optimize explicit objective functions, failure-first analysis, n-order effects, leverage, evolution, and ship correct evolvable outcomes.
+description: Use-case-agnostic systems thinking for humans and AI agents - start from reality not technology, model systems mathematically, optimize explicit objective functions, failure-first analysis, n-order effects, leverage, evolution, and ship correct evolvable outcomes.
 alwaysApply: true
 ---
 
@@ -11,7 +11,7 @@ The core question this rule answers:
 
 > **How should an engineer think so deeply about a system that both humans and AI coding agents can reliably build the right thing, avoid hidden failures, and maximize long-term business value?**
 
-Deep systems thinking **before, during, and after building anything**. The coding — or any deliverable — is the easy part. **Thinking correctly is the hard part.**
+Deep systems thinking **before, during, and after building anything**. The coding - or any deliverable - is the easy part. **Thinking correctly is the hard part.**
 
 This rule applies to **every domain and every deliverable**:
 * Software, hardware, firmware, networks, data, ML/AI agents
@@ -27,7 +27,7 @@ The deliverable may be code, a document, a diagram, a configuration, a training 
 
 Goal: **correct, evolvable systems** that survive real load, failure, adversaries, regulation, organizational turnover, and time.
 
-**Final principle:** AI coding agents **amplify whatever thinking you provide** — clear thinking → extraordinary systems; shallow thinking → faster disasters. Never treat agents as "smart autocomplete." They are probabilistic reasoning systems, architecture amplifiers, and implementation multipliers — **not reliable truth systems**.
+**Final principle:** AI coding agents **amplify whatever thinking you provide** - clear thinking → extraordinary systems; shallow thinking → faster disasters. Never treat agents as "smart autocomplete." They are probabilistic reasoning systems, architecture amplifiers, and implementation multipliers - **not reliable truth systems**.
 
 ---
 
@@ -50,26 +50,26 @@ Most failures start at the wrong layer:
 |---|---|
 | "Which framework?" | "What fundamental problem exists?" |
 | "Which API?" | "What invariant must hold?" |
-| "Which model?" | "What are we optimizing — and sacrificing?" |
+| "Which model?" | "What are we optimizing - and sacrificing?" |
 | "Which database?" | "How does this break at scale, over time, and under misuse?" |
 | "Let's use microservices / RAG / agents / Kubernetes" | "What human need does technology compress?" |
 
-Technology is a **compression layer over human needs** — not the starting point.
+Technology is a **compression layer over human needs** - not the starting point.
 
 ### Ten pillars of deep thinking
 
 Every non-trivial system must be reasoned through:
 
-1. **Reality** — root problem, not hype or solution-shopping
-2. **Constraints** — hidden limits others ignored (innovation often lives here)
-3. **Incentives** — what behavior you accidentally reward
-4. **Failure modes** — failure-first, not happy-path-first
-5. **Evolution over time** — scale, regulation, models, behavior decay
-6. **Human behavior** — misuse, gaming, habit formation, trust
-7. **Economic consequences** — build, maintain, support, cognitive, migration cost vs value
-8. **System interactions** — coupling, cascades, feedback across boundaries
-9. **Information flow** — what moves where, who trusts it, where it corrupts
-10. **Irreversibility** — what cannot be undone if this succeeds massively
+1. **Reality** - root problem, not hype or solution-shopping
+2. **Constraints** - hidden limits others ignored (innovation often lives here)
+3. **Incentives** - what behavior you accidentally reward
+4. **Failure modes** - failure-first, not happy-path-first
+5. **Evolution over time** - scale, regulation, models, behavior decay
+6. **Human behavior** - misuse, gaming, habit formation, trust
+7. **Economic consequences** - build, maintain, support, cognitive, migration cost vs value
+8. **System interactions** - coupling, cascades, feedback across boundaries
+9. **Information flow** - what moves where, who trusts it, where it corrupts
+10. **Irreversibility** - what cannot be undone if this succeeds massively
 
 ### Ultimate mental model
 
@@ -120,7 +120,7 @@ Scale **output**, never **discipline**.
 
 Mixed systems need **multiple lenses**. A hospital app is software + clinical workflow + regulatory + human factors.
 
-### 0A — System class taxonomy (pick all that apply)
+### 0A - System class taxonomy (pick all that apply)
 
 #### Information & computation
 | Class | Primary questions | Typical failures |
@@ -177,7 +177,7 @@ Cyber-physical (IoT, robotics, AV), socio-technical (EHR + clinicians), fintech 
 
 **When hybrid:** draw separate sub-diagrams per class, then map **interfaces** where failures propagate.
 
-### 0B — Complexity domain (Cynefin-style routing)
+### 0B - Complexity domain (Cynefin-style routing)
 
 | Domain | Characteristics | Approach |
 |---|---|---|
@@ -189,7 +189,7 @@ Cyber-physical (IoT, robotics, AV), socio-technical (EHR + clinicians), fintech 
 
 If the user asks for a big build in **Complex** or **Confused** territory, propose **small probes** with explicit learning goals before commitment.
 
-### 0C — Boundary map (always produce for non-trivial work)
+### 0C - Boundary map (always produce for non-trivial work)
 
 ```
 [Purpose: who benefits, success metric]
@@ -203,7 +203,7 @@ If the user asks for a big build in **Complex** or **Confused** territory, propo
 [Actors outside boundary] ←──
 ```
 
-### 0D — Stakeholder & incentive map
+### 0D - Stakeholder & incentive map
 
 | Stakeholder | Goal | Fear | Incentive created by your change | Misalignment risk |
 |---|---|---|---|---|
@@ -218,43 +218,43 @@ If the user asks for a big build in **Complex** or **Confused** territory, propo
 
 ### Cross-domain discovery examples
 
-**Software — webhook retries:** event processor + integration; actors = SaaS, API, worker, DB; state = delivery log + idempotency keys.
+**Software - webhook retries:** event processor + integration; actors = SaaS, API, worker, DB; state = delivery log + idempotency keys.
 
-**Operations — warehouse pick path redesign:** physical flow + human factors; invariant = order accuracy ≥ target; failure = congestion at packing station.
+**Operations - warehouse pick path redesign:** physical flow + human factors; invariant = order accuracy ≥ target; failure = congestion at packing station.
 
-**Policy — remote work approval:** governance + HR workflow; failure = managers bypass with shadow "always approve" culture.
+**Policy - remote work approval:** governance + HR workflow; failure = managers bypass with shadow "always approve" culture.
 
-**Healthcare — triage protocol change:** clinical + legal + human; invariant = critical patients never downgraded below evidence-based threshold.
+**Healthcare - triage protocol change:** clinical + legal + human; invariant = critical patients never downgraded below evidence-based threshold.
 
-**Manufacturing — add supplier:** supply chain + quality; failure = untested sub-tier component voids certification.
+**Manufacturing - add supplier:** supply chain + quality; failure = untested sub-tier component voids certification.
 
-**Education — new grading rubric:** incentive system + knowledge; second-order = students optimize for rubric not learning.
+**Education - new grading rubric:** incentive system + knowledge; second-order = students optimize for rubric not learning.
 
-**Finance — dynamic pricing:** market + fairness perception; failure = PR crisis reads as price gouging.
+**Finance - dynamic pricing:** market + fairness perception; failure = PR crisis reads as price gouging.
 
-**Research — A/B test new ranking:** experiment + ethics; invariant = no harm to vulnerable cohorts; guardrail metrics required.
+**Research - A/B test new ranking:** experiment + ethics; invariant = no harm to vulnerable cohorts; guardrail metrics required.
 
 ---
 
 ## Mandatory Execution Flow
 
-1. **Start from reality, not technology** — human need first; reject fad-driven design
-2. **Understand the real problem** — root cause vs symptom vs political narrative
-3. **Identify invariants** — laws (physical, legal, logical) that must always hold
-4. **Define system mathematically** — state, information, decision, constraint, optimization, economic, reliability, human
-5. **Clarify assumptions** — explicit, testable, dated; hidden assumptions are failure seeds
-6. **Model flows** — information, money, trust, state, control, failure propagation
-7. **Define objective function** — rank what you optimize; name what you sacrifice
-8. **Analyze constraints** — technical, physical, human, economic, legal, ethical, environmental, organizational
-9. **Explore ≥2 viable designs** — never default to the first idea or industry fad
-10. **Failure-first analysis** — seven paths + failure types; elite engineers ask "how does it break?"
-11. **Evaluate scale & irreversibility** — 10×, 100×, 1000×; **what if it works too well?**
-12. **N-order effects** — behavioral, incentive, economic, organizational, data, ecosystem, competitive
-13. **Business / mission leverage** — Value Created ÷ Complexity Added; full cost accounting
-14. **Observability with baseline** — how you'll know; compared to what
-15. **Evolution & cost of change** — adaptability, reversibility, modularity
-16. **AI agent workflow** (when applicable) — reasoning before code; design critic; paradigm exploration
-17. **Only then implement** — code, process, policy, build, launch, or org change
+1. **Start from reality, not technology** - human need first; reject fad-driven design
+2. **Understand the real problem** - root cause vs symptom vs political narrative
+3. **Identify invariants** - laws (physical, legal, logical) that must always hold
+4. **Define system mathematically** - state, information, decision, constraint, optimization, economic, reliability, human
+5. **Clarify assumptions** - explicit, testable, dated; hidden assumptions are failure seeds
+6. **Model flows** - information, money, trust, state, control, failure propagation
+7. **Define objective function** - rank what you optimize; name what you sacrifice
+8. **Analyze constraints** - technical, physical, human, economic, legal, ethical, environmental, organizational
+9. **Explore ≥2 viable designs** - never default to the first idea or industry fad
+10. **Failure-first analysis** - seven paths + failure types; elite engineers ask "how does it break?"
+11. **Evaluate scale & irreversibility** - 10×, 100×, 1000×; **what if it works too well?**
+12. **N-order effects** - behavioral, incentive, economic, organizational, data, ecosystem, competitive
+13. **Business / mission leverage** - Value Created ÷ Complexity Added; full cost accounting
+14. **Observability with baseline** - how you'll know; compared to what
+15. **Evolution & cost of change** - adaptability, reversibility, modularity
+16. **AI agent workflow** (when applicable) - reasoning before code; design critic; paradigm exploration
+17. **Only then implement** - code, process, policy, build, launch, or org change
 
 ---
 
@@ -274,7 +274,7 @@ Ask: *What human need does this feature compress?* If you cannot answer, stop an
 
 ### Core questions
 * What **exact** problem? Who experiences pain? **Root cause, symptom, or proxy metric?**
-* What does **success** look like — quantified where possible, qualitative where necessary?
+* What does **success** look like - quantified where possible, qualitative where necessary?
 * Who **benefits**, who is **harmed**, who **bears cost** without benefit?
 * What **incentives** does success create? How will people **game** the metric?
 * What is **explicitly out of scope**?
@@ -322,7 +322,7 @@ Before implementation, classify what you're building. Every system is one or mor
 | **Reliability system** | What happens when parts fail? |
 | **Human system** | How do humans misuse, game, or misunderstand it? |
 
-This is how principal engineers think — map all types that apply, then design.
+This is how principal engineers think - map all types that apply, then design.
 
 ### Invariants (must never break)
 
@@ -377,12 +377,12 @@ Template: **Inputs → Transformations → Decisions → Outputs → Feedback lo
 
 ### Objective function (explicit priority stack)
 
-Every system optimizes something **implicitly** if you don't define it explicitly — and accidental metrics destroy systems.
+Every system optimizes something **implicitly** if you don't define it explicitly - and accidental metrics destroy systems.
 
 **Possible optimization targets (rank, don't hide):**
 Revenue · Retention · Trust · Accuracy · Latency · Reliability · Cognitive simplicity · Developer productivity · User success rate · Time-to-value · Network effects · Safety · Compliance · Margin
 
-**When tradeoffs conflict, state your ranking.** Examples — pick or adapt:
+**When tradeoffs conflict, state your ranking.** Examples - pick or adapt:
 
 | Stack | Priority order |
 |---|---|
@@ -393,7 +393,7 @@ Revenue · Retention · Trust · Accuracy · Latency · Reliability · Cognitive
 | **Research** | validity > reproducibility > novelty > throughput |
 | **Sustainability-led** | long-term footprint > short-term margin > convenience |
 
-**Goodhart's law — implicit optimization disasters:**
+**Goodhart's law - implicit optimization disasters:**
 
 | If you optimize… | You may get… |
 |---|---|
@@ -445,7 +445,7 @@ Always compare **≥2 viable approaches**. Document **why the loser lost** again
 
 ### Universal design pattern catalog
 
-Patterns below apply to **software, orgs, supply chains, and policies** — translate the metaphor deliberately.
+Patterns below apply to **software, orgs, supply chains, and policies** - translate the metaphor deliberately.
 
 | Pattern | Good when | Avoid when |
 |---|---|---|
@@ -488,15 +488,15 @@ Patterns below apply to **software, orgs, supply chains, and policies** — tran
 
 ### Cross-domain comparison examples
 
-**Notifications (digital):** sync in request vs outbox+worker vs managed queue — pick on reliability vs latency stack.
+**Notifications (digital):** sync in request vs outbox+worker vs managed queue - pick on reliability vs latency stack.
 
-**Staffing (org):** centralized scheduling vs regional autonomy — pick on SLA variance vs coordination cost.
+**Staffing (org):** centralized scheduling vs regional autonomy - pick on SLA variance vs coordination cost.
 
-**Quality (manufacturing):** end-of-line inspection vs in-process statistical control — pick on defect escape cost vs capex.
+**Quality (manufacturing):** end-of-line inspection vs in-process statistical control - pick on defect escape cost vs capex.
 
-**Moderation (content):** pre-publish human review vs post-publish ML flag — pick on harm velocity vs throughput.
+**Moderation (content):** pre-publish human review vs post-publish ML flag - pick on harm velocity vs throughput.
 
-**Pricing (market):** fixed tiers vs usage-based vs outcome-based — pick on predictability vs alignment vs gaming surface.
+**Pricing (market):** fixed tiers vs usage-based vs outcome-based - pick on predictability vs alignment vs gaming surface.
 
 ---
 
@@ -536,20 +536,20 @@ For each feature or change, trace all seven paths:
 
 ### Universal failure categories
 
-1. **Input invalidity** — wrong spec, contaminated material, malformed data, fraud
-2. **Transformation error** — bug, procedure skip, miscalibration, model drift
-3. **State corruption** — partial update, race, stale record, mislabeled inventory
-4. **Dependency failure** — supplier, API, power, talent, single expert leaves
-5. **Resource exhaustion** — capacity, cash, attention, storage, bandwidth, beds
-6. **Concurrency / contention** — double booking, deadlock, queue collapse
-7. **Time & timing** — clock skew, expiry, seasonality miss, approval timeout
-8. **Communication / handoff** — lost ticket, ambiguous ownership, translation error
-9. **Security / adversarial** — theft, sabotage, injection, social engineering, prompt injection
-10. **Human factors** — fatigue, habituation, alert fatigue, normalization of deviance
-11. **Organizational** — reorg voids ownership; incentive misalignment; shadow process
-12. **External shock** — weather, pandemic, regulation change, war, bank failure
-13. **Compounding / cascade** — one failure triggers others; domino in tightly coupled system
-14. **AI-specific** — hallucination, automation bias, feedback loop pollution, cost runaway
+1. **Input invalidity** - wrong spec, contaminated material, malformed data, fraud
+2. **Transformation error** - bug, procedure skip, miscalibration, model drift
+3. **State corruption** - partial update, race, stale record, mislabeled inventory
+4. **Dependency failure** - supplier, API, power, talent, single expert leaves
+5. **Resource exhaustion** - capacity, cash, attention, storage, bandwidth, beds
+6. **Concurrency / contention** - double booking, deadlock, queue collapse
+7. **Time & timing** - clock skew, expiry, seasonality miss, approval timeout
+8. **Communication / handoff** - lost ticket, ambiguous ownership, translation error
+9. **Security / adversarial** - theft, sabotage, injection, social engineering, prompt injection
+10. **Human factors** - fatigue, habituation, alert fatigue, normalization of deviance
+11. **Organizational** - reorg voids ownership; incentive misalignment; shadow process
+12. **External shock** - weather, pandemic, regulation change, war, bank failure
+13. **Compounding / cascade** - one failure triggers others; domino in tightly coupled system
+14. **AI-specific** - hallucination, automation bias, feedback loop pollution, cost runaway
 
 ### Severity × likelihood (prioritize honestly)
 
@@ -583,7 +583,7 @@ For each feature or change, trace all seven paths:
 
 ### FTA sketches (reference)
 
-**Digital — create order:**
+**Digital - create order:**
 ```
 Order failed
 ├── Validation → reject cleanly
@@ -593,7 +593,7 @@ Order failed
 └── Inventory timeout → reserve/compensate saga
 ```
 
-**Physical — cold chain shipment:**
+**Physical - cold chain shipment:**
 ```
 Spoilage
 ├── Pre-cool insufficient → sensor alert at load
@@ -602,7 +602,7 @@ Spoilage
 └── Wrong SKU picked → barcode scan gate at pack
 ```
 
-**Organizational — incident response:**
+**Organizational - incident response:**
 ```
 Slow mitigation
 ├── No clear incident commander → RACI defined pre-incident
@@ -611,7 +611,7 @@ Slow mitigation
 └── Comms externally inconsistent → single spokesperson protocol
 ```
 
-**Policy — benefits enrollment:**
+**Policy - benefits enrollment:**
 ```
 Wrong eligibility
 ├── Rules ambiguous → worked examples + appeals path
@@ -630,7 +630,7 @@ Wrong eligibility
 | **3rd** | Systemic distortion? | Quality reputation drop; regulatory scrutiny; ecosystem dependency |
 | **4th** | Strategic / structural shift? | Platform lock-in; industry consolidation; norm change (privacy expectations) |
 
-### Worked example — AI code autocomplete (1st through 4th order)
+### Worked example - AI code autocomplete (1st through 4th order)
 
 | Order | Effect |
 |---|---|
@@ -658,7 +658,7 @@ Whenever adding a feature, ask:
 
 **Mandatory questions:**
 * *What happens if this succeeds massively?*
-* ***What if it works too well?*** — reveals hidden scaling problems, abuse vectors, governance issues, operational nightmares, societal impacts, economic distortions
+* ***What if it works too well?*** - reveals hidden scaling problems, abuse vectors, governance issues, operational nightmares, societal impacts, economic distortions
 
 | Success scenario | Often neglected failure |
 |---|---|
@@ -678,7 +678,7 @@ Whenever adding a feature, ask:
 
 Value ≠ only revenue. Includes: time saved, risk reduced, lives improved, emissions cut, learning accelerated.
 
-High-value engineering is **leverage engineering** — more output per unit effort, not more code, complexity, or features.
+High-value engineering is **leverage engineering** - more output per unit effort, not more code, complexity, or features.
 
 ### Highest-leverage areas (prioritize these)
 
@@ -708,7 +708,7 @@ Always compute **marginal value vs marginal cost**. Ask: does marginal value exc
 | Unblocks revenue/retention/mission | Gold-plates internal artifact few use |
 | Reduces tail risk cheaply | Adds process that slows everyone 5% forever |
 
-**Review bar:** Would a principled senior owner approve this tradeoff in a design review **in this domain** (staff engineer, clinical director, plant manager, general counsel — whoever fits)?
+**Review bar:** Would a principled senior owner approve this tradeoff in a design review **in this domain** (staff engineer, clinical director, plant manager, general counsel - whoever fits)?
 
 ---
 
@@ -718,15 +718,15 @@ Always compute **marginal value vs marginal cost**. Ask: does marginal value exc
 
 Whenever decisions are probabilistic or delegated to models:
 
-* **Ground truth** — what source is authoritative? When is model output advisory only?
-* **Deterministic gates** — hard rules before irreversible actions (pay, delete, prescribe, publish, permit)
-* **Human oversight** — where required by law, ethics, or error cost
-* **Monitoring** — drift, bias slices, cost per decision, override rate
-* **Fallback** — rule-based path when model unavailable or low confidence
-* **Security** — prompt injection, data exfiltration via tools, training data leakage
-* **Evaluation** — golden sets, regression, shadow mode, pre/post launch guardrails
-* **Automation bias** — humans stop checking; design friction where checking matters
-* **Assumption audit** — list hidden assumptions; failures often come from unstated beliefs, implicit coupling, wrong invariants
+* **Ground truth** - what source is authoritative? When is model output advisory only?
+* **Deterministic gates** - hard rules before irreversible actions (pay, delete, prescribe, publish, permit)
+* **Human oversight** - where required by law, ethics, or error cost
+* **Monitoring** - drift, bias slices, cost per decision, override rate
+* **Fallback** - rule-based path when model unavailable or low confidence
+* **Security** - prompt injection, data exfiltration via tools, training data leakage
+* **Evaluation** - golden sets, regression, shadow mode, pre/post launch guardrails
+* **Automation bias** - humans stop checking; design friction where checking matters
+* **Assumption audit** - list hidden assumptions; failures often come from unstated beliefs, implicit coupling, wrong invariants
 
 **Anti-pattern:** probabilistic system owns **irreversible high-stakes** actions with no policy envelope.
 
@@ -738,7 +738,7 @@ AI agents are **not** smart autocomplete. Treat them as design collaborators who
 
 **Never start with code.** Force reasoning first.
 
-#### Step 1 — Define reality clearly
+#### Step 1 - Define reality clearly
 
 Provide: business goal · constraints · scale expectations · non-functional requirements · failure tolerance · security requirements · expected evolution
 
@@ -746,7 +746,7 @@ Provide: business goal · constraints · scale expectations · non-functional re
 |---|---|
 | "Build auth system." | "Design multi-tenant auth for B2B SaaS with RBAC, audit logs, SSO compatibility, 50k orgs, low operational complexity, future migration flexibility." |
 
-#### Step 2 — Force architectural reasoning first
+#### Step 2 - Force architectural reasoning first
 
 Before implementation, produce:
 * ≥2 architectures possible
@@ -755,11 +755,11 @@ Before implementation, produce:
 * Operational complexity and migration risk
 * Long-term maintainability assessment
 
-#### Step 3 — Force assumption enumeration
+#### Step 3 - Force assumption enumeration
 
-Explicitly list **all hidden assumptions** — unstated coupling, implicit invariants, scale beliefs, vendor stability, user behavior, team capacity. This is one of the highest-leverage steps in existence.
+Explicitly list **all hidden assumptions** - unstated coupling, implicit invariants, scale beliefs, vendor stability, user behavior, team capacity. This is one of the highest-leverage steps in existence.
 
-#### Step 4 — Use the agent as design critic
+#### Step 4 - Use the agent as design critic
 
 Ask (or self-apply):
 * "How does this architecture fail?"
@@ -768,16 +768,16 @@ Ask (or self-apply):
 * "What would senior engineers criticize?"
 * "What technical debt accumulates?"
 
-#### Step 5 — Explore alternative paradigms
+#### Step 5 - Explore alternative paradigms
 
 Do not accept the first average output. Explicitly explore alternatives:
 * Event-driven · stateless · CRDT / local-first · streaming · edge-first · async-first · agentic · batch · hub-and-spoke · federated
 
 Innovation emerges from **exploring solution space**, not narrowing prematurely.
 
-#### Step 6 — Think economically before building
+#### Step 6 - Think economically before building
 
-Compute full cost stack (build, maintain, infra, support, cognitive, onboarding, migration) against value stack (revenue, retention, moat, trust). Proceed only when **Value Created ÷ Complexity Added** is favorable — or risks are explicitly accepted.
+Compute full cost stack (build, maintain, infra, support, cognitive, onboarding, migration) against value stack (revenue, retention, moat, trust). Proceed only when **Value Created ÷ Complexity Added** is favorable - or risks are explicitly accepted.
 
 ---
 
@@ -785,9 +785,9 @@ Compute full cost stack (build, maintain, infra, support, cognitive, onboarding,
 
 The system must answer: **What happened? Why? Under what conditions? For whom? Compared to what baseline?**
 
-Observability is not logging alone. It is **system introspection** — the ability to understand internal state from external evidence.
+Observability is not logging alone. It is **system introspection** - the ability to understand internal state from external evidence.
 
-Observability is not only logs — it is **any evidence loop**:
+Observability is not only logs - it is **any evidence loop**:
 
 | Domain | Signals | Mechanisms |
 |---|---|---|
@@ -817,13 +817,13 @@ Observability is not only logs — it is **any evidence loop**:
 
 A system is **never finished**. Design for change over time:
 
-* **Scale** — users, data, geography, transactions
-* **Traffic patterns** — seasonality, virality, decay
-* **Models & dependencies** — APIs sunset, model drift, vendor shifts
-* **Regulations** — new compliance, jurisdiction expansion
-* **User behavior** — adaptation, gaming, expectations
-* **Pricing & economics** — margins, packaging, unit cost curves
-* **Integrations** — partners, acquisitions, ecosystem shifts
+* **Scale** - users, data, geography, transactions
+* **Traffic patterns** - seasonality, virality, decay
+* **Models & dependencies** - APIs sunset, model drift, vendor shifts
+* **Regulations** - new compliance, jurisdiction expansion
+* **User behavior** - adaptation, gaming, expectations
+* **Pricing & economics** - margins, packaging, unit cost curves
+* **Integrations** - partners, acquisitions, ecosystem shifts
 
 ### The architecture question that matters
 
@@ -833,14 +833,14 @@ Instead: **"How expensive is future change?"**
 
 Great systems optimize: **adaptability · reversibility · modularity · observability**
 
-Design for **change over time** — technology, regulation, leadership, climate, competition.
+Design for **change over time** - technology, regulation, leadership, climate, competition.
 
-* **Reversible decisions** — pilots, flags, trial periods, sunset clauses
-* **Replaceable components** — adapters; standard interfaces; documented contracts
-* **Versioned evolution** — expand → migrate → contract (data, policy, org)
-* **Optionality** — modularity preserves future choices; avoid irreversible lock-in without payoff
-* **Knowledge transfer** — runbooks, ADRs, training; reduce bus factor
-* **Deprecation discipline** — remove old paths or pay eternal tax
+* **Reversible decisions** - pilots, flags, trial periods, sunset clauses
+* **Replaceable components** - adapters; standard interfaces; documented contracts
+* **Versioned evolution** - expand → migrate → contract (data, policy, org)
+* **Optionality** - modularity preserves future choices; avoid irreversible lock-in without payoff
+* **Knowledge transfer** - runbooks, ADRs, training; reduce bus factor
+* **Deprecation discipline** - remove old paths or pay eternal tax
 
 **Pre-lock questions:**
 * Can we undo this in one cycle (sprint / quarter / production season)?
@@ -853,13 +853,13 @@ Design for **change over time** — technology, regulation, leadership, climate,
 
 Not optional for human-affecting systems.
 
-* **Distribution of harm/benefit** — who bears downside without upside?
-* **Consent & autonomy** — can affected parties opt out or appeal?
-* **Dignity & accessibility** — disability, language, literacy, bandwidth, device access
-* **Vulnerable populations** — children, patients, migrants, low-income — heightened duty of care
-* **Dual use** — can this be weaponized, surveilled, or gamed at scale?
-* **Environmental footprint** — energy, materials, waste, travel induced
-* **When uncertain on legal/ethical line** — **flag for qualified human review**; do not guess
+* **Distribution of harm/benefit** - who bears downside without upside?
+* **Consent & autonomy** - can affected parties opt out or appeal?
+* **Dignity & accessibility** - disability, language, literacy, bandwidth, device access
+* **Vulnerable populations** - children, patients, migrants, low-income - heightened duty of care
+* **Dual use** - can this be weaponized, surveilled, or gamed at scale?
+* **Environmental footprint** - energy, materials, waste, travel induced
+* **When uncertain on legal/ethical line** - **flag for qualified human review**; do not guess
 
 ---
 
@@ -880,7 +880,7 @@ Real innovation usually comes from one of these moves:
 
 **Opportunity question:** *What friction currently exists in this workflow?* That is where leverage lives.
 
-Also ask: *Are we building novelty or removing friction?* Both valid — but optimize deliberately.
+Also ask: *Are we building novelty or removing friction?* Both valid - but optimize deliberately.
 
 ---
 
@@ -909,7 +909,7 @@ Also ask: *Are we building novelty or removing friction?* Both valid — but opt
 
 * What became **simpler** vs **more complex**?
 * New **failure modes** introduced?
-* **Observability** sufficient — who watches which signal?
+* **Observability** sufficient - who watches which signal?
 * **Follow-ups:** tests, metrics, training, cleanup, debt ticket, sunset date
 * **10× scale check** on the dimension that matters (users, units, countries, cases, dollars)
 
@@ -917,7 +917,7 @@ Also ask: *Are we building novelty or removing friction?* Both valid — but opt
 
 ## Domain Lenses (Apply All That Match)
 
-Use as **additive checklists**, not bureaucracy. Skip only what truly doesn't apply — justify briefly.
+Use as **additive checklists**, not bureaucracy. Skip only what truly doesn't apply - justify briefly.
 
 ### Security & trust
 STRIDE-lite; least privilege; supply chain integrity; insider threat; recovery from breach; zero trust where appropriate.
@@ -956,57 +956,57 @@ Hypothesis, controls, confounders, reproducibility, publication bias, honest unc
 
 ## Extended Worked Examples (Pattern Library)
 
-Use these as **templates** — swap nouns for your domain.
+Use these as **templates** - swap nouns for your domain.
 
-### 1 — Digital service with external dependency
+### 1 - Digital service with external dependency
 Async job + status polling; idempotency; vendor timeout + retry + DLQ; metrics on job outcomes; user sees progress not spinner forever.
 
-### 2 — Batch sync (data or physical counts)
+### 2 - Batch sync (data or physical counts)
 Watermark/cursor; single-flight lock; row/item quarantine; alert on error rate threshold; reconcile totals.
 
-### 3 — Multi-tenant isolation (SaaS, housing, healthcare networks)
+### 3 - Multi-tenant isolation (SaaS, housing, healthcare networks)
 Tenant ID on every access path; cache keys scoped; penetration test scenario "tenant A reads tenant B"; default-deny.
 
-### 4 — Real-time collaboration (docs, design, control room)
+### 4 - Real-time collaboration (docs, design, control room)
 Auth on join; presence; conflict resolution strategy explicit; reconnect with jitter after deploy.
 
-### 5 — Marketplace liquidity
+### 5 - Marketplace liquidity
 Chicken-and-egg: subsidize supply or demand? Trust: reviews, escrow, dispute resolution; anti-leakage.
 
-### 6 — Manufacturing line changeover
+### 6 - Manufacturing line changeover
 SMED principles; FAI; control plan update; operator training sign-off; revert to old tooling within X hours if yield drops.
 
-### 7 — Clinical pathway tweak
+### 7 - Clinical pathway tweak
 Evidence citation; clinician override with reason; monitor adverse proxy; IRB/ethics if research.
 
-### 8 — School scheduling / rostering
+### 8 - School scheduling / rostering
 Hard constraints (room capacity) vs soft (teacher preference); explainability for parents; appeal path.
 
-### 9 — Nonprofit program expansion
+### 9 - Nonprofit program expansion
 Theory of change mapped; measure outcomes not outputs; donor reporting aligned; don't collapse under admin load.
 
-### 10 — Crisis comms protocol
+### 10 - Crisis comms protocol
 Single source of truth; pre-approved templates; role roster; drill before the hurricane season / breach / recall.
 
-### 11 — IoT fleet firmware OTA
+### 11 - IoT fleet firmware OTA
 Staged rollout; dual bank; automatic rollback on health metric; signing keys protected; bricking postmortem unacceptable.
 
-### 12 — Pricing change
+### 12 - Pricing change
 Segment analysis; grandfathering; communication timing; competitor response scenario; margin floor guardrail.
 
-### 13 — Hiring loop redesign
+### 13 - Hiring loop redesign
 Structured interviews; rubrics; debiasing checks; time-to-hire vs quality tradeoff explicit; candidate experience.
 
-### 14 — Content moderation at scale
+### 14 - Content moderation at scale
 Severity tiers; SLA per tier; reviewer wellness; audit sample; adversarial evolution expected.
 
-### 15 — M&A integration (systems + people)
+### 15 - M&A integration (systems + people)
 Day-1 invariants (payroll, safety); integration factory; culture clash risks; retain critical tacit knowledge.
 
-### 16 — Personal knowledge system / docs
+### 16 - Personal knowledge system / docs
 Discoverability; ownership; stale content decay; don't duplicate canonical sources.
 
-### 17 — Cursor rule / agent instruction (meta)
+### 17 - Cursor rule / agent instruction (meta)
 Scope control (alwaysApply vs globs); non-contradiction with other rules; test on sample tasks; length vs compliance tradeoff.
 
 ---
@@ -1031,7 +1031,7 @@ Run proportionate to scope. For non-trivial work, every section gets at least on
 
 ### Constraints
 - [ ] Technical, human, business, organizational limits identified?
-- [ ] Hidden constraints others ignored — opportunity or trap?
+- [ ] Hidden constraints others ignored - opportunity or trap?
 
 ### Tradeoffs & objective function
 - [ ] What are we maximizing? What worsens when we win?
@@ -1114,15 +1114,15 @@ For **question-only** or **review-only** tasks: apply the same thinking; output 
 ## Anti-Patterns (Universal)
 
 * Start from technology fad (microservices, RAG, agents, Kubernetes) before problem and invariants
-* Treat AI agents as smart autocomplete — skip architectural reasoning
+* Treat AI agents as smart autocomplete - skip architectural reasoning
 * Build from title / ticket / hype with no model
-* Single design presented as obvious — no tradeoffs
+* Single design presented as obvious - no tradeoffs
 * Optimize local metric, destroy global outcome (Goodhart)
-* Implicit objective function — accidental optimization (engagement → addiction)
-* Tight coupling everywhere — no bulkheads
+* Implicit objective function - accidental optimization (engagement → addiction)
+* Tight coupling everywhere - no bulkheads
 * Incentives that reward the wrong behavior
 * Hidden state, shadow processes, tribal knowledge only
-* Unstated assumptions — implicit coupling, wrong invariants
+* Unstated assumptions - implicit coupling, wrong invariants
 * "We'll measure / document / train later" on critical paths
 * Irreversible launch with no kill criteria; ignore "works too well" scenarios
 * Automation without override and audit
@@ -1141,6 +1141,6 @@ For **question-only** or **review-only** tasks: apply the same thinking; output 
 * **After:** Audit complexity & risk; name monitors; list follow-ups; stress at 10× and "works too well"; verify Value ÷ Complexity.
 **No domain is exempt. No artifact is too small for proportionate thought.**
 
-**The highest level of engineering is not coding — it is systems thinking, incentive design, abstraction management, risk management, economic reasoning, information architecture, and long-term adaptability.**
+**The highest level of engineering is not coding - it is systems thinking, incentive design, abstraction management, risk management, economic reasoning, information architecture, and long-term adaptability.**
 
 **Think deeply first. Then build.**

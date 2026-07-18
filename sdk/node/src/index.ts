@@ -188,7 +188,7 @@ export function getModelPricing(model: string): [number, number] {
 
   const pricing = MODEL_PRICING[queryNorm];
   if (pricing) return [pricing.input, pricing.output];
-  
+
   const sortedKeys = Object.keys(MODEL_PRICING).sort((a, b) => b.length - a.length);
   for (const key of sortedKeys) {
     if (queryNorm.includes(key)) {
@@ -208,9 +208,9 @@ export function getModelPricing(model: string): [number, number] {
     if (instance && instance.defaultPricing) {
       return [instance.defaultPricing.input, instance.defaultPricing.output];
     }
-  } catch (e) {}
+  } catch (e) { }
 
-  // Moderate fallback — avoids extreme overcharging for unknown/new models
+  // Moderate fallback - avoids extreme overcharging for unknown/new models
   return [1.50, 6.00];
 }
 
@@ -230,12 +230,12 @@ export function calculateCost(
 ): number {
   const [inputPrice, outputPrice] = getModelPricing(model);
   const provider = extractProvider(model);
-  
+
   const nonCachedInput = Math.max(0, inputTokens - cachedTokens - cacheWriteTokens);
-  
+
   let cacheReadMult = 1.0;
   let cacheCreateMult = 1.0;
-  
+
   if (provider === "anthropic") {
     cacheReadMult = 0.10;
     cacheCreateMult = 1.25;
@@ -249,18 +249,18 @@ export function calculateCost(
     cacheReadMult = 0.25;
     cacheCreateMult = 1.0;
   }
-  
+
   let cost = (
     (nonCachedInput / 1_000_000 * inputPrice) +
     (cachedTokens / 1_000_000 * inputPrice * cacheReadMult) +
     (cacheWriteTokens / 1_000_000 * inputPrice * cacheCreateMult) +
     (outputTokens / 1_000_000 * outputPrice)
   );
-  
+
   if (isBatch) {
     cost *= 0.50; // 50% Batch API discount
   }
-  
+
   return cost;
 }
 
@@ -323,7 +323,7 @@ export class AurexAuditor {
       autoDowngradeSimplePrompts: config?.autoDowngradeSimplePrompts ?? false,
       otelExport: config?.otelExport ?? false,
       onCacheHit: config?.onCacheHit || (() => undefined),
-      onCacheMiss: config?.onCacheMiss || (() => {}),
+      onCacheMiss: config?.onCacheMiss || (() => { }),
       pricingPath: config?.pricingPath || process.env.AUREX_PRICING_PATH || "",
       defaultPricing: config?.defaultPricing || { input: 1.50, output: 6.00 },
       simplePromptTokenLimit: config?.simplePromptTokenLimit ?? 120,
@@ -398,7 +398,7 @@ export class AurexAuditor {
         for (const line of lines) {
           try {
             recoveredEvents.push(JSON.parse(line));
-          } catch (e) {}
+          } catch (e) { }
         }
         if (recoveredEvents.length > 0) {
           // Write recovered events directly to ledger
@@ -406,7 +406,7 @@ export class AurexAuditor {
           fs.appendFileSync(this.config.ledgerPath, dataStr, "utf-8");
           // Optionally sync to cloud
           if (this.config.cloudSync && !this.config.localOnly && this.config.apiKey) {
-            this.syncToCloud(recoveredEvents).catch(() => {});
+            this.syncToCloud(recoveredEvents).catch(() => { });
           }
         }
         fs.unlinkSync(pendingPath);
@@ -423,7 +423,7 @@ export class AurexAuditor {
         exitHandled = true;
         this.persistPendingAndShutdown();
       };
-      
+
       process.on("beforeExit", handleExit);
       process.on("exit", handleExit);
       process.on("SIGINT", () => {
@@ -643,7 +643,7 @@ export class AurexAuditor {
           span.setAttribute("llm.quality_score", params.qualityScore);
         }
         span.end();
-      } catch (err) {}
+      } catch (err) { }
     }
 
     // Track metrics for the sliding window
@@ -742,7 +742,7 @@ export class AurexAuditor {
 
     // Filter recent requests to last 5 minutes
     this.recentRequests = this.recentRequests.filter(r => now - r.timestamp < 300000);
-    
+
     // Semantic cache suggestion check
     let cacheHitFound = false;
     if (params.prompt) {
@@ -755,7 +755,7 @@ export class AurexAuditor {
         }
       }
     }
-    
+
     this.recentRequests.push(reqMeta);
     if (this.recentRequests.length > 200) {
       this.recentRequests.shift();
@@ -889,7 +889,7 @@ export class AurexAuditor {
       const nearBudget =
         budgetConfig?.maxCostPerSession !== undefined &&
         sessionCost > (budgetConfig.maxCostPerSession * 0.8);
-      
+
       let shouldDowngrade = false;
       if (decision.action === "proceed") {
         if (nearBudget) {
@@ -1207,7 +1207,7 @@ export class AurexAuditor {
         setTimeout(() => reject(new Error("flushAndWait timeout")), Math.max(0, remaining));
       }),
     ]).catch(() => {
-      /* timeout — return false below */
+      /* timeout - return false below */
     });
 
     if (Date.now() > deadline) {
@@ -1367,7 +1367,7 @@ export class AurexAuditor {
       if (qualityScore === undefined) qualityScore = metadata.qualityScore ?? metadata.quality_score;
       if (!workflowId) workflowId = metadata.workflowId ?? metadata.workflow_id;
     }
-    
+
     if (!workflowId) {
       workflowId = params.user;
     }
@@ -1375,7 +1375,7 @@ export class AurexAuditor {
     if (tags && typeof tags !== "object") {
       tags = undefined;
     }
-    
+
     return { tags, qualityScore, workflowId };
   }
 
@@ -1449,7 +1449,7 @@ export class AurexAuditor {
       try {
         const content = resp?.choices?.[0]?.message?.content;
         self.recordResponse(workflowId, content);
-      } catch {}
+      } catch { }
       try {
         const usage = resp?.usage || {};
         const toolCalls = resp?.choices?.[0]?.message?.tool_calls || [];
@@ -1564,7 +1564,7 @@ export class AurexAuditor {
           try {
             const text = resp?.content?.[0]?.text;
             self.recordResponse(workflowId, text);
-          } catch {}
+          } catch { }
           try {
             const usage = resp?.usage || {};
             const contentBlocks = resp?.content || [];
@@ -1588,7 +1588,7 @@ export class AurexAuditor {
               toolCallsCount,
               toolNames
             });
-          } catch {}
+          } catch { }
           return resp;
         };
         patched.__aurex_patched__ = true;
@@ -1702,7 +1702,7 @@ export class AurexAuditor {
               toolCallsCount,
               toolNames
             });
-          } catch {}
+          } catch { }
           return resp;
         };
         patched.__aurex_patched__ = true;
@@ -1747,7 +1747,7 @@ export class AurexAuditor {
           } else if (contents) {
             userPrompt = typeof contents === "object" ? JSON.stringify(contents) : String(contents);
           }
-          
+
           let systemPrompt = "";
           const config = params.config;
           if (config) {
@@ -1762,10 +1762,10 @@ export class AurexAuditor {
               }
             }
           }
-          
+
           const extraParams = self.extractAurexExtraParams(params);
           const workflowId = extraParams.workflowId || "default_workflow";
-          
+
           let decision;
           try {
             decision = self.preCallCheck({
@@ -1799,14 +1799,14 @@ export class AurexAuditor {
             }
             console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
           }
-          
+
           let resp;
           resp = await self.callWithResilience(() => origGenerate(...args), {
             provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
             workflowId,
             model: (params?.model || args?.[0]?.model || 'unknown') as string,
           });
-          
+
           try {
             const usage = resp?.usageMetadata || {};
             self.logEvent({
@@ -1825,13 +1825,13 @@ export class AurexAuditor {
             if (resp?.text) {
               self.recordResponse(workflowId, resp.text);
             }
-          } catch {}
+          } catch { }
           return resp;
         };
         patchedGenerate.__aurex_patched__ = true;
         models.generateContent = patchedGenerate;
       }
-      
+
       if (models && typeof models.generateContentStream === "function" && !models.generateContentStream.__aurex_patched__) {
         const origGenerateStream = models.generateContentStream.bind(models);
         const patchedGenerateStream: any = async function (...args: any[]) {
@@ -1846,7 +1846,7 @@ export class AurexAuditor {
           } else if (contents) {
             userPrompt = typeof contents === "object" ? JSON.stringify(contents) : String(contents);
           }
-          
+
           let systemPrompt = "";
           const config = params.config;
           if (config) {
@@ -1861,10 +1861,10 @@ export class AurexAuditor {
               }
             }
           }
-          
+
           const extraParams = self.extractAurexExtraParams(params);
           const workflowId = extraParams.workflowId || "default_workflow";
-          
+
           let decision;
           try {
             decision = self.preCallCheck({
@@ -1903,14 +1903,14 @@ export class AurexAuditor {
             }
             console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
           }
-          
+
           let resp;
           resp = await self.callWithResilience(() => origGenerateStream(...args), {
             provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
             workflowId,
             model: (params?.model || args?.[0]?.model || 'unknown') as string,
           });
-          
+
           async function* wrapGoogleStream(stream: any) {
             let accumulatedContent = "";
             let finalUsage: any = null;
@@ -1945,7 +1945,7 @@ export class AurexAuditor {
         patchedGenerateStream.__aurex_patched__ = true;
         models.generateContentStream = patchedGenerateStream;
       }
-      
+
       return inst;
     };
     Wrapped.prototype = Cls.prototype;
@@ -1963,7 +1963,7 @@ export class AurexAuditor {
         const params = args[0] || {};
         let model = params.model || "llama-4-scout";
         const messages = params.messages || [];
-        
+
         let userPrompt = "";
         let systemPrompt = "";
         for (const m of messages) {
@@ -1973,10 +1973,10 @@ export class AurexAuditor {
             userPrompt = m.content;
           }
         }
-        
+
         const extraParams = self.extractAurexExtraParams(params);
         const workflowId = extraParams.workflowId || "default_workflow";
-        
+
         let decision;
         try {
           decision = self.preCallCheck({
@@ -2009,14 +2009,14 @@ export class AurexAuditor {
           }
           console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
         }
-        
+
         let resp;
         resp = await self.callWithResilience(() => originalChat(...args), {
           provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
           workflowId,
           model: (params?.model || args?.[0]?.model || 'unknown') as string,
         });
-        
+
         if (params.stream) {
           async function* wrapOllamaStream(stream: any) {
             let accumulatedContent = "";
@@ -2047,7 +2047,7 @@ export class AurexAuditor {
           }
           return wrapOllamaStream(resp);
         }
-        
+
         try {
           const content = resp?.message?.content;
           self.recordResponse(workflowId, content);
@@ -2064,13 +2064,13 @@ export class AurexAuditor {
             qualityScore: extraParams.qualityScore,
             provider: "ollama"
           });
-        } catch {}
+        } catch { }
         return resp;
       };
       patchedChat.__aurex_patched__ = true;
       target.chat = patchedChat;
     }
-    
+
     if (typeof target.generate === "function" && !target.generate.__aurex_patched__) {
       const originalGenerate = target.generate.bind(target);
       const patchedGenerate: any = async function (...args: any[]) {
@@ -2078,10 +2078,10 @@ export class AurexAuditor {
         let model = params.model || "llama-4-scout";
         const userPrompt = params.prompt || "";
         const systemPrompt = params.system || "";
-        
+
         const extraParams = self.extractAurexExtraParams(params);
         const workflowId = extraParams.workflowId || "default_workflow";
-        
+
         let decision;
         try {
           decision = self.preCallCheck({
@@ -2112,14 +2112,14 @@ export class AurexAuditor {
           }
           console.warn(`[Aurex SDK Real-Time Warning Check Error] ${err.message}`);
         }
-        
+
         let resp;
         resp = await self.callWithResilience(() => originalGenerate(...args), {
           provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
           workflowId,
           model: (params?.model || args?.[0]?.model || 'unknown') as string,
         });
-        
+
         if (params.stream) {
           async function* wrapOllamaStream(stream: any) {
             let accumulatedContent = "";
@@ -2150,7 +2150,7 @@ export class AurexAuditor {
           }
           return wrapOllamaStream(resp);
         }
-        
+
         try {
           const content = resp?.response;
           self.recordResponse(workflowId, content);
@@ -2167,7 +2167,7 @@ export class AurexAuditor {
             qualityScore: extraParams.qualityScore,
             provider: "ollama"
           });
-        } catch {}
+        } catch { }
         return resp;
       };
       patchedGenerate.__aurex_patched__ = true;
@@ -2217,7 +2217,7 @@ export class AurexAuditor {
         const params = args[0] || {};
         const model = params.model || "unknown";
         const messages = params.messages || [];
-        
+
         let systemPrompt = "";
         let userPrompt = "";
         for (const m of messages) {
@@ -2227,11 +2227,11 @@ export class AurexAuditor {
             userPrompt = m.content;
           }
         }
-        
+
         const ctx = aurexContext.getStore() || {};
         const extraParams = self.extractAurexExtraParams(params);
         const workflowId = extraParams.workflowId || ctx.workflowId || "default_workflow";
-        
+
         const decision = self.preCallCheck({
           model,
           prompt: userPrompt,
@@ -2239,21 +2239,21 @@ export class AurexAuditor {
           workflowId,
           messages,
         });
-        
+
         if (decision.action === "block") {
           throw new Error(`[Aurex] Blocked: ${decision.reason}`);
         }
         if (decision.action === "downgrade" && decision.suggestedModel) {
           params.model = decision.suggestedModel;
         }
-        
+
         let resp;
         resp = await self.callWithResilience(() => origChat.call(this, ...args), {
           provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
           workflowId,
           model: (params?.model || args?.[0]?.model || 'unknown') as string,
         });
-        
+
         // Handle streaming
         if (params.stream) {
           const origStream = resp;
@@ -2282,7 +2282,7 @@ export class AurexAuditor {
           }
           return wrappedChatStream();
         }
-        
+
         // Non-streaming response
         const text = resp?.choices?.[0]?.message?.content || "";
         self.recordResponse(workflowId, text);
@@ -2312,31 +2312,31 @@ export class AurexAuditor {
         const params = args[0] || {};
         const model = params.model || "unknown";
         const prompt = params.inputs || "";
-        
+
         const ctx = aurexContext.getStore() || {};
         const extraParams = self.extractAurexExtraParams(params);
         const workflowId = extraParams.workflowId || ctx.workflowId || "default_workflow";
-        
+
         const decision = self.preCallCheck({
           model,
           prompt,
           workflowId,
         });
-        
+
         if (decision.action === "block") {
           throw new Error(`[Aurex] Blocked: ${decision.reason}`);
         }
         if (decision.action === "downgrade" && decision.suggestedModel) {
           params.model = decision.suggestedModel;
         }
-        
+
         let resp;
         resp = await self.callWithResilience(() => origGen.call(this, ...args), {
           provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
           workflowId,
           model: (params?.model || args?.[0]?.model || 'unknown') as string,
         });
-        
+
         const text = typeof resp === "string" ? resp : (resp?.generated_text || "");
         self.recordResponse(workflowId, text);
         self.logEvent({
@@ -2362,31 +2362,31 @@ export class AurexAuditor {
         const params = args[0] || {};
         const model = params.model || "unknown";
         const prompt = params.inputs || "";
-        
+
         const ctx = aurexContext.getStore() || {};
         const extraParams = self.extractAurexExtraParams(params);
         const workflowId = extraParams.workflowId || ctx.workflowId || "default_workflow";
-        
+
         const decision = self.preCallCheck({
           model,
           prompt,
           workflowId,
         });
-        
+
         if (decision.action === "block") {
           throw new Error(`[Aurex] Blocked: ${decision.reason}`);
         }
         if (decision.action === "downgrade" && decision.suggestedModel) {
           params.model = decision.suggestedModel;
         }
-        
+
         let resp;
         resp = await self.callWithResilience(() => origGenStream.call(this, ...args), {
           provider: extractProvider((params?.model || args?.[0]?.model || 'unknown') as string),
           workflowId,
           model: (params?.model || args?.[0]?.model || 'unknown') as string,
         });
-        
+
         const origStream = resp;
         async function* wrappedGenStream() {
           const accumulated: string[] = [];

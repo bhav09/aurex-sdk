@@ -1,5 +1,5 @@
 """
-Migration 001 — Extend llm_events with May-2026 provider fields.
+Migration 001 - Extend llm_events with May-2026 provider fields.
 
 Idempotent. Safe to re-run. Works on the existing SQLite database that
 backend/src/database.py provisions via `Base.metadata.create_all`. For Postgres
@@ -186,7 +186,7 @@ def main() -> int:
         try:
             conn.execute(text("SELECT 1 FROM llm_events LIMIT 1"))
         except Exception:
-            print("  llm_events table does not exist — run init_db() first")
+            print("  llm_events table does not exist - run init_db() first")
             return 1
 
         added_cols = add_columns(conn)

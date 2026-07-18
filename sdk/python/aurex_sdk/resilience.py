@@ -213,7 +213,7 @@ def _idempotency_allows_retry(policy: ResiliencePolicy, idempotency_key: Optiona
         return False
     if policy.idempotency == "require_key":
         return bool(idempotency_key) and kind in ("timeout", "429", "5xx", "network")
-    # auto: conservative — only hard failures without side effects
+    # auto: conservative - only hard failures without side effects
     return kind in ("timeout", "429", "5xx", "network")
 
 
@@ -441,7 +441,7 @@ def execute_with_resilience(
     except Exception as outer_exc:
         if last_exc is not None:
             raise last_exc
-        # Fail-open: resilience orchestration bug — single raw attempt
+        # Fail-open: resilience orchestration bug - single raw attempt
         try:
             return call_fn(), {"resilience": "fail_open"}
         except Exception:
@@ -453,7 +453,7 @@ async def async_execute_with_resilience(
     policy: ResiliencePolicy,
     **kwargs: Any,
 ) -> Tuple[Any, Dict[str, Any]]:
-    """Async resilience executor — awaits coroutine call_fn when needed."""
+    """Async resilience executor - awaits coroutine call_fn when needed."""
     if not policy.enabled:
         result = call_fn()
         if asyncio.iscoroutine(result):

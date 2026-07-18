@@ -1,7 +1,7 @@
 export type DocsNavItem = {
   href: string;
   label: string;
-  /** Short hint for agents — mirrored in /llms.txt routing table */
+  /** Short hint for agents - mirrored in /llms.txt routing table */
   agentHint?: string;
 };
 
@@ -15,49 +15,53 @@ export const docsNavGroups: DocsNavGroup[] = [
     title: "Getting Started",
     items: [
       { href: "/docs", label: "Overview", agentHint: "Product summary and doc map" },
-      { href: "/docs/installation", label: "Installation", agentHint: "pip/npm install, API key, first event" },
+      { href: "/docs/installation", label: "Installation", agentHint: "pip/npm install, API key, first request" },
       { href: "/docs/installation/env-vars", label: "Environment Variables", agentHint: "AUREX_API_KEY, AUREX_LEDGER_PATH" },
       { href: "/docs/reference/autohook", label: "Zero-Code Auto-Hook", agentHint: "aurex install-hook" },
-    ],
-  },
-  {
-    title: "Cloud & Harness",
-    items: [
-      { href: "/docs/deployment", label: "Cloud Deployment", agentHint: "Deployment hub" },
-      { href: "/docs/deployment/serverless-flush", label: "Serverless Flush", agentHint: "flushAndWait before handler return" },
-      { href: "/docs/deployment/filesystem", label: "Filesystem & Ledger", agentHint: "read-only FS, per_process_ledger" },
-      { href: "/docs/deployment/cloud-sync", label: "Cloud Sync Resilience", agentHint: "HTTP retries, 429, queue drops" },
-      { href: "/docs/deployment/rate-limits", label: "Backend Rate Limits", agentHint: "ingest limits per API key" },
-      { href: "/docs/harness", label: "Harness Integration", agentHint: "patch vs wrap vs manual log" },
-      { href: "/docs/harness/decision-matrix", label: "Harness Decision Matrix", agentHint: "avoid double-counting" },
     ],
   },
   {
     title: "API Reference",
     items: [
       { href: "/docs/reference", label: "API Reference Hub", agentHint: "Links to focused API pages" },
-      { href: "/docs/reference/integration", label: "Manual Integration", agentHint: "singleton init, flush, patch" },
+      { href: "/docs/reference/integration", label: "Integration", agentHint: "singleton init, flush, patch lifecycle" },
       { href: "/docs/reference/config", label: "AurexConfig", agentHint: "core config fields" },
-      { href: "/docs/reference/budget-guard", label: "BudgetGuard", agentHint: "spend circuit breaker limits" },
+      { href: "/docs/reference/budget-guard", label: "BudgetGuard", agentHint: "spending and rate limits" },
       { href: "/docs/reference/providers", label: "Supported Providers", agentHint: "OpenAI, Anthropic, LiteLLM, etc." },
-      { href: "/docs/reference/guards", label: "Real-Time Guards", agentHint: "pre_call_check" },
-      { href: "/docs/reference/wrap", label: "wrap() Context", agentHint: "per-request budget overrides" },
-      { href: "/docs/reference/outcomes", label: "Outcomes", agentHint: "mark_success / mark_failure" },
-      { href: "/docs/reference/health", label: "Health & Recovery", agentHint: "get_health, pending.jsonl" },
-      { href: "/docs/reference/heuristics", label: "Heuristics CLI", agentHint: "aurex audit" },
-      { href: "/docs/reference/ci", label: "CI Policy Gate", agentHint: "npx aurex ci" },
+      { href: "/docs/reference/guards", label: "Runtime Guards", agentHint: "pre_call_check, route, compress, block" },
+      { href: "/docs/reference/wrap", label: "wrap() Context", agentHint: "request-scoped budget and overrides" },
+      { href: "/docs/reference/outcomes", label: "Outcomes", agentHint: "workflow success/failure signals" },
+      { href: "/docs/reference/health", label: "Health & Status", agentHint: "runtime health, sync status, recovery" },
+      { href: "/docs/reference/heuristics", label: "Heuristics CLI", agentHint: "ledger analysis and optimization" },
+      { href: "/docs/reference/ci", label: "CI Policy Gate", agentHint: "enforce policies in CI pipelines" },
     ],
   },
   {
-    title: "Reliability & Loss Recovery",
+    title: "Integration Patterns",
     items: [
-      { href: "/docs/reliability", label: "Reliability Hub", agentHint: "Provider-call resilience overview" },
-      { href: "/docs/reliability/overview", label: "Overview", agentHint: "billed-but-failed spend problem" },
-      { href: "/docs/reliability/policy", label: "ResiliencePolicy", agentHint: "resilience config fields" },
+      { href: "/docs/harness", label: "Overview", agentHint: "auto-patch vs wrap vs manual" },
+      { href: "/docs/harness/decision-matrix", label: "Decision Matrix", agentHint: "pick integration style for your stack" },
+    ],
+  },
+  {
+    title: "Deployment",
+    items: [
+      { href: "/docs/deployment", label: "Overview", agentHint: "environment matrix and patterns" },
+      { href: "/docs/deployment/serverless-flush", label: "Serverless", agentHint: "flush() before Lambda/Edge exit" },
+      { href: "/docs/deployment/filesystem", label: "Filesystem & Ledger", agentHint: "read-only FS, ledger path" },
+      { href: "/docs/deployment/cloud-sync", label: "Cloud Sync", agentHint: "HTTP retries, queue, 429 handling" },
+      { href: "/docs/deployment/rate-limits", label: "Rate Limits", agentHint: "per-key ingest limits" },
+    ],
+  },
+  {
+    title: "Reliability",
+    items: [
+      { href: "/docs/reliability", label: "Overview", agentHint: "automatic retry and failover" },
+      { href: "/docs/reliability/policy", label: "ResiliencePolicy", agentHint: "resilience config" },
       { href: "/docs/reliability/observe-enforce", label: "Observe vs Enforce", agentHint: "detect-only vs active retry" },
-      { href: "/docs/reliability/fallbacks", label: "Fallbacks", agentHint: "register_fallback callables" },
+      { href: "/docs/reliability/fallbacks", label: "Fallbacks", agentHint: "register_fallback with custom clients" },
       { href: "/docs/reliability/classification", label: "Classification", agentHint: "retry_on failure kinds" },
-      { href: "/docs/reliability/accounting", label: "Loss Accounting", agentHint: "loss_avoided, dashboard metrics" },
+      { href: "/docs/reliability/accounting", label: "Cost Accounting", agentHint: "cost tracking and dashboard metrics" },
     ],
   },
 ];

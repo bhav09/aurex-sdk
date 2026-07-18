@@ -1,11 +1,8 @@
 import { Navigation } from "@/components/landing/navigation";
 import { HeroSection } from "@/components/landing/hero-section";
 import { FeaturesSection } from "@/components/landing/features-section";
-import { AuditSlider } from "@/components/landing/audit-slider";
 import { HowItWorksSection } from "@/components/landing/how-it-works-section";
 import { MetricsSection } from "@/components/landing/metrics-section";
-import { TestimonialsSection } from "@/components/landing/testimonials-section";
-import { PricingSection } from "@/components/landing/pricing-section";
 import { CtaSection } from "@/components/landing/cta-section";
 import { FooterSection } from "@/components/landing/footer-section";
 
@@ -15,11 +12,8 @@ export default function Home() {
       <Navigation />
       <HeroSection />
       <FeaturesSection />
-      <AuditSlider />
       <HowItWorksSection />
       <MetricsSection />
-      <TestimonialsSection />
-      <PricingSection />
       <CtaSection />
       <FooterSection />
     </main>

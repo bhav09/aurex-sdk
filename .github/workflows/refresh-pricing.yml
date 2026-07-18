@@ -8,7 +8,7 @@ name: Refresh provider pricing
 
 on:
   schedule:
-    - cron: "17 9 * * *"   # 09:17 UTC daily — off-peak, off-the-hour
+    - cron: "17 9 * * *"   # 09:17 UTC daily - off-peak, off-the-hour
   workflow_dispatch:
 
 permissions:
@@ -43,10 +43,10 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           branch: pricing/refresh-${{ github.run_id }}
-          title: "Pricing refresh — $(date -u +%Y-%m-%d)"
+          title: "Pricing refresh - $(date -u +%Y-%m-%d)"
           body: |
             Automated daily refresh of `backend/data/pricing/*.json` from provider pricing pages.
 
-            Review any added or removed models carefully — provider pages occasionally rename SKUs or de-list older snapshots (which would zero out cost on rows that still reference them in customer exports).
+            Review any added or removed models carefully - provider pages occasionally rename SKUs or de-list older snapshots (which would zero out cost on rows that still reference them in customer exports).
           commit-message: "chore(pricing): daily catalog refresh"
           add-paths: backend/data/pricing/*.json

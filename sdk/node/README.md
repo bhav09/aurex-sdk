@@ -1,254 +1,135 @@
-# Aurex Node.js SDK
+<div align="center">
+  <img src="https://raw.githubusercontent.com/heyaurex/aurex-sdk/main/frontend/public/heyaurex_logo/1.png" alt="Aurex Logo" width="160" />
+  <h1>Aurex Node.js SDK</h1>
+  <p><b>The In-Process AI Runtime Layer for Production Agent Infrastructure</b></p>
+</div>
 
-The lightweight, zero-PII Node.js SDK for Aurex AI cost-optimization and budget circuit-breaking.
+Aurex is an in-process AI runtime layer designed for production LLM applications and autonomous agent frameworks. Embedded directly within your application host process, Aurex intercepts LLM provider calls with under 2 milliseconds of overhead to handle model routing, context compression, behavioral loop detection, and automatic provider failover.
+
+---
+
+## Key Features
+
+* **Sub-2ms In-Process Execution**: All decisions, loop guards, and routing rules execute locally in memory with zero network hop latency.
+* **Universal Auto-Patching**: Single-line integration for OpenAI, Anthropic, LiteLLM, Ollama, and Hugging Face.
+* **Zero Prompt Data Egress**: Operates local-first using SHA-256 signatures. Sensitive prompt payloads and LLM responses never leave your application host.
+* **Adaptive Model Routing**: Dynamically routes low-complexity calls to higher-efficiency model tiers (for example, GPT-4o to GPT-4o-mini).
+* **Behavioral Loop Mitigation**: Hybrid structural and semantic detection (F1 score: 0.72) stops infinite agent loops and recursive tool cascades.
+
+---
 
 ## Installation
-
-Install the SDK in your project:
 
 ```bash
 npm install aurex-sdk
 ```
 
----
-
-## Features
-
-- **Zero-code Auto-Instrumentation**: Automatically patch LLM clients (OpenAI, Anthropic, LiteLLM) via a Node.js require-hook.
-- **Real-Time Guardrails (`preCallCheck`)**: Detect and block/redirect loops, system prompt waste, and expensive models before they execute.
-- **In-Memory Budget Circuit Breaker**: Prevent budget overrun with context token limits and rate guards.
-- **Local-First & Privacy-Focused**: Telemetry is batched asynchronously and kept offline in `.aurex/ledger.jsonl`. Prompts are not synced by default.
-- **Crash Safety**: Persistent queue handling keeps your local metrics safe even during process shutdown.
+For Python environments:
+```bash
+pip install aurex-sdk
+```
 
 ---
 
-## Quick Start
+## Quick Start Guide
 
-### 1. Zero-Code Auto-Hook (Recommended)
+### Option A: Zero-Code Auto-Hook (Recommended)
 
-Generate a workspace environment hook configuration file. Node.js processes will load the auto-instrumentation automatically.
+Attach Aurex runtime hooks at application launch with no modifications to existing codebase logic.
 
 ```bash
-# Generate the .env.aurex configuration file
+# Generate environment configuration file
 npx aurex install-hook
 
-# Source the configuration to set NODE_OPTIONS and run your app
+# Source environment variables and start your application
 source .env.aurex
 export AUREX_API_KEY=aux_dev_yourkey
 node your_app.js
 ```
 
-To remove the hook:
-```bash
-npx aurex uninstall-hook
-```
+---
 
-### 2. Manual Integration
+### Option B: Programmatic SDK Setup
+
+Initialize the Aurex auditor singleton and auto-patch your LLM clients directly.
 
 ```typescript
 import { AurexAuditor } from "aurex-sdk";
+import OpenAI from "openai";
 
-// Initialize the auditor singleton
+// Initialize auditor singleton
 const auditor = AurexAuditor.getInstance({
   apiKey: "aux_dev_yourkey",
   project: "production-service",
-  ledgerPath: ".aurex/ledger.jsonl",
   cloudSync: true
 });
 
-// Patch all supported clients (OpenAI, Anthropic, LiteLLM)
+// Patch all installed provider packages automatically
 auditor.patchAll();
 
-// Or patch manually/selectively
-// auditor.patchOpenAI();
-// auditor.patchAnthropic();
-// auditor.patchLiteLLM();
-```
-
----
-
-## API Reference
-
-### `AurexConfig` Parameters
-
-| Option | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `apiKey` | `string` | `undefined` / `env(AUREX_API_KEY)` | Your Aurex Project API key. |
-| `project` | `string` | `"default"` | Logical project identifier. |
-| `ledgerPath` | `string` | `".aurex/ledger.jsonl"` | Path to write the local telemetry ledger to. |
-| `cloudSync` | `boolean` | `false` | Sync telemetry events asynchronously to the cloud dashboard. |
-| `cloudEndpoint`| `string` | `undefined` | Endpoint for cloud syncing. Overrides default API endpoint. |
-| `baseUrl` | `string` | `undefined` / `env(AUREX_BASE_URL)` | Base URL of backend API (defaults to `http://localhost:8000/api/v1`). |
-| `flushIntervalMs` | `number` | `30000` | Telemetry sync queue flush interval in milliseconds. |
-| `maxBatchSize` | `number` | `100` | Maximum batch size of synced events. |
-| `localOnly` | `boolean` | `true` | Runs fully locally without cloud sync. (Turn off for cloud sync) |
-| `syncPromptHashes` | `boolean` | `false` | Sync prompt/response hashes to the cloud dashboard. |
-| `budgetGuard` | `BudgetGuardConfig` | `undefined` | Configuration object for budget limits (see below). |
-| `pricingPath` | `string` | `undefined` / `env(AUREX_PRICING_PATH)` | Path to a custom JSON pricing configuration. |
-| `defaultPricing` | `object` | `undefined` | Fallback cost object with keys `input` and `output` (USD per 1M tokens) for unknown models. |
-| `simplePromptTokenLimit` | `number` | `120` | Threshold token count below which prompts are classified as simple. |
-| `runawayContextMultiplier` | `number` | `2.2` | Scaling multiplier representing runaway context growth checks. |
-| `loopSimilarityThreshold` | `number` | `0.8` | Jaccard similarity threshold for semantic loop checks. |
-| `downgradeMap` | `object` | `undefined` | Custom model mappings representing downgrade paths (e.g. `{"gpt-4o": "gpt-4o-mini"}`). |
-
-### Dynamic Pricing & Programmatic Registration
-
-You can specify custom pricing using a local JSON file or register rates programmatically:
-
-1. **Custom JSON File (`pricingPath` or `env(AUREX_PRICING_PATH)`)**:
-   Create a JSON pricing file:
-   ```json
-   {
-     "my-custom-model": { "input": 12.50, "output": 35.00 },
-     "finetuned-gpt-*": { "input": 3.00, "output": 12.00 }
-   }
-   ```
-
-2. **Programmatic Registration**:
-   ```typescript
-   auditor.registerModelPricing("custom-model", 10.0, 30.0);
-   ```
-
-### Budget Guard Configuration (`BudgetGuardConfig`)
-
-Pass an object to `budgetGuard` to enforce runtime limits:
-
-```typescript
-const auditor = AurexAuditor.getInstance({
-  budgetGuard: {
-    maxCostPerMinute: 5.00,
-    maxCostPerSession: 50.00,
-    maxRequestsPerMinute: 100,
-    maxContextTokens: 128000,
-    onBudgetExceeded: "throw",    // "throw" | "warn" | "webhook"
-    webhookUrl: "https://api.yourdomain.com/aurex-alert",
-    dryRun: false
-  }
+// Use standard provider clients as usual
+const openai = new OpenAI();
+const response = await openai.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Explain quantum computing in simple terms." }]
 });
 ```
 
 ---
 
-## Context Overrides (Per-Call Options)
+### Option C: Runtime Guards and Circuit Breakers
 
-When using wrapper methods (`wrap`), you can pass request-scoped options (e.g., `tags`, custom thresholds, loop sensitivity) via the third parameter using `AsyncLocalStorage`:
-
-```typescript
-const resp = await auditor.wrap(
-  async (params) => {
-    return client.chat.completions.create(params);
-  },
-  () => ({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: "Query..." }]
-  }),
-  {
-    workflowId: "tenant_abc_session",
-    tags: { tier: "enterprise" },
-    simplePromptTokenLimit: 50, // override default threshold
-    budgetGuard: {
-      maxCostPerSession: 2.00 // custom budget limit for this call
-    }
-  }
-);
-```
-
----
-
-## Hugging Face Native Integration
-
-Auto-instrument Hugging Face text generation and chat completions.
-
-Call `patchAll()` or `patchHuggingFace()` to instrument standard `@huggingface/inference` client calls:
+Enforce spending limits and pre-call policy routing before sending API calls to providers.
 
 ```typescript
 import { AurexAuditor } from "aurex-sdk";
-import { HfInference } from "@huggingface/inference";
 
 const auditor = AurexAuditor.getInstance();
-auditor.patchHuggingFace();
-
-const client = new HfInference("your-hf-token");
-const resp = await client.chatCompletion({
-  model: "meta-llama/Llama-3-8b-Instruct",
-  messages: [{ role: "user", content: "Hello" }]
+auditor.configureCircuitBreaker({
+  maxCostPerMinute: 5.00,
+  maxCostPerSession: 50.00,
+  onBudgetExceeded: "throw"  // Options: "throw", "warn", "webhook"
 });
-// Tracked at $0.00 (Hugging Face serverless defaults to free cost)
-```
 
-To configure pricing for dedicated Hugging Face endpoints, use the dynamic pricing configuration or register the endpoint name under wildcard pricing.
-
----
-
----
-
-## Real-Time Guards (`preCallCheck`)
-
-For manual LLM calls, run a pre-call check to catch loops and budget overruns before calling the LLM API.
-
-```typescript
-import { AurexAuditor, AurexDecision, AurexAction } from "aurex-sdk";
-
-const auditor = AurexAuditor.getInstance();
-
-// Perform the check
-const decision: AurexDecision = auditor.preCallCheck({
+// Pre-call evaluation
+const decision = auditor.preCallCheck({
   model: "gpt-4o",
-  prompt: "Generate code for Antigravity...",
-  systemPrompt: "You are a senior dev...",
-  workflowId: "user_session_123",
-  messages: [{ role: "user", content: "..." }]
+  prompt: "Generate system report.",
+  workflowId: "session_4921"
 });
 
 if (decision.action === "block") {
-  throw new Error(`Request blocked: ${decision.reason}`);
+  throw new Error(`Call blocked: ${decision.reason}`);
 } else if (decision.action === "downgrade") {
-  // Use cheaper model suggestion
-  const model = decision.suggestedModel; // e.g. "gpt-4o-mini"
-  console.log(`Downgrading to ${model} because: ${decision.reason}`);
-} else if (decision.action === "compress") {
-  // Use compressed messages to avoid system prompt waste
-  const messages = decision.compressedMessages;
+  const model = decision.suggestedModel;  // Route to suggested efficient model
 }
 ```
 
 ---
 
-## CLI Commands
+## Offline CI/CD Quality Gates
 
-The Node.js SDK comes with a built-in CLI command run via `npx aurex`.
+Enforce cost and efficiency thresholds during continuous integration builds:
 
-### `npx aurex install-hook [target]`
-Generates the `.env.aurex` environment file for pre-requiring the hook.
-- `target`: Optional explicit directory path.
-
-### `npx aurex uninstall-hook [target]`
-Removes the `.env.aurex` file.
-
-### `npx aurex ci [--mode=warn|block] [--github-comment]`
-Analyze a local ledger offline to check against CI policies (Build Breaker).
-- `--mode`: CI/CD action mode: `warn` (default) or `block` (returns exit code `1` on failure if critical issues are found).
-- `--github-comment`: Outputs a formatted Markdown summary (useful for posting back in PR actions).
-
-Example:
 ```bash
+# Execute automated CI verification
 npx aurex ci --mode=block
 ```
 
 ---
 
-## Health & Monitoring
+## Self-Hosting and Dashboard Setup (Optional)
 
-Check the status of the auditor instance:
+For local development and self-hosted deployments, telemetry flushes asynchronously to an optional Aurex backend and analytics dashboard.
 
-```typescript
-const health = auditor.getHealth();
-console.log(health);
-// Output:
-// {
-//   status: "healthy",
-//   queueSize: 0,
-//   threadActive: true, // always true in Node (event loop based)
-//   eventsLogged: 12
-// }
-```
+1. **Backend Server**: Runs on FastAPI at `http://localhost:8000`.
+2. **Analytics Dashboard**: Next.js UI running at `http://localhost:3000`.
+
+To run the local control plane during development, clone the repository and refer to the full deployment documentation at `http://localhost:3000/docs`.
+
+---
+
+## License and Documentation
+
+* **Interactive Documentation**: `http://localhost:3000/docs`
+* **GitHub Repository**: `https://github.com/heyaurex/aurex-sdk`

@@ -16,7 +16,7 @@ import { Bot } from "lucide-react";
 import { DocHashRedirect } from "@/components/docs/doc-hash-redirect";
 
 export const metadata = {
-  title: "API Reference — Aurex SDK",
+  title: "API Reference - Aurex SDK",
   description: "Focused API reference pages for configuration, guards, providers, and CLI tools.",
 };
 
@@ -29,8 +29,8 @@ const cards: HubCard[] = [
   },
   {
     href: "/docs/reference/integration",
-    title: "Manual Integration",
-    description: "Singleton init, client patching, pricing, flush, and shutdown.",
+    title: "Integration",
+    description: "Initialize, patch providers, and manage the runtime lifecycle.",
     icon: Code,
   },
   {
@@ -42,7 +42,7 @@ const cards: HubCard[] = [
   {
     href: "/docs/reference/budget-guard",
     title: "BudgetGuard",
-    description: "In-process spend and rate circuit breakers.",
+    description: "Set spending and rate limits that are enforced automatically, in-process.",
     icon: ShieldCheck,
   },
   {
@@ -53,8 +53,8 @@ const cards: HubCard[] = [
   },
   {
     href: "/docs/reference/guards",
-    title: "Real-Time Guards",
-    description: "pre_call_check decision engine and actions.",
+    title: "Runtime Guards",
+    description: "Evaluate each call before it’s sent - route, compress, or block.",
     icon: Zap,
   },
   {
@@ -71,20 +71,20 @@ const cards: HubCard[] = [
   },
   {
     href: "/docs/reference/health",
-    title: "Health & Recovery",
-    description: "Sync health, crash recovery, and pending ledger.",
+    title: "Health & Status",
+    description: "Runtime health, recovery state, and sync status.",
     icon: Info,
   },
   {
     href: "/docs/reference/heuristics",
     title: "Heuristics CLI",
-    description: "Offline ledger waste analysis.",
+    description: "Analyze your ledger for optimization opportunities.",
     icon: Flame,
   },
   {
     href: "/docs/reference/ci",
     title: "CI Policy Gate",
-    description: "Block builds on cost or efficiency thresholds.",
+    description: "Enforce cost and efficiency policies in your CI pipeline.",
     icon: RefreshCw,
   },
 ];
@@ -96,15 +96,15 @@ export default function DocsReferenceHubPage() {
       <div>
         <h1 className="text-3xl font-display font-bold text-white">API Reference</h1>
         <p className="text-white/50 mt-2">
-          Each topic lives on its own page. Open one page per task — do not load the full reference at once.
+          Each topic lives on its own page. Pick the one that matches what you’re building.
         </p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <p className="text-sm text-white/60">
           Agents: use{" "}
-          <Link href="/llms.txt" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/llms.txt" className="text-teal-400 hover:text-teal-300">
             /llms.txt
           </Link>{" "}
           to route tasks to a single URL below.

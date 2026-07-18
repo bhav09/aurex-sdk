@@ -4,7 +4,7 @@ import { DocSeeAlso } from "@/components/docs/doc-see-also";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Cloud Sync Resilience — Aurex SDK",
+  title: "Cloud Sync Resilience - Aurex SDK",
   description: "HTTP retries, 429 Retry-After, and queue drop monitoring for ledger ingest.",
 };
 
@@ -13,15 +13,15 @@ export default function DocsCloudSyncPage() {
     <DocPageShell
       title="Cloud Sync Resilience"
       description="Telemetry upload to POST /api/v1/ledger/events uses bounded timeouts, retries with jitter, and respects HTTP 429."
-      agentHint="Use for sync_error_count, events_dropped, sync_max_retries — not provider LLM retry."
+      agentHint="Use for sync_error_count, events_dropped, sync_max_retries - not provider LLM retry."
       scopeIn={["Cloud sync retry behavior", "Health fields for sync failures", "sync_timeout / syncMaxRetries config"]}
-      scopeOut={["Provider-call retry/fallback — see /docs/reliability", "Backend rate limit numbers — see Rate Limits"]}
+      scopeOut={["Provider-call retry/fallback - see /docs/reliability", "Backend rate limit numbers - see Rate Limits"]}
     >
       <div className="p-4 rounded-xl border border-white/[0.06] bg-white/[0.01] text-sm text-white/50">
         This is <strong className="text-white">cloud sync resilience</strong> (SDK → Aurex backend). Provider-call
         resilience (OpenAI → fallback model) is documented under{" "}
-        <Link href="/docs/reliability/overview" className="text-indigo-400">
-          Reliability & Loss Recovery
+        <Link href="/docs/reliability/overview" className="text-teal-400">
+          Reliability
         </Link>
         .
       </div>

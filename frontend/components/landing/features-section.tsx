@@ -1,41 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { RotateCcw, BrainCircuit, ShieldAlert } from "lucide-react";
 
-const features = [
+const pillars = [
   {
     number: "01",
-    title: "Cost Savings",
-    description: "Identify where you're wasting tokens and reduce spend. Get actionable recommendations to optimize your AI usage and cut costs by up to 40%.",
-    stats: { value: "40%", label: "avg cost reduction" },
+    title: "Behavioral Awareness",
+    description: "Understands the shape of what your agents are doing - matching tool calls, context growth, and semantic patterns across a run. It's how Aurex tells a genuinely new step from a repeated one.",
+    stats: { value: "F1: 0.72", label: "hybrid structural + semantic detection" },
+    icon: RotateCcw,
+    docsHref: "/docs/reference#infinite-loop-detection",
   },
   {
     number: "02",
-    title: "Visibility",
-    description: "Understand exactly how your AI is being used. Track token consumption, model distribution, and usage patterns across your entire organization.",
-    stats: { value: "100%", label: "usage transparency" },
+    title: "Adaptive Routing",
+    description: "Every call is scored for complexity and routed to the model that fits it - a frontier model when the task needs it, a smaller one when it doesn't. Compression and caching happen the same way, automatically.",
+    stats: { value: "98%", label: "cost recovered without manual prompt review" },
+    icon: BrainCircuit,
+    docsHref: "/docs/reference#cost-based-routing",
   },
   {
     number: "03",
-    title: "Control",
-    description: "Local SDK ledger by default. Cloud sync is opt-in and project-scoped. You decide what leaves your environment.",
-    stats: { value: "100%", label: "control" },
+    title: "Provider Continuity",
+    description: "Aurex knows the health of every provider in your stack in real time and reroutes around a bad one without you writing failover logic.",
+    stats: { value: "0ms", label: "added latency vs routing through an external gateway" },
+    icon: ShieldAlert,
+    docsHref: "/docs/reference#resilience-fallbacks",
   },
 ];
-
-// Auto-scroll through features
-function useFeatureScroll(featuresLength: number) {
-  const [activeFeature, setActiveFeature] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveFeature((prev) => (prev + 1) % featuresLength);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [featuresLength]);
-
-  return activeFeature;
-}
 
 // Floating dot particles visualization
 function ParticleVisualization() {
@@ -139,7 +132,6 @@ function ParticleVisualization() {
 export function FeaturesSection() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const activeFeature = useFeatureScroll(features.length);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -155,7 +147,7 @@ export function FeaturesSection() {
 
   return (
     <section
-      id="features"
+      id="pillars"
       ref={sectionRef}
       className="relative py-16 sm:py-20 lg:py-28 overflow-hidden"
     >
@@ -175,69 +167,66 @@ export function FeaturesSection() {
             <div className="lg:col-span-7">
               <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4 sm:mb-6">
                 <span className="w-12 h-px bg-foreground/30" />
-                Value Propositions
+                Three Capabilities
               </span>
               <h2
                 className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                   }`}
               >
-                Smart
+                One layer.
                 <br />
-                <span className="text-muted-foreground">auditing.</span>
+                <span className="text-muted-foreground">It understands what your agents are doing.</span>
               </h2>
             </div>
             <div className="lg:col-span-5 lg:pb-4">
               <p className={`text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 }`}>
-                Analyze your AI token usage locally and discover where you're wasting money. Get actionable insights in seconds.
+                Most infrastructure is passive - it logs, reports, waits for you to look at a dashboard. Aurex is active. It sits in the request path itself and makes a decision on every call before it goes out.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Horizontal Scrollable Cards */}
+        {/* Four-pillar grid */}
         <div className="relative">
-          {/* Scroll container */}
-          <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-6 px-6 lg:mx-0 lg:px-0">
-            {features.map((feature, index) => (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {pillars.map((pillar, index) => (
               <div
-                key={feature.number}
-                className={`flex-none w-[85vw] sm:w-[75vw] lg:w-[calc(33.333%-16px)] relative bg-background border border-foreground/10 min-h-[380px] sm:min-h-[400px] overflow-hidden group transition-all duration-700 snap-start ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                key={pillar.number}
+                className={`relative bg-background border border-foreground/10 min-h-[380px] sm:min-h-[420px] overflow-hidden group transition-all duration-700 hover:border-foreground/25 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                   }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <div className="relative h-full p-6 sm:p-8 lg:p-10 bg-background">
+                <div className="relative h-full p-6 sm:p-8 bg-background">
                   <ParticleVisualization />
                   <div className="relative z-10 flex flex-col h-full">
-                    <span className="font-mono text-xs sm:text-sm text-muted-foreground">{feature.number}</span>
-                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-display mt-3 sm:mt-4 mb-4 sm:mb-6 group-hover:translate-x-2 transition-transform duration-500">
-                      {feature.title}
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="font-mono text-xs sm:text-sm text-muted-foreground">{pillar.number}</span>
+                      <pillar.icon className="w-4 h-4 text-[#2dd4bf]" />
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-display mt-1 mb-4 group-hover:translate-x-2 transition-transform duration-500">
+                      {pillar.title}
                     </h3>
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-6 sm:mb-8 flex-1">
-                      {feature.description}
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-6 flex-1">
+                      {pillar.description}
                     </p>
                     <div className="mt-auto">
-                      <span className="text-4xl sm:text-5xl lg:text-6xl font-display">{feature.stats.value}</span>
-                      <span className="block text-xs sm:text-sm text-muted-foreground font-mono mt-2">{feature.stats.label}</span>
+                      <span className="text-3xl sm:text-4xl font-display">{pillar.stats.value}</span>
+                      <span className="block text-xs text-muted-foreground font-mono mt-2">{pillar.stats.label}</span>
                     </div>
+                    <a
+                      href={pillar.docsHref}
+                      className="inline-flex items-center gap-1 text-xs text-[#2dd4bf]/60 hover:text-[#2dd4bf] font-mono mt-4 transition-colors"
+                    >
+                      Read docs →
+                    </a>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-
-          {/* Scroll indicators */}
-          <div className="flex justify-center gap-2 mt-6 lg:hidden">
-            {features.map((_, index) => (
-              <button
-                key={index}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === activeFeature ? "bg-foreground w-8" : "bg-foreground/20"
-                  }`}
-                aria-label={`Go to feature ${index + 1}`}
-              />
-            ))}
-          </div>
         </div>
+
       </div>
     </section>
   );

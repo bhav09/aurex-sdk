@@ -8,11 +8,12 @@ import { aurexAPI } from "@/lib/api-client";
 import { AuthModal } from "./auth-modal";
 import { UserDropdown } from "@/components/app/user-dropdown";
 
+import { useTheme } from "next-themes";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+
 const navLinks = [
-  { name: "Features", href: "/#features" },
-  { name: "How It Works", href: "/#how-it-works" },
-  { name: "Pricing", href: "/#pricing" },
   { name: "Docs", href: "/docs" },
+  { name: "Changelog", href: "/changelog" },
 ];
 
 export function Navigation() {
@@ -23,6 +24,12 @@ export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const isHomePage = pathname === "/";
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,7 +63,7 @@ export function Navigation() {
           {/* Logo */}
           <a href="/" className="flex items-center gap-3 group">
             <Image
-              src="/heyaurex_logo/1.png"
+              src={mounted && resolvedTheme === "light" ? "/heyaurex_logo/2.png" : "/heyaurex_logo/1.png"}
               alt="AUREX logo"
               width={140}
               height={120}
@@ -64,12 +71,16 @@ export function Navigation() {
               priority
             />
             <span className={`font-serif uppercase tracking-[0.2em] font-medium transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>
-              AUREX
+              Aurex
+            </span>
+            <span className="px-1.5 py-0.5 rounded-sm bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wider border border-amber-500/20">
+              Beta
             </span>
           </a>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
+
             {navLinks.map((link) => (
               <a
                 key={link.name}
@@ -84,16 +95,24 @@ export function Navigation() {
 
             {hasSession ? (
               <div className="flex items-center gap-4 border-l border-white/[0.08] pl-6 ml-2 text-white">
+                <ThemeToggle />
                 <UserDropdown />
               </div>
             ) : (
               <div className="flex items-center gap-4 border-l border-white/[0.08] pl-6 ml-2">
+                <ThemeToggle />
                 <button
                   onClick={() => setIsAuthOpen(true)}
-                  className="px-4 py-1.5 text-xs font-semibold bg-white text-black hover:bg-white/90 rounded-full transition-all duration-300 shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 ${isScrolled ? "text-foreground hover:bg-foreground/5" : "text-white hover:bg-white/10"}`}
                 >
                   Sign In
                 </button>
+                <a
+                  href="/docs#quickstart"
+                  className="px-4 py-1.5 text-xs font-semibold bg-teal-500 text-white hover:bg-teal-400 rounded-full transition-all duration-300 shadow-[0_4px_12px_rgba(20,184,166,0.3)]"
+                >
+                  Get started free
+                </a>
               </div>
             )}
           </div>

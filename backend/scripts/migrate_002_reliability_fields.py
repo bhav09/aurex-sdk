@@ -1,5 +1,5 @@
 """
-Migration 002 — Reliability / counterfactual fields on llm_events.
+Migration 002 - Reliability / counterfactual fields on llm_events.
 
 Idempotent. Adds projected_cost, recovery_provider, attempt_index if missing.
 Run after migrate_001_extend_event_schema when present.

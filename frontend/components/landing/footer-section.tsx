@@ -4,11 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 const footerLinks = {
-  Product: [
-    { name: "Features", href: "/#features" },
-    { name: "How it works", href: "/#how-it-works" },
-    { name: "Pricing", href: "/#pricing" },
-  ],
+
   Resources: [
     { name: "Documentation", href: "/docs" },
     { name: "Support", href: "mailto:contact@heyaurex.com" },
@@ -86,18 +82,18 @@ export function FooterSection() {
     <footer className="relative bg-background">
       {/* Panoramic banner image */}
       {/* <div className="relative w-full h-[340px] md:h-[420px] overflow-hidden"> */}
-        {/* <img
+      {/* <img
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Upscaled%20Image%20%2810%29-UnDKstODkIENp5xqTYUEpt0Sm8tNOw.png"
           alt="Bioluminescent landscape"
           className="w-full h-full object-cover object-center"
         /> */}
-        {/* Gradient fade to black at bottom */}
-        {/* <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" /> */}
-        {/* Subtle dark vignette on sides */}
-        {/* <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40" /> */}
+      {/* Gradient fade to black at bottom */}
+      {/* <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black" /> */}
+      {/* Subtle dark vignette on sides */}
+      {/* <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40" /> */}
       {/* </div> */}
 
-      {/* Footer content — black background, white text */}
+      {/* Footer content - black background, white text */}
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Main Footer */}
         <div className="py-16 lg:py-20">
@@ -109,8 +105,8 @@ export function FooterSection() {
                 <span className="text-xs text-white/40 font-mono">TM</span>
               </a>
 
-              <p className="text-white/50 leading-relaxed mb-8 max-w-xs text-sm">
-                AI cost optimization through intelligent auditing. Reduce your LLM expenses instantly.
+              <p className="text-white/50 leading-relaxed mb-8 max-w-xs text-sm font-mono">
+                Token waste prevention platform
               </p>
 
               {/* Social Links */}
@@ -147,6 +143,16 @@ export function FooterSection() {
                 </ul>
               </div>
             ))}
+
+            {/* Install block */}
+            <div className="col-span-2 md:col-span-2">
+              <h3 className="text-sm font-medium text-white mb-6">Install SDK</h3>
+              <div className="bg-white/[0.03] border border-white/10 rounded-lg p-3 font-mono text-sm text-white/70 flex items-center justify-between group cursor-pointer hover:bg-white/[0.05] transition-colors"
+                onClick={() => navigator.clipboard.writeText('pip install aurex-sdk')}>
+                <span><span className="text-emerald-400">$</span> pip install aurex-sdk</span>
+                <span className="text-xs text-white/30 opacity-0 group-hover:opacity-100 transition-opacity">Copy</span>
+              </div>
+            </div>
           </div>
         </div>
 

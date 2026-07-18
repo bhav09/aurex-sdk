@@ -6,8 +6,8 @@ import { Bot } from "lucide-react";
 import { Grid3X3 } from "lucide-react";
 
 export const metadata = {
-  title: "Harness Integration — Aurex SDK",
-  description: "Integrate Aurex with existing LLM wrappers and observability stacks.",
+  title: "Integration Patterns - Aurex SDK",
+  description: "Choose your integration style: auto-patch, wrap, or manual logging.",
 };
 
 const cards: HubCard[] = [
@@ -37,20 +37,20 @@ export default function DocsHarnessHubPage() {
       <DocHashRedirect />
       <div>
         <h1 className="text-3xl font-display font-bold text-white flex items-center gap-2">
-          <Layers className="w-7 h-7 text-emerald-400" />
-          Harness Integration
+          <Layers className="w-7 h-7 text-teal-400" />
+          Integration Patterns
         </h1>
-        <p className="text-white/50 mt-2">Match integration depth to your existing LLM wrapper or observability stack.</p>
+        <p className="text-white/50 mt-2">Choose your integration style: auto-patch for zero-code setup, wrap for request-scoped control, or manual logging for full flexibility.</p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
         <p className="text-sm text-white/60">
-          Avoid double-counting: never patch and wrap the same call path. Check{" "}
-          <Link href="/docs/reference/health" className="text-indigo-400">
-            patch_status
+          If you patch and wrap the same call path, events will be logged twice. Use{" "}
+          <Link href="/docs/reference/health" className="text-teal-400">
+            health output
           </Link>{" "}
-          in health output.
+          to verify your setup.
         </p>
       </div>
 

@@ -2,7 +2,7 @@
 
 Both `/auth/verify-otp` and `/auth/google-login` call into this to ensure the
 user has a User row, an Organization, a default Project, and an owner
-Membership. Idempotent — re-runs return the existing tuple.
+Membership. Idempotent - re-runs return the existing tuple.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ async def ensure_user_and_default_org(
     email: str,
     name: Optional[str] = None,
 ) -> Tuple[User, Organization, Project]:
-    """Return (user, org, default_project) — creating any missing pieces.
+    """Return (user, org, default_project) - creating any missing pieces.
 
     `name` is used to seed the User row and the human-readable Organization
     name on first login. Subsequent logins are no-ops.
@@ -70,7 +70,7 @@ async def ensure_user_and_default_org(
         await db.commit()
         return user, org, project
 
-    # Existing membership — fetch its org and the org's first project as default.
+    # Existing membership - fetch its org and the org's first project as default.
     org = (
         await db.execute(select(Organization).where(Organization.id == membership.org_id))
     ).scalar_one()

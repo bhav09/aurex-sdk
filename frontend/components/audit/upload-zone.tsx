@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, X, AlertCircle, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,14 @@ interface UploadZoneProps {
     initialUserInfo?: { user_name: string; email: string; company_name: string } | null;
     otpNotice?: string | null;
     onResetPending?: () => void;
+}
+
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 export function UploadZone({ 
@@ -55,12 +63,12 @@ export function UploadZone({
     }, [initialUserInfo]);
 
     const validateFile = (file: File): boolean => {
-        const validExtensions = ['.csv', '.json'];
+        const validExtensions = ['.csv', '.json', '.jsonl'];
         const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
         const maxSize = 100 * 1024 * 1024; // 100MB
 
         if (!validExtensions.includes(fileExtension)) {
-            setError('Accepted file types: CSV, JSON');
+            setError('Accepted file types: CSV, JSON, JSONL');
             return false;
         }
 
@@ -138,7 +146,6 @@ export function UploadZone({
     const handleRemoveFile = () => {
         setSelectedFile(null);
         setError(null);
-        // Reset file input
         const fileInput = document.getElementById('file-upload-audit') as HTMLInputElement;
         if (fileInput) {
             fileInput.value = '';
@@ -193,7 +200,6 @@ export function UploadZone({
             setOtpError(null);
             await aurexAPI.verifyOTP(email, otp);
             aurexAPI.trackClick("verify_and_analyze_click", email || undefined);
-            // OTP verified! Proceed with upload
             onFileSelect(selectedFile!, {
                 user_name: userName,
                 email: email,
@@ -222,12 +228,10 @@ export function UploadZone({
         }
     };
 
-    // Load Google Identity Services script
     useEffect(() => {
         const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
         if (!googleClientId) return;
 
-        // Check if already loaded
         if (document.getElementById('google-gsi-script')) return;
 
         const script = document.createElement('script');
@@ -245,7 +249,6 @@ export function UploadZone({
             return;
         }
 
-        // Check if GSI script has loaded
         if (typeof window === 'undefined' || !(window as any).google?.accounts?.id) {
             setError("Google sign-in is still loading. Please try again in a moment.");
             return;
@@ -292,14 +295,6 @@ export function UploadZone({
                 
                 google.accounts.id.prompt((notification: any) => {
                     if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                        // Fallback: if One Tap is blocked (e.g., by browser), use the redirect flow
-                        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-                            `client_id=${googleClientId}` +
-                            `&redirect_uri=${encodeURIComponent(window.location.origin + '/audit')}` +
-                            `&response_type=id_token` +
-                            `&scope=openid email profile` +
-                            `&nonce=${Math.random().toString(36).substring(2)}`;
-                        // We don't actually redirect for now; just show a notice
                         setError("Google popup was blocked. Please allow popups for this site and try again.");
                         setOtpLoading(false);
                         reject(new Error("Google popup blocked"));
@@ -307,17 +302,11 @@ export function UploadZone({
                 });
             });
         } catch (err: any) {
-            if (!error) { // Don't overwrite more specific error messages
+            if (!error) {
                 setError(err.message || "Failed to sign in with Google");
             }
             setOtpLoading(false);
         }
-    };
-
-    const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
     if (isOtpStep) {
@@ -377,7 +366,7 @@ export function UploadZone({
                             type="submit"
                             variant="default"
                             disabled={otpLoading || otp.length !== 6}
-                            className="whitespace-nowrap rounded-sm bg-primary px-4 py-2 text-sm text-primary-foreground"
+                            className="whitespace-nowrap rounded-sm bg-emerald-500 px-6 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {otpLoading ? "Verifying..." : "Verify & Analyze"}
                         </Button>
@@ -390,9 +379,14 @@ export function UploadZone({
     return (
         <div className="sm:mx-auto sm:max-w-lg flex items-center justify-center p-10 w-full max-w-lg">
             <form onSubmit={handleSubmit} className="w-full">
-                <h3 className="text-lg font-semibold text-foreground">File Upload</h3>
+                <div className="text-center mb-8">
+                    <h3 className="text-2xl font-display text-white mb-2">Drop your OpenAI/Anthropic logs here</h3>
+                    <p className="text-sm text-emerald-400 flex items-center justify-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        Runs entirely locally in your browser. Data never leaves your machine.
+                    </p>
+                </div>
 
-                {/* User Information Fields or Active Session badge */}
                 {isMounted && aurexAPI.hasActiveSession() && aurexAPI.getUserInfo() ? (
                     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 mt-4 flex items-center justify-between">
                         <div>
@@ -523,7 +517,6 @@ export function UploadZone({
                     </div>
                 )}
 
-                {/* File Upload Area */}
                 <div className="mt-4 flex justify-end">
                     <DataExportGuide />
                 </div>
@@ -549,7 +542,7 @@ export function UploadZone({
                                     id="file-upload-audit"
                                     name="file-upload-audit"
                                     type="file"
-                                    accept=".csv,.json,.xlsx,.xls"
+                                    accept=".csv,.json,.jsonl,.xlsx,.xls"
                                     className="sr-only"
                                     onChange={handleFileInput}
                                 />
@@ -560,7 +553,7 @@ export function UploadZone({
 
                 <div className="mt-2 text-xs leading-5 text-muted-foreground">
                     <p className="flex items-center justify-between">
-                        Recommended max. size: 100 MB, Accepted file types: CSV, JSON.
+                        Recommended max. size: 100 MB, Accepted file types: CSV, JSON, JSONL.
                     </p>
                     <p className="mt-1">
                         <strong>Note:</strong> Ensure your file contains LLM usage data with columns for <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">timestamp</code>, <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">model</code>, and token counts (e.g., <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">input_tokens</code> / <code className="bg-muted/50 px-1 py-0.5 rounded text-foreground">output_tokens</code>).
@@ -574,7 +567,6 @@ export function UploadZone({
                     </div>
                 )}
 
-                {/* Selected File Display */}
                 {selectedFile && (
                     <div className="relative mt-8 rounded-lg bg-muted p-3">
                         <div className="absolute right-1 top-1">
@@ -609,7 +601,6 @@ export function UploadZone({
                     </div>
                 )}
 
-                {/* Action Buttons */}
                 <div className="mt-8 flex items-center justify-end space-x-3">
                     <Button
                         type="button"
@@ -623,7 +614,7 @@ export function UploadZone({
                         type="submit"
                         variant="default"
                         disabled={!selectedFile || otpLoading}
-                        className="whitespace-nowrap rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="whitespace-nowrap rounded-sm bg-emerald-500 px-6 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {otpLoading ? "Sending OTP..." : "Upload & Analyze"}
                     </Button>
@@ -632,5 +623,3 @@ export function UploadZone({
         </div>
     );
 }
-
-

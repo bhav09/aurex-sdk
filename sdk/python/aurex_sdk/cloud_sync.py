@@ -50,7 +50,7 @@ def sync_batch_with_retry(
                 time.sleep((2**attempt) + random.uniform(0, 1))
                 continue
             return False, last_error
-        except Exception as exc:  # noqa: BLE001 — transport boundary
+        except Exception as exc:  # noqa: BLE001 - transport boundary
             last_error = str(exc)
             if attempt < max_retries:
                 time.sleep((2**attempt) + random.uniform(0, 1))

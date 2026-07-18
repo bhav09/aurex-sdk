@@ -51,7 +51,7 @@ class ApiKey(Base):
     owner_email = Column(String, nullable=False, index=True)
     company_name = Column(String, nullable=False, index=True)
 
-    # Project scoping (Phase 1 — nullable for legacy rows).
+    # Project scoping (Phase 1 - nullable for legacy rows).
     project_id = Column(String, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     environment = Column(String, nullable=True)  # dev|staging|prod
     scopes = Column(JSON, nullable=True)  # list[str]

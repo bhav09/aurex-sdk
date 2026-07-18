@@ -6,7 +6,7 @@ import { DocHashRedirect } from "@/components/docs/doc-hash-redirect";
 import { Server, HardDrive, Wifi, Gauge } from "lucide-react";
 
 export const metadata = {
-  title: "Cloud Deployment — Aurex SDK",
+  title: "Deployment - Aurex SDK",
   description: "Deploy Aurex in serverless, containers, and multi-worker environments.",
 };
 
@@ -26,7 +26,7 @@ const cards: HubCard[] = [
   {
     href: "/docs/deployment/cloud-sync",
     title: "Cloud Sync Resilience",
-    description: "HTTP retries, 429 handling, queue drops — not provider-call retry.",
+    description: "HTTP retries, 429 handling, queue drops - not provider-call retry.",
     icon: Wifi,
   },
   {
@@ -43,28 +43,28 @@ export default function DocsDeploymentHubPage() {
       <DocHashRedirect />
       <div>
         <h1 className="text-3xl font-display font-bold text-white flex items-center gap-2">
-          <Cloud className="w-7 h-7 text-emerald-400" />
-          Cloud Deployment
+          <Cloud className="w-7 h-7 text-teal-400" />
+          Deployment
         </h1>
         <p className="text-white/50 mt-2">
-          Patterns for serverless handlers, read-only filesystems, cloud sync, and backend rate limits.
+          Run Aurex in serverless functions, containers, or multi-worker environments.
         </p>
       </div>
 
       <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-sm text-white/60">
         <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
         <p>
-          Cloud sync is asynchronous. Always flush before short-lived handlers exit. Provider-call retry lives under{" "}
-          <Link href="/docs/reliability" className="text-indigo-400">
+          Cloud sync runs asynchronously. In short-lived handlers, call flush() before the function exits. For provider-call retry, see{" "}
+          <Link href="/docs/reliability" className="text-teal-400">
             Reliability
           </Link>
           .
         </p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
-        <Bot className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
-        <p className="text-sm text-white/60">Pick one deployment topic below — each page covers a single concern.</p>
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
+        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
+        <p className="text-sm text-white/60">Pick one deployment topic below - each page covers a single concern.</p>
       </div>
 
       <DocHubCards cards={cards} />
@@ -83,11 +83,11 @@ export default function DocsDeploymentHubPage() {
               <tr>
                 <td className="p-3 text-white/80">AWS Lambda</td>
                 <td className="p-3">
-                  <Link href="/docs/deployment/filesystem" className="text-indigo-400">
+                  <Link href="/docs/deployment/filesystem" className="text-teal-400">
                     AUREX_LEDGER_PATH=/tmp/...
                   </Link>
                   ,{" "}
-                  <Link href="/docs/deployment/serverless-flush" className="text-indigo-400">
+                  <Link href="/docs/deployment/serverless-flush" className="text-teal-400">
                     flush at handler end
                   </Link>
                 </td>

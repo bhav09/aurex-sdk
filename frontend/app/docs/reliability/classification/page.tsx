@@ -2,7 +2,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Response Classification — Aurex SDK",
+  title: "Response Classification - Aurex SDK",
   description: "Failure kinds, retry_on list, and classify_response override.",
 };
 
@@ -26,7 +26,7 @@ export default function DocsClassificationPage() {
       description="Every provider response or exception is classified into a kind. retry_on filters which kinds trigger enforce-mode retry."
       agentHint="Use for retry_on list, billed-but-empty detection, classify_response_override hook."
       scopeIn={["Default retry_on kinds", "Billed vs usable distinction", "Custom classifier override"]}
-      scopeOut={["Enforce cost cap — see Policy", "Fallback chain — see Fallbacks"]}
+      scopeOut={["Enforce cost cap - see Policy", "Fallback chain - see Fallbacks"]}
     >
       <p className="text-sm text-white/50">* Retry only when mode is enforce and kind is listed in retry_on.</p>
 
@@ -42,7 +42,7 @@ export default function DocsClassificationPage() {
           <tbody className="divide-y divide-white/[0.04] text-white/50 text-xs">
             {defaultKinds.map((row) => (
               <tr key={row.kind}>
-                <td className="p-3 font-mono text-indigo-400">{row.kind}</td>
+                <td className="p-3 font-mono text-teal-400">{row.kind}</td>
                 <td className="p-3">{row.retry}</td>
                 <td className="p-3 font-sans">{row.desc}</td>
               </tr>
@@ -52,8 +52,8 @@ export default function DocsClassificationPage() {
       </div>
 
       <p className="text-sm text-white/50">
-        Empty and content-filter responses are often still billed — observe mode records them as{" "}
-        <code className="text-indigo-400">UNFULFILLED_SPEND</code> for dashboard analytics.
+        Empty and content-filter responses are often still billed - observe mode records them as{" "}
+        <code className="text-teal-400">UNFULFILLED_SPEND</code> for dashboard analytics.
       </p>
 
       <DocSeeAlso

@@ -125,7 +125,7 @@ const originalRequire = Module.prototype.require;
 import { AurexAuditor, AurexConfig, normalizeModelName, getModelPricing, calculateCost } from "./index";
 
 async function runTests() {
-  console.log("🚀 Running Node SDK Patcher & Integration Tests...");
+  console.log("Running Node SDK Patcher & Integration Tests...");
 
   // Reset singleton
   AurexAuditor.reset();
@@ -440,7 +440,7 @@ async function runTests() {
     assert.strictEqual(hfEvent.cost, 0.0);
   }
 
-  console.log("✅ All Node SDK tests passed successfully!");
+  console.log("All Node SDK tests passed successfully!");
   
   // Cleanup ledger
   if (fs.existsSync(ledgerPath)) {
@@ -451,6 +451,6 @@ async function runTests() {
 
 import fs from "fs";
 runTests().catch(err => {
-  console.error("❌ Test failed:", err);
+  console.error("Test failed:", err);
   process.exit(1);
 });

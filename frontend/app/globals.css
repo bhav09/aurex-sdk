@@ -4,6 +4,51 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --background: oklch(0.98 0 0);
+  --foreground: oklch(0.14 0.005 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.14 0.005 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.14 0.005 260);
+  --primary: oklch(0.11 0.008 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.14 0.005 260);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.96 0 0);
+  --accent-foreground: oklch(0.14 0.005 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.14 0.005 260);
+  --chart-1: oklch(0.14 0.005 260);
+  --chart-2: oklch(0.28 0 0);
+  --chart-3: oklch(0.48 0 0);
+  --chart-4: oklch(0.68 0 0);
+  --chart-5: oklch(0.88 0 0);
+  --radius: 0.25rem;
+  --sidebar: oklch(0.98 0 0);
+  --sidebar-foreground: oklch(0.14 0.005 260);
+  --sidebar-primary: oklch(0.11 0.008 260);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.96 0 0);
+  --sidebar-accent-foreground: oklch(0.14 0.005 260);
+  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-ring: oklch(0.14 0.005 260);
+  --shell: oklch(0.98 0 0);
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(0.96 0 0);
+  --surface-sunken: oklch(0.94 0 0);
+  --surface-panel: oklch(0.96 0 0);
+  
+  /* INVERT HARDCODED DARK THEME CLASSES FOR LIGHT MODE */
+  --color-white: #000000;
+  --color-black: #ffffff;
+}
+
+.dark {
   --background: oklch(0.11 0.008 260);
   --foreground: oklch(0.94 0.005 90);
   --card: oklch(0.14 0.008 260);
@@ -28,7 +73,6 @@
   --chart-3: oklch(0.52 0.015 90);
   --chart-4: oklch(0.35 0.01 90);
   --chart-5: oklch(0.24 0.008 90);
-  --radius: 0.25rem;
   --sidebar: oklch(0.11 0.008 260);
   --sidebar-foreground: oklch(0.94 0.005 90);
   --sidebar-primary: oklch(0.94 0.005 90);
@@ -42,6 +86,10 @@
   --surface-raised: oklch(0.17 0.008 260);
   --surface-sunken: oklch(0.15 0.008 260);
   --surface-panel: oklch(0.19 0.008 260);
+  
+  /* RESTORE DEFAULT BEHAVIOR IN DARK MODE */
+  --color-white: #ffffff;
+  --color-black: #000000;
 }
 
 @theme inline {
@@ -199,11 +247,11 @@
   .word-gradient {
     background: linear-gradient(
       45deg,
-      #eca8d6 0%,
+      #2dd4bf 0%,
       #a78bfa 25%,
       #67e8f9 50%,
       #fbbf24 75%,
-      #eca8d6 100%
+      #2dd4bf 100%
     );
     background-size: 300% 300%;
     background-clip: text;

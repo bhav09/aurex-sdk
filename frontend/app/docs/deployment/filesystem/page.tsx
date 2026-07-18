@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Filesystem & Ledger — Aurex SDK",
+  title: "Filesystem & Ledger - Aurex SDK",
   description: "Read-only filesystem fallbacks, AUREX_LEDGER_PATH, and per_process_ledger.",
 };
 
@@ -28,7 +28,7 @@ export default function DocsFilesystemPage() {
       description="When the configured ledger directory is not writable, the SDK falls back to /tmp/.aurex then memory-only storage."
       agentHint="Use for AUREX_LEDGER_PATH, per_process_ledger, storage_mode file vs memory."
       scopeIn={["Fallback chain: configured path → /tmp → memory", "Multi-worker ledger suffix", "AUREX_WORKER_ID"]}
-      scopeOut={["Cloud sync retries — see Cloud Sync Resilience"]}
+      scopeOut={["Cloud sync retries - see Cloud Sync Resilience"]}
     >
       <DualCodeBlock
         pythonCode={pythonReadonly}

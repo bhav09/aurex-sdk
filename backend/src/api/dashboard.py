@@ -1,4 +1,4 @@
-"""Dashboard API endpoints — project-scoped overview, events, SSE."""
+"""Dashboard API endpoints - project-scoped overview, events, SSE."""
 
 from __future__ import annotations
 
@@ -244,7 +244,7 @@ async def realtime_events(
     db: AsyncSession = Depends(get_db),
     ctx: JwtContext = Depends(get_jwt_context),
 ):
-    """SSE stream — polls recent events when Pub/Sub is unavailable."""
+    """SSE stream - polls recent events when Pub/Sub is unavailable."""
 
     async def event_generator() -> AsyncGenerator[str, None]:
         last_id: Optional[str] = None

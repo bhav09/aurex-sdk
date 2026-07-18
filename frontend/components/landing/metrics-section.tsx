@@ -1,45 +1,39 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { FALLBACK_SHOWCASE_MODELS } from "@/lib/showcase-models-fallback";
+import { Sparkles } from "lucide-react";
+
+const TOOLS = [
+  "OpenAI", "Anthropic", "Google Gemini", "LiteLLM",
+  "LangChain", "LlamaIndex", "Vercel AI SDK", "Ollama",
+  "HuggingFace", "AWS Bedrock", "CrewAI", "AutoGen"
+];
 
 const metrics = [
   {
-    value: 100,
-    suffix: "%",
-    prefix: "",
-    label: "Local SDK Ledger",
-    sublabel: "Sync is strictly opt-in and project-scoped",
+    value: 72,
+    suffix: "",
+    prefix: "F1 0.",
+    label: "Loop Detection Accuracy",
+    sublabel: "hybrid structural + semantic",
   },
   {
-    value: 5,
+    value: 4,
     suffix: "",
     prefix: "",
-    label: "Detection Algorithms",
-    sublabel: "identifying cost inefficiencies",
+    label: "Prevention Pillars",
+    sublabel: "Infinite Loop Detection · Prompt Optimization · Cost-Based Routing · Resilience",
   },
   {
-    value: 10,
-    suffix: "+",
-    prefix: "",
-    label: "LLM Providers",
-    sublabel: "supported out of the box",
+    value: 2,
+    suffix: "ms",
+    prefix: "<",
+    label: "Hot-Path Latency",
+    sublabel: "zero network hop overhead",
   },
 ];
 
-function MarqueeModels({ models }: { models: string[] }) {
-  const items = [...models, ...models];
-  return (
-    <>
-      {items.map((model, index) => (
-        <span key={`${model}-${index}`} className="inline-flex items-center gap-8">
-          <span>{model}</span>
-          <span>•</span>
-        </span>
-      ))}
-    </>
-  );
-}
+
 
 function AnimatedNumber({ end, suffix = "", prefix = "" }: { end: number; suffix?: string; prefix?: string }) {
   const [count, setCount] = useState(0);
@@ -246,25 +240,9 @@ function DotGraph({
 export function MetricsSection() {
   const [time, setTime] = useState<Date | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [showcaseModels, setShowcaseModels] = useState<string[]>(FALLBACK_SHOWCASE_MODELS);
   const sectionRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/showcase-models")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled && Array.isArray(data?.models) && data.models.length > 0) {
-          setShowcaseModels(data.models);
-        }
-      })
-      .catch(() => {
-        /* keep fallback list */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+
 
   useEffect(() => {
     setTime(new Date());
@@ -284,83 +262,42 @@ export function MetricsSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative py-32 lg:py-40 overflow-hidden">
+    <section ref={sectionRef} className="relative py-16 lg:py-20 overflow-hidden border-t border-foreground/5">
       <GridBackground />
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header */}
-        <div className="grid lg:grid-cols-12 gap-8 mb-20 lg:mb-32">
-          <div className="lg:col-span-8 lg:col-start-1">
-            <div className="flex items-center gap-4 mb-6">
-              <span className="flex items-center gap-2 px-3 py-1 bg-[#eca8d6]/10 text-[#eca8d6] text-xs font-mono">
-                <span className="w-2 h-2 rounded-full bg-[#eca8d6] animate-pulse" />
-                BETA
-              </span>
-              <span className="text-sm font-mono text-muted-foreground">
-                {time ? `${time.toLocaleTimeString("en-GB")} UTC` : ""}
-              </span>
-            </div>
-
-            <h2 className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.95] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-              }`}>
-              Built for <span className="text-muted-foreground">control.</span>
-            </h2>
-            <p className="mt-6 text-xl text-muted-foreground max-w-2xl">
-              Enforce prompt caching, intercept infinite runaway loops, and govern your model usage in real-time. Privacy is a default: cloud sync is strictly opt-in.
-            </p>
-          </div>
-        </div>
-
-        {/* Metrics grid */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Large metric */}
-          <div className={`lg:col-span-1 bg-foreground/[0.02] border border-foreground/10 p-10 lg:p-14 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-            }`}>
-            <div className="text-4xl md:text-5xl lg:text-6xl font-display tracking-tight mb-4 whitespace-nowrap overflow-hidden">
-              <AnimatedNumber end={metrics[0].value} suffix={metrics[0].suffix} prefix={metrics[0].prefix} />
-            </div>
-            <div className="mb-6">
-              <DotGraph color="white" height={36} freq1={0.28} freq2={0.09} freqT={0.5} speed={0.018} baseline={0.35} amplitude={0.55} />
-            </div>
-            <div className="text-lg text-foreground mb-2">{metrics[0].label}</div>
-            <div className="text-sm text-muted-foreground font-mono">{metrics[0].sublabel}</div>
-          </div>
-
-          {/* Metrics */}
-          {metrics.slice(1).map((metric, index) => (
-            <div
-              key={metric.label}
-              className={`bg-foreground/[0.02] border border-foreground/10 p-8 flex flex-col items-start justify-between gap-6 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-                }`}
-              style={{ transitionDelay: `${(index + 1) * 100}ms` }}
-            >
-              <div className="w-full">
-                <div className="text-sm text-muted-foreground font-mono mb-2">{metric.sublabel}</div>
-                <div className="text-base text-foreground mb-3">{metric.label}</div>
-                <DotGraph
-                  color={index === 0 ? "green" : "white"}
-                  height={24}
-                  freq1={index === 0 ? 0.45 : 0.22}
-                  freq2={index === 0 ? 0.18 : 0.07}
-                  freqT={index === 0 ? 1.1 : 0.4}
-                  speed={index === 0 ? 0.032 : 0.015}
-                  baseline={index === 0 ? 0.4 : 0.25}
-                  amplitude={index === 0 ? 0.45 : 0.6}
-                />
-              </div>
-              <div className="text-3xl md:text-4xl lg:text-5xl font-display tracking-tight w-full">
-                <AnimatedNumber end={metric.value} suffix={metric.suffix} prefix={metric.prefix} />
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Bottom ticker - Sliding marquee */}
-        <div className={`mt-16 pt-8 border-t border-foreground/10 overflow-hidden transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"
-          }`}>
-          <div className="relative h-8 flex items-center">
-            <div className="animate-marquee whitespace-nowrap flex items-center gap-8 text-sm font-mono text-muted-foreground">
-              <MarqueeModels models={showcaseModels} />
+        <div className={`overflow-hidden transition-all duration-1000 ${isVisible ? "opacity-100" : "opacity-0"}`}>
+          <div className="flex flex-col items-center mb-6 text-center">
+            <span className="text-sm text-foreground mb-1">Aurex intercepts calls to all major providers</span>
+            <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-2">
+              <span>0.5–2ms overhead</span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span>12+ providers auto-patched</span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span className="text-emerald-400/80">SHA-256 only - zero prompt egress</span>
+            </span>
+          </div>
+
+          <div className="pt-6 flex flex-col md:flex-row items-stretch gap-6 relative">
+            <div className="flex flex-1 overflow-hidden relative order-2 md:order-1 items-center">
+              <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 hidden md:block" />
+              <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 hidden md:block" />
+
+              <div className="flex gap-12 items-center w-max animate-[marquee_50s_linear_infinite]">
+                {[...TOOLS, ...TOOLS, ...TOOLS].map((tool, i) => (
+                  <div key={`${tool}-${i}`} className="flex items-center gap-2 text-muted-foreground/80 whitespace-nowrap hover:text-foreground transition-colors cursor-default">
+                    <Sparkles className="w-3.5 h-3.5 opacity-40 text-teal-500" />
+                    <span className="font-medium text-sm">{tool}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 z-20 md:pl-6 md:border-l border-border order-1 md:order-2 flex items-center">
+              <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest font-semibold">
+                Works with most tools
+              </span>
             </div>
           </div>
         </div>

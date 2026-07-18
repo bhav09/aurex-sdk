@@ -26,7 +26,7 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
     { rating: 0, label: "Love It!", icon: Heart, color: "text-rose-400 hover:text-rose-300", bg: "bg-rose-500/10 border-rose-500/20", glow: "shadow-rose-500/20" },
     { rating: 1, label: "It's Okay", icon: Smile, color: "text-amber-400 hover:text-amber-300", bg: "bg-amber-500/10 border-amber-500/20", glow: "shadow-amber-500/20" },
     { rating: 2, label: "Not Great", icon: Meh, color: "text-sky-400 hover:text-sky-300", bg: "bg-sky-500/10 border-sky-500/20", glow: "shadow-sky-500/20" },
-    { rating: 3, label: "Hate It", icon: Frown, color: "text-violet-400 hover:text-violet-300", bg: "bg-violet-500/10 border-violet-500/20", glow: "shadow-violet-500/20" },
+    { rating: 3, label: "Hate It", icon: Frown, color: "text-emerald-400 hover:text-emerald-300", bg: "bg-emerald-500/10 border-emerald-500/20", glow: "shadow-emerald-500/20" },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +81,7 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.95, y: 15, opacity: 0 }}
             transition={{ type: "spring", duration: 0.5, bounce: 0.2 }}
-            className="relative w-full max-w-[480px] overflow-hidden rounded-2xl border border-white/10 bg-card/75 backdrop-blur-md p-6 text-foreground shadow-2xl shadow-purple-500/5 noise-overlay"
+            className="relative w-full max-w-[480px] overflow-hidden rounded-2xl border border-white/10 bg-card/75 backdrop-blur-md p-6 text-foreground shadow-2xl shadow-emerald-500/5 noise-overlay"
           >
             {/* Close button */}
             <button
@@ -97,7 +97,7 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
                 <div className="flex flex-col gap-1.5 pr-6">
                   <div className="flex items-center gap-2">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-white/90">
-                      <Sparkles className="h-4 w-4 text-purple-400" />
+                      <Sparkles className="h-4 w-4 text-emerald-400" />
                     </span>
                     <h3 className="font-display text-xl font-medium tracking-tight text-white">
                       Help Us Improve Aurex

@@ -3,20 +3,20 @@
 import { useState, useEffect, useRef } from "react";
 
 const features = [
-  { 
-    title: "TypeScript native", 
+  {
+    title: "TypeScript native",
     description: "Full type safety for agent configs and responses."
   },
-  { 
-    title: "Streaming results", 
+  {
+    title: "Streaming results",
     description: "Watch your agents think and act in real-time."
   },
-  { 
-    title: "Multi-model support", 
+  {
+    title: "Multi-model support",
     description: "OpenAI, Anthropic, Mistral, or bring your own."
   },
-  { 
-    title: "Local debugging", 
+  {
+    title: "Local debugging",
     description: "Test agents locally before deploying to cloud."
   },
 ];
@@ -40,11 +40,10 @@ export function DevelopersSection() {
   return (
     <section id="developers" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
 
-      {/* Image — absolute, bottom-right, behind all content */}
+      {/* Image - absolute, bottom-right, behind all content */}
       <div
-        className={`absolute bottom-0 right-0 w-[55%] h-[85%] pointer-events-none transition-all duration-1000 delay-300 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}
+        className={`absolute bottom-0 right-0 w-[55%] h-[85%] pointer-events-none transition-all duration-1000 delay-300 ${isVisible ? "opacity-100" : "opacity-0"
+          }`}
       >
         <img
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Upscaled%20Image%20%2813%29-OQ2DiR3ElVsUg8kTvTL1kC5A3Q6maM.png"
@@ -60,11 +59,10 @@ export function DevelopersSection() {
 
       {/* All text content sits on top */}
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header — Full width */}
+        {/* Header - Full width */}
         <div
-          className={`mb-16 transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
+          className={`mb-16 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
         >
           <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
             <span className="w-8 h-px bg-foreground/30" />
@@ -77,23 +75,21 @@ export function DevelopersSection() {
           </h2>
         </div>
 
-        {/* Description + Features — left half only */}
+        {/* Description + Features - left half only */}
         <div
-          className={`max-w-[50%] transition-all duration-700 delay-100 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
+          className={`max-w-[50%] transition-all duration-700 delay-100 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
         >
           <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-md">
-            A powerful SDK for building, deploying, and orchestrating AI agents. 
+            A powerful SDK for building, deploying, and orchestrating AI agents.
             Define behaviors in code or natural language.
           </p>
           <div className="grid grid-cols-2 gap-6">
             {features.map((feature, index) => (
               <div
                 key={feature.title}
-                className={`transition-all duration-500 ${
-                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-                }`}
+                className={`transition-all duration-500 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                  }`}
                 style={{ transitionDelay: `${index * 50 + 200}ms` }}
               >
                 <h3 className="font-medium mb-1">{feature.title}</h3>

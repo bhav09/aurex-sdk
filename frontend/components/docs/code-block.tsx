@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { Highlight, themes } from "prism-react-renderer";
 
 export interface CodeBlockProps {
   code: string;
@@ -22,8 +23,15 @@ export function CodeBlock({ code, language, id }: CodeBlockProps) {
     }
   };
 
+  // Convert language to what prism expects, fallback to tsx or markup
+  const lang = language.toLowerCase() === "python" ? "python" 
+               : language.toLowerCase() === "bash" || language.toLowerCase() === "sh" ? "bash"
+               : language.toLowerCase() === "yaml" || language.toLowerCase() === "yml" ? "yaml"
+               : language.toLowerCase() === "json" ? "json"
+               : "typescript";
+
   return (
-    <div className="relative group rounded-xl border border-white/[0.08] bg-surface-sunken overflow-hidden my-4">
+    <div className="relative group rounded-xl border border-white/[0.08] bg-[#282c34] overflow-hidden my-4">
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.05] bg-white/[0.02] text-xs font-mono text-white/40">
         <span>{language.toUpperCase()}</span>
         <button
@@ -33,8 +41,8 @@ export function CodeBlock({ code, language, id }: CodeBlockProps) {
         >
           {copied ? (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400">Copied!</span>
+              <Check className="w-3.5 h-3.5 text-teal-400" />
+              <span className="text-teal-400">Copied!</span>
             </>
           ) : (
             <>
@@ -44,10 +52,20 @@ export function CodeBlock({ code, language, id }: CodeBlockProps) {
           )}
         </button>
       </div>
-      <div className="p-4 overflow-x-auto">
-        <pre className="font-mono text-[13px] text-white/80 leading-relaxed whitespace-pre select-all">
-          {code}
-        </pre>
+      <div className="p-4 overflow-x-auto text-[13px] font-mono select-all">
+        <Highlight theme={themes.oneDark} code={code.trim()} language={lang}>
+          {({ className, style, tokens, getLineProps, getTokenProps }) => (
+            <pre className={`${className} bg-transparent! p-0 m-0 leading-relaxed`} style={{ ...style, backgroundColor: 'transparent' }}>
+              {tokens.map((line, i) => (
+                <div key={i} {...getLineProps({ line })}>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({ token })} />
+                  ))}
+                </div>
+              ))}
+            </pre>
+          )}
+        </Highlight>
       </div>
     </div>
   );

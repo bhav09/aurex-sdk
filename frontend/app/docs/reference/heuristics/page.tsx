@@ -3,8 +3,8 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Heuristics CLI — Aurex SDK",
-  description: "Offline ledger analysis for loops, waste, and context spikes.",
+  title: "Heuristics CLI - Aurex SDK",
+  description: "Analyze your ledger for optimization opportunities - loops, context spikes, and routing improvements.",
 };
 
 const pythonCliCode = `aurex audit --ledger .aurex/ledger.jsonl
@@ -16,16 +16,16 @@ npx aurex ci --mode=block --github-comment`;
 export default function DocsHeuristicsPage() {
   return (
     <DocPageShell
-      title="Offline Heuristics CLI"
-      description="Scan local ledger.jsonl without a database to detect loops, context spikes, and waste drivers."
+      title="Heuristics CLI"
+      description="Scan your local ledger to identify optimization opportunities - loops, context spikes, and routing improvements - without a database."
       agentHint="Use for aurex audit CLI flags: --ledger, --fail-under, --max-waste-usd, --mode."
       scopeIn={["Python aurex audit", "Detected heuristic categories"]}
-      scopeOut={["CI pipeline integration — see CI Policy Gate"]}
+      scopeOut={["CI pipeline integration - see CI Policy Gate"]}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-white/50">
         {[
           "System prompt duplication",
-          "Agent runaway loops",
+          "Infinite loop patterns",
           "Expensive model misuse",
           "Context expansion ratios",
           "Semantic loop detection",
