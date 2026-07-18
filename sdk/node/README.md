@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/heyaurex/aurex-sdk/main/frontend/public/heyaurex_logo/1.png" alt="Aurex Logo" width="160" />
+  <img src="https://raw.githubusercontent.com/bhav09/aurex-sdk/main/frontend/public/heyaurex_logo/1.png" alt="Aurex Logo" width="160" />
   <h1>Aurex Node.js SDK</h1>
   <p><b>The In-Process AI Runtime Layer for Production Agent Infrastructure</b></p>
 </div>
@@ -122,14 +122,14 @@ npx aurex ci --mode=block
 
 For local development and self-hosted deployments, telemetry flushes asynchronously to an optional Aurex backend and analytics dashboard.
 
-1. **Backend Server**: Runs on FastAPI at `http://localhost:8000`.
-2. **Analytics Dashboard**: Next.js UI running at `http://localhost:3000`.
+1. **Backend Server**: FastAPI backend service at `https://heyaurex.com/api/v1`.
+2. **Analytics Dashboard**: Next.js UI running at `https://heyaurex.com`.
 
-To run the local control plane during development, clone the repository and refer to the full deployment documentation at `http://localhost:3000/docs`.
+To run the local control plane during development, clone the repository and refer to the full deployment documentation at `https://heyaurex.com/docs`.
 
 ---
 
 ## License and Documentation
 
-* **Interactive Documentation**: `http://localhost:3000/docs`
-* **GitHub Repository**: `https://github.com/heyaurex/aurex-sdk`
+* **Interactive Documentation**: `https://heyaurex.com/docs`
+* **GitHub Repository**: `https://github.com/bhav09/aurex-sdk`
