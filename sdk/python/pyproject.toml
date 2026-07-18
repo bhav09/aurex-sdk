@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aurex-sdk"
-version = "0.4.1"
+version = "0.4.2"
 description = "Aurex Python SDK - In-process AI runtime layer for AI applications and agents"
 readme = "README.md"
 requires-python = ">=3.10"

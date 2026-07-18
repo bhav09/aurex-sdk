@@ -109,7 +109,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-The interactive API documentation is available at `http://localhost:8000/docs`.
+The interactive API documentation is available at `https://heyaurex.com/docs`.
 
 ### 2. Frontend Analytics Dashboard
 
@@ -121,7 +121,7 @@ npm install
 npm run dev
 ```
 
-Access the dashboard at `http://localhost:3000`.
+Access the dashboard at `https://heyaurex.com`.
 
 ---
 
@@ -294,7 +294,7 @@ Global SDK behavior can be configured through standard environment variables:
 | :--- | :--- | :--- | :--- |
 | `AUREX_ENABLED` | Integer (`0`/`1`) | `1` | Globally activates or deactivates Aurex runtime logic. |
 | `AUREX_API_KEY` | String | `None` | Project API key for authentication and cloud synchronization. |
-| `AUREX_BASE_URL` | String | `http://localhost:8000/api/v1` | Endpoint URL for the Aurex backend service. |
+| `AUREX_BASE_URL` | String | `https://heyaurex.com/api/v1` | Endpoint URL for the Aurex backend service. |
 | `AUREX_WORKFLOW_ID` | String | `default` | Logical grouping tag for cost allocation and analytics. |
 | `AUREX_SYNC_PROMPT_HASHES` | Integer (`0`/`1`) | `0` | Opts into hashing and transmitting prompt signatures for telemetry. |
 | `AUREX_PRICING_PATH` | String | `None` | File path to custom model pricing configuration overrides. |
@@ -336,7 +336,7 @@ npx aurex ci --mode=block
 
 ## Technical Documentation and Resources
 
-* **Web Documentation**: [http://localhost:3000/docs](http://localhost:3000/docs)
+* **Web Documentation**: [https://heyaurex.com/docss](https://heyaurex.com/docs)
 * **Python SDK Module**: `sdk/python/`
 * **Node.js SDK Module**: `sdk/node/`
-* **API Specifications**: `http://localhost:8000/docs`
+* **API Specifications**: `https://heyaurex.com/docs`
