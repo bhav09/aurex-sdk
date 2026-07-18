@@ -277,7 +277,7 @@ export default function SettingsPage() {
 
     const projectNameMapper = useMemo(() => {
         const map = new Map(projects.map((p) => [p.id, p.name]));
-        return (id: string | null) => (id ? map.get(id) || id.slice(0, 8) : "—");
+        return (id: string | null) => (id ? map.get(id) || id.slice(0, 8) : "-");
     }, [projects]);
 
     return (
@@ -300,11 +300,10 @@ export default function SettingsPage() {
                                 setError(null);
                                 setSuccessMsg(null);
                             }}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider rounded-xl transition-all duration-300 ${
-                                activeSection === sec.id
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider rounded-xl transition-all duration-300 ${activeSection === sec.id
                                     ? "bg-white/[0.05] text-white"
                                     : "text-white/40 hover:text-white/70 hover:bg-white/[0.01]"
-                            }`}
+                                }`}
                         >
                             <Icon className="w-4 h-4 shrink-0" />
                             {sec.label}
@@ -611,7 +610,7 @@ export default function SettingsPage() {
                                                         {k.prefix}…{k.last4 || "----"}
                                                     </TableCell>
                                                     <TableCell className="text-xs text-teal-300 font-mono">{projectNameMapper(k.project_id)}</TableCell>
-                                                    <TableCell className="text-xs font-mono">{k.environment || "—"}</TableCell>
+                                                    <TableCell className="text-xs font-mono">{k.environment || "-"}</TableCell>
                                                     <TableCell className="text-xs text-white/40">
                                                         {new Date(k.created_at).toLocaleDateString()}
                                                     </TableCell>

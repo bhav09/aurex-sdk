@@ -70,9 +70,9 @@ const ledger = await http("POST", "/ledger/events", ledgerBody);
 if (ledger.status === 200 && ledger.json?.accepted >= 1) {
   ok("POST /ledger/events", `accepted=${ledger.json.accepted}`);
 } else if (ledger.status === 400 && String(ledger.json?.detail || "").includes("project")) {
-  fail("POST /ledger/events", "key not bound to project — use Phase 1 key from /app/api-keys");
+  fail("POST /ledger/events", "key not bound to project - use Phase 1 key from /app/api-keys");
 } else if (ledger.status === 401) {
-  fail("POST /ledger/events", "unauthorized — invalid or revoked key");
+  fail("POST /ledger/events", "unauthorized - invalid or revoked key");
 } else {
   fail("POST /ledger/events", `${ledger.status} ${JSON.stringify(ledger.json)}`);
 }

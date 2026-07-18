@@ -1,38 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RotateCcw, BrainCircuit, ArrowDownUp, ShieldAlert } from "lucide-react";
+import { RotateCcw, BrainCircuit, ShieldAlert } from "lucide-react";
 
 const pillars = [
   {
     number: "01",
-    title: "Infinite Loop Detection",
-    description: "Multi-layered detection matching exact tool calls, context window explosions, and semantic fuzzy repetitions.",
-    stats: { value: "F1: 0.72", label: "vs 0.08 for naive step limits" },
+    title: "Behavioral Awareness",
+    description: "Understands the shape of what your agents are doing - matching tool calls, context growth, and semantic patterns across a run. It's how Aurex tells a genuinely new step from a repeated one.",
+    stats: { value: "F1: 0.72", label: "hybrid structural + semantic detection" },
     icon: RotateCcw,
     docsHref: "/docs/reference#infinite-loop-detection",
   },
   {
     number: "02",
-    title: "Prompt Optimization",
-    description: "Flags prompt drift, chain-of-thought inflation, and caching opportunities without reading raw prompt text.",
-    stats: { value: "$60/day", label: "flagged in a typical RAG pipeline" },
+    title: "Adaptive Routing",
+    description: "Every call is scored for complexity and routed to the model that fits it - a frontier model when the task needs it, a smaller one when it doesn't. Compression and caching happen the same way, automatically.",
+    stats: { value: "98%", label: "cost recovered without manual prompt review" },
     icon: BrainCircuit,
-    docsHref: "/docs/reference#prompt-optimization",
-  },
-  {
-    number: "03",
-    title: "Cost-Based Routing",
-    description: "Downgrade simple queries to cheaper models dynamically using token credit scores and query complexity.",
-    stats: { value: "98%", label: "cost reduction (Stanford FrugalGPT)" },
-    icon: ArrowDownUp,
     docsHref: "/docs/reference#cost-based-routing",
   },
   {
-    number: "04",
-    title: "Resilience & Fallbacks",
-    description: "Circuit breakers for provider outages. Automatically falls back to secondary providers if latency spikes.",
-    stats: { value: "0ms", label: "latency penalty vs external gateways" },
+    number: "03",
+    title: "Provider Continuity",
+    description: "Aurex knows the health of every provider in your stack in real time and reroutes around a bad one without you writing failover logic.",
+    stats: { value: "0ms", label: "added latency vs routing through an external gateway" },
     icon: ShieldAlert,
     docsHref: "/docs/reference#resilience-fallbacks",
   },
@@ -175,21 +167,21 @@ export function FeaturesSection() {
             <div className="lg:col-span-7">
               <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4 sm:mb-6">
                 <span className="w-12 h-px bg-foreground/30" />
-                Four Pillars
+                Three Capabilities
               </span>
               <h2
                 className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                   }`}
               >
-                Prevention,
+                One layer.
                 <br />
-                <span className="text-muted-foreground">not observability.</span>
+                <span className="text-muted-foreground">It understands what your agents are doing.</span>
               </h2>
             </div>
             <div className="lg:col-span-5 lg:pb-4">
               <p className={`text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 }`}>
-                Four in-process capabilities that detect and stop token waste before a single wasted token is billed.
+                Most infrastructure is passive - it logs, reports, waits for you to look at a dashboard. Aurex is active. It sits in the request path itself and makes a decision on every call before it goes out.
               </p>
             </div>
           </div>
@@ -197,7 +189,7 @@ export function FeaturesSection() {
 
         {/* Four-pillar grid */}
         <div className="relative">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {pillars.map((pillar, index) => (
               <div
                 key={pillar.number}

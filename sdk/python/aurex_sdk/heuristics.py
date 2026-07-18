@@ -473,7 +473,7 @@ class LocalHeuristicsEngine:
                 })
 
     def detect_prompt_drift(self):
-        """Phase 1 — PromptIQ Signal A: Prompt length drift tracking.
+        """Phase 1 - PromptIQ Signal A: Prompt length drift tracking.
         
         Track system prompt token count as a time series keyed by workflow_id.
         Flag when any workflow's median system prompt token count has grown more
@@ -548,7 +548,7 @@ class LocalHeuristicsEngine:
                 })
 
     def detect_cot_inflation(self):
-        """Phase 1 — PromptIQ Signal B: Chain-of-thought token inflation.
+        """Phase 1 - PromptIQ Signal B: Chain-of-thought token inflation.
         
         Detect when a response's reasoning tokens represent >40% of completion
         cost, suggesting the caller may not need extended thinking mode.
@@ -595,7 +595,7 @@ class LocalHeuristicsEngine:
             })
 
     def detect_cache_opportunity(self):
-        """Phase 1 — PromptIQ Signal C: Prompt caching opportunity detection.
+        """Phase 1 - PromptIQ Signal C: Prompt caching opportunity detection.
         
         Flag calls where the system prompt is identical across sessions (matched
         by hash) and the provider supports prompt caching but no cache header

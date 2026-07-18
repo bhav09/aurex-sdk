@@ -33,19 +33,19 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { 
-  Activity, 
-  DollarSign, 
-  CheckCircle, 
-  AlertCircle, 
-  RefreshCw, 
-  Search, 
-  Clock, 
-  Zap, 
-  Cpu, 
-  Layers, 
-  TrendingDown, 
-  ArrowUpRight, 
+import {
+  Activity,
+  DollarSign,
+  CheckCircle,
+  AlertCircle,
+  RefreshCw,
+  Search,
+  Clock,
+  Zap,
+  Cpu,
+  Layers,
+  TrendingDown,
+  ArrowUpRight,
   FileText,
   X,
   Sparkles,
@@ -86,12 +86,12 @@ interface SavingsItem {
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Array<{ id: string; name: string; environment: string }>>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
-  
+
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [events, setEvents] = useState<LLMEvent[]>([]);
   const [savings, setSavings] = useState<SavingsItem[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "traces" | "workflows" | "models">("overview");
   const [selectedEvent, setSelectedEvent] = useState<LLMEvent | null>(null);
@@ -194,10 +194,10 @@ export default function DashboardPage() {
   // Timeline Data for Charting
   const timelineData = useMemo(() => {
     if (!events.length) return [];
-    
+
     // Group by day
     const dailyMap: Record<string, { date: string; totalTokens: number; cachedTokens: number; cost: number; calls: number }> = {};
-    
+
     events.forEach(e => {
       const dateStr = new Date(e.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
       const cached = Number(e.extra_metadata?.cache_read_tokens || 0);
@@ -227,7 +227,7 @@ export default function DashboardPage() {
   // Filtered Events for Traces tab
   const filteredEvents = useMemo(() => {
     if (!searchQuery) return events;
-    return events.filter(e => 
+    return events.filter(e =>
       e.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.workflow_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.provider?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -297,11 +297,10 @@ export default function DashboardPage() {
               setActiveTab(tab.id as any);
               setSelectedEvent(null);
             }}
-            className={`px-5 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all duration-300 ${
-              activeTab === tab.id
+            className={`px-5 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all duration-300 ${activeTab === tab.id
                 ? "border-white text-white bg-white/[0.02]"
                 : "border-transparent text-white/40 hover:text-white/70"
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -315,10 +314,10 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="relative flex gap-6 items-start">
-          
+
           {/* Main Content Area */}
           <div className="flex-1 space-y-6 min-w-0">
-            
+
             {activeTab === "overview" && (
               <>
                 {/* KPI Cards Grid */}
@@ -388,8 +387,8 @@ export default function DashboardPage() {
                         {totalCachedTokens ? totalCachedTokens.toLocaleString() : "0"}
                       </div>
                       <p className="text-[10px] text-teal-400/60 mt-1">
-                        {stats?.total_tokens && totalCachedTokens 
-                          ? `${((totalCachedTokens / stats.total_tokens) * 100).toFixed(1)}% cache hit rate` 
+                        {stats?.total_tokens && totalCachedTokens
+                          ? `${((totalCachedTokens / stats.total_tokens) * 100).toFixed(1)}% cache hit rate`
                           : "0.0% hit rate"}
                       </p>
                     </CardContent>
@@ -427,17 +426,17 @@ export default function DashboardPage() {
                           <AreaChart data={timelineData}>
                             <defs>
                               <linearGradient id="totalTokensColor" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.1}/>
-                                <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0}/>
+                                <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.1} />
+                                <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0} />
                               </linearGradient>
                               <linearGradient id="cachedTokensColor" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#818CF8" stopOpacity={0.2}/>
-                                <stop offset="95%" stopColor="#818CF8" stopOpacity={0}/>
+                                <stop offset="5%" stopColor="#818CF8" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#818CF8" stopOpacity={0} />
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#2e2e34" />
                             <XAxis dataKey="date" stroke="#666" fontSize={10} />
-                            <YAxis stroke="#666" fontSize={10} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                            <YAxis stroke="#666" fontSize={10} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
                             <Tooltip contentStyle={{ backgroundColor: "surface", borderColor: "#404048", color: "#FFF" }} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
                             <Area type="monotone" name="Total Volume" dataKey="totalTokens" stroke="#FFFFFF" fillOpacity={1} fill="url(#totalTokensColor)" strokeWidth={1.5} />
@@ -577,9 +576,8 @@ export default function DashboardPage() {
                               <TableRow
                                 key={e.id}
                                 onClick={() => setSelectedEvent(e)}
-                                className={`border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-all ${
-                                  selectedEvent?.id === e.id ? "bg-white/[0.03]" : ""
-                                }`}
+                                className={`border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-all ${selectedEvent?.id === e.id ? "bg-white/[0.03]" : ""
+                                  }`}
                               >
                                 <TableCell className="py-3 font-mono text-[10px] text-white/40">
                                   {new Date(e.timestamp).toLocaleTimeString()}
@@ -588,7 +586,7 @@ export default function DashboardPage() {
                                   {e.model}
                                 </TableCell>
                                 <TableCell className="py-3 font-mono text-[10px] text-teal-300">
-                                  {e.workflow_id || "—"}
+                                  {e.workflow_id || "-"}
                                 </TableCell>
                                 <TableCell className="py-3 text-xs">
                                   <div className="flex items-center gap-1.5">
@@ -610,8 +608,8 @@ export default function DashboardPage() {
                                       e.outcome === "success"
                                         ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 text-[10px]"
                                         : e.outcome === "failure"
-                                        ? "bg-rose-500/10 border-rose-500/20 text-rose-400 text-[10px]"
-                                        : "bg-zinc-500/10 border-zinc-500/20 text-zinc-400 text-[10px]"
+                                          ? "bg-rose-500/10 border-rose-500/20 text-rose-400 text-[10px]"
+                                          : "bg-zinc-500/10 border-zinc-500/20 text-zinc-400 text-[10px]"
                                     }
                                   >
                                     {e.outcome || "success"}
@@ -656,7 +654,7 @@ export default function DashboardPage() {
                             <TableCell className="text-xs font-mono">${w.cost_7d.toFixed(2)}</TableCell>
                             <TableCell className="text-xs">{w.success_count}</TableCell>
                             <TableCell className="text-xs font-mono text-white/70">
-                              {w.cost_per_success != null ? `$${w.cost_per_success.toFixed(4)}` : "—"}
+                              {w.cost_per_success != null ? `$${w.cost_per_success.toFixed(4)}` : "-"}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -728,7 +726,7 @@ export default function DashboardPage() {
                 </Button>
               </CardHeader>
               <CardContent className="pt-4 space-y-5 text-xs">
-                
+
                 {/* Metrics */}
                 <div className="grid grid-cols-2 gap-3 p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl font-mono">
                   <div>

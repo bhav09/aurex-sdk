@@ -73,7 +73,7 @@ const NAV_GROUPS = [
 function PromptDiffPanel({ event, issue }: { event: LLMEvent; issue: Issue | undefined }) {
     const current =
         event.prompt?.trim() ||
-        "(No prompt text in this export—many provider CSVs omit message bodies.)";
+        "(No prompt text in this export-many provider CSVs omit message bodies.)";
     const optimized = issue
         ? `${issue.cta ? `${issue.cta}\n\n` : ""}${issue.one_line_summary}`
         : "Route this workload to a smaller model when token count is low; cache static system text; dedupe repeated prefixes.";
@@ -629,7 +629,7 @@ export default function AuditPage() {
             await new Promise(r => setTimeout(r, 500));
             setData(summary);
             setPendingFile(null); setPendingUserInfo(null); setAuthRequired(false); setAuthRequiredMessage(null);
-            
+
             // Show the feedback dialog with a 3-minute delay (180,000 ms) to give the user time to inspect the dashboard
             feedbackTimeoutRef.current = setTimeout(() => {
                 setFeedbackLabel("Analysis completed successfully!");
@@ -671,8 +671,8 @@ export default function AuditPage() {
     const loadEvents = async (workflowFilter?: string) => {
         setLoadingEvents(true);
         try {
-            const fetched = await aurexAPI.getEvents({ 
-                limit: 1000, 
+            const fetched = await aurexAPI.getEvents({
+                limit: 1000,
                 workflow_id: workflowFilter,
                 session_id: sessionId || undefined
             });
@@ -745,7 +745,7 @@ export default function AuditPage() {
                                     <p className="text-sm font-semibold text-red-300">Failed to load report</p>
                                     <p className="text-xs text-red-400/80 font-mono mt-1 max-h-32 overflow-y-auto pr-1">{error}</p>
                                 </div>
-                                <Button 
+                                <Button
                                     onClick={() => router.push('/app/profile')}
                                     className="bg-white hover:bg-white/90 text-black text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
                                 >
@@ -833,7 +833,7 @@ export default function AuditPage() {
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground border-t border-border pt-4">
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        <span>Runs via your API — nothing leaves your machine in dev.</span>
+                        <span>Runs via your API - nothing leaves your machine in dev.</span>
                     </div>
                 </div>
             </div>
@@ -846,7 +846,7 @@ export default function AuditPage() {
 
     if (isGated) {
         return (
-            <ScoreGateStep 
+            <ScoreGateStep
                 data={data}
                 onUnlock={(email, company) => {
                     const userInfo = {
@@ -902,8 +902,7 @@ export default function AuditPage() {
                                                 key={item.id}
                                                 type="button"
                                                 onClick={() => setActiveTab(item.id)}
-                                                className={`mx-3 flex items-center px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-[13px] group ${
-                                                    isActive
+                                                className={`mx-3 flex items-center px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-[13px] group ${isActive
                                                         ? "bg-emerald-500/15 text-emerald-50 border border-emerald-500/20 shadow-[0_0_15px_-3px_rgba(16,185,129,0.1)]"
                                                         : "text-muted-foreground border border-transparent hover:text-white hover:bg-white/[0.04]"
                                                     }`}

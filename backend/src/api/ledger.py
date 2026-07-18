@@ -1,4 +1,4 @@
-"""POST /api/v1/ledger/events — API-key authenticated ledger ingest.
+"""POST /api/v1/ledger/events - API-key authenticated ledger ingest.
 
 Project is derived from the API key, never from the request body. Requires
 the key to carry the `ledger:write` scope (legacy keys without `scopes`

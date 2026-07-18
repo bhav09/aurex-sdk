@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Resilience Fallbacks — Aurex SDK",
+  title: "Resilience Fallbacks - Aurex SDK",
   description: "register_fallback and registerFallback for customer-owned provider clients.",
 };
 
@@ -57,7 +57,7 @@ export default function DocsFallbacksPage() {
       description="Register named callables that invoke your own provider clients and API keys. Aurex does not proxy LLM traffic."
       agentHint="Use for register_fallback / registerFallback, fallbacks config chain, idempotency modes."
       scopeIn={["register_fallback API", "fallbacks config name/after", "idempotency auto | require_key | off"]}
-      scopeOut={["Classification kinds — see Classification", "Dashboard metrics — see Loss Accounting"]}
+      scopeOut={["Classification kinds - see Classification", "Dashboard metrics - see Loss Accounting"]}
     >
       <DualCodeBlock
         pythonCode={pythonFallback}
@@ -68,7 +68,7 @@ export default function DocsFallbacksPage() {
 
       <ul className="space-y-2 text-sm text-white/50 list-disc list-inside">
         <li>
-          <code className="text-teal-400">idempotency: require_key</code> — skips retry/fallback without a stable
+          <code className="text-teal-400">idempotency: require_key</code> - skips retry/fallback without a stable
           idempotency key (safe for non-idempotent tools).
         </li>
         <li>

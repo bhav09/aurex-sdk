@@ -3,7 +3,7 @@ Scrape provider-official pricing pages and refresh backend/data/pricing/<provide
 
 Strategy: each provider's pricing page is loaded once, parsed by a provider-specific
 function, and merged into the existing JSON catalog (preserving entries the page
-doesn't list — provider pages rarely show every model). The merge writes a flat,
+doesn't list - provider pages rarely show every model). The merge writes a flat,
 diff-friendly JSON file with `source_url` and `scraped_at` set to the live values.
 
 Why merge instead of replace? Provider pages routinely de-list older snapshots
@@ -62,7 +62,7 @@ def _fetch(url: str, timeout: float = 30.0) -> str:
 # ─── Provider-specific parsers ──────────────────────────────────────────────
 # Each parser returns a list of partial model entries. Keys present override
 # the existing catalog; missing keys preserve whatever the catalog already had.
-# Parsers are intentionally tolerant — provider HTML changes often.
+# Parsers are intentionally tolerant - provider HTML changes often.
 
 
 PRICE_RX = re.compile(r"\$\s*([0-9]+(?:\.[0-9]+)?)")
@@ -249,7 +249,7 @@ def refresh_provider(name: str) -> dict:
     try:
         html = _fetch(cfg["url"])
     except Exception as e:
-        print(f"[{name}] WARN fetch failed: {e} — keeping existing catalog")
+        print(f"[{name}] WARN fetch failed: {e} - keeping existing catalog")
         return {"added": 0, "updated": 0, "ok": False}
 
     partials = cfg["parser"](html)

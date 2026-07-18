@@ -3,8 +3,8 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Manual Integration — Aurex SDK",
-  description: "Initialize the Aurex singleton, patch LLM clients, register pricing, and flush telemetry.",
+  title: "Integration - Aurex SDK",
+  description: "Initialize the Aurex singleton, patch LLM clients, and manage the runtime lifecycle.",
 };
 
 const pythonManualCode = `from aurex_sdk import AurexAuditor, AurexConfig
@@ -71,7 +71,7 @@ export default function DocsIntegrationPage() {
       description="Initialize the auditor singleton, patch clients or log events manually, and flush before shutdown."
       agentHint="Use when wiring AurexAuditor.getInstance / AurexAuditor(), patchAll, logEvent, flush, or shutdown."
       scopeIn={["Singleton initialization", "patch_all / patchOpenAI", "Manual log_event", "Pricing registration", "flush / flushAndWait"]}
-      scopeOut={["Full AurexConfig field list — see AurexConfig", "wrap() — see Context Wrappers"]}
+      scopeOut={["Full AurexConfig field list - see AurexConfig", "wrap() - see Context Wrappers"]}
     >
       <h2 className="text-lg font-semibold text-white">Initialize and log</h2>
       <DualCodeBlock

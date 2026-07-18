@@ -1,4 +1,4 @@
-# Aurex — LLM & Agent Reference
+# Aurex - LLM & Agent Reference
 
 > Local-first LLM cost tracking, budget guards, provider-call resilience, and zero-PII telemetry sync.
 
@@ -49,35 +49,35 @@ Paths are relative to the site origin (e.g. `https://your-host/docs/installation
 
 Synced manually with `frontend/components/docs/docs-nav.ts`.
 
-- `/docs` — Overview
-- `/docs/installation` — Installation
-- `/docs/installation/env-vars` — Environment variables
-- `/docs/deployment` — Cloud deployment hub
-- `/docs/deployment/serverless-flush` — Serverless flush
-- `/docs/deployment/filesystem` — Filesystem & ledger
-- `/docs/deployment/cloud-sync` — Cloud sync resilience
-- `/docs/deployment/rate-limits` — Backend rate limits
-- `/docs/harness` — Harness hub
-- `/docs/harness/decision-matrix` — Harness decision matrix
-- `/docs/reference` — API reference hub
-- `/docs/reference/autohook` — Auto-hook
-- `/docs/reference/integration` — Manual integration
-- `/docs/reference/config` — AurexConfig
-- `/docs/reference/budget-guard` — BudgetGuard
-- `/docs/reference/providers` — Supported providers
-- `/docs/reference/guards` — Real-time guards
-- `/docs/reference/wrap` — wrap()
-- `/docs/reference/outcomes` — Outcomes
-- `/docs/reference/health` — Health & recovery
-- `/docs/reference/heuristics` — Heuristics CLI
-- `/docs/reference/ci` — CI policy gate
-- `/docs/reliability` — Reliability hub
-- `/docs/reliability/overview` — Reliability overview
-- `/docs/reliability/policy` — ResiliencePolicy
-- `/docs/reliability/observe-enforce` — Observe vs enforce
-- `/docs/reliability/fallbacks` — Fallbacks
-- `/docs/reliability/classification` — Classification
-- `/docs/reliability/accounting` — Loss accounting
+- `/docs` - Overview
+- `/docs/installation` - Installation
+- `/docs/installation/env-vars` - Environment variables
+- `/docs/deployment` - Cloud deployment hub
+- `/docs/deployment/serverless-flush` - Serverless flush
+- `/docs/deployment/filesystem` - Filesystem & ledger
+- `/docs/deployment/cloud-sync` - Cloud sync resilience
+- `/docs/deployment/rate-limits` - Backend rate limits
+- `/docs/harness` - Harness hub
+- `/docs/harness/decision-matrix` - Harness decision matrix
+- `/docs/reference` - API reference hub
+- `/docs/reference/autohook` - Auto-hook
+- `/docs/reference/integration` - Manual integration
+- `/docs/reference/config` - AurexConfig
+- `/docs/reference/budget-guard` - BudgetGuard
+- `/docs/reference/providers` - Supported providers
+- `/docs/reference/guards` - Real-time guards
+- `/docs/reference/wrap` - wrap()
+- `/docs/reference/outcomes` - Outcomes
+- `/docs/reference/health` - Health & recovery
+- `/docs/reference/heuristics` - Heuristics CLI
+- `/docs/reference/ci` - CI policy gate
+- `/docs/reliability` - Reliability hub
+- `/docs/reliability/overview` - Reliability overview
+- `/docs/reliability/policy` - ResiliencePolicy
+- `/docs/reliability/observe-enforce` - Observe vs enforce
+- `/docs/reliability/fallbacks` - Fallbacks
+- `/docs/reliability/classification` - Classification
+- `/docs/reliability/accounting` - Loss accounting
 
 ---
 
@@ -97,11 +97,11 @@ Config details: see `/docs/reference/config`. Resilience: see `/docs/reliability
 
 ## Typed errors
 
-- `AurexBudgetExceeded` — budget guard `on_budget_exceeded: "throw"`
-- `AurexBlocked` — guard blocked the call
-- `AurexConfigError` — invalid configuration
-- `AurexRecovered` — enforce mode recovered via retry/fallback (carries recovery metadata)
-- `AurexResilienceExhausted` — enforce mode exceeded attempts or `max_extra_cost_usd`
+- `AurexBudgetExceeded` - budget guard `on_budget_exceeded: "throw"`
+- `AurexBlocked` - guard blocked the call
+- `AurexConfigError` - invalid configuration
+- `AurexRecovered` - enforce mode recovered via retry/fallback (carries recovery metadata)
+- `AurexResilienceExhausted` - enforce mode exceeded attempts or `max_extra_cost_usd`
 
 ---
 
@@ -129,9 +129,9 @@ Details: `/docs/reference/heuristics`, `/docs/reference/ci`
 ## Agent integration tips
 
 1. Read `/llms.txt` first, then fetch **one** URL from the routing table.
-2. Do not scroll monolithic pages — each topic has its own route.
+2. Do not scroll monolithic pages - each topic has its own route.
 3. In tests, set `per_process_ledger=False` / `perProcessLedger: false` when asserting ledger paths.
-4. Do not patch and wrap the same call path — check `patch_status` in health output.
+4. Do not patch and wrap the same call path - check `patch_status` in health output.
 5. For serverless, call `flush()` / `await flushAndWait()` before handler return.
-6. `resilience.enabled` defaults to **false** — opt in explicitly.
+6. `resilience.enabled` defaults to **false** - opt in explicitly.
 7. Distinguish **cloud sync resilience** (`/docs/deployment/cloud-sync`) from **provider resilience** (`/docs/reliability/*`).

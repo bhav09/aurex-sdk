@@ -2,7 +2,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Environment Variables — Aurex SDK",
+  title: "Environment Variables - Aurex SDK",
   description: "AUREX_* environment variables for API keys, ledger paths, and worker IDs.",
 };
 
@@ -13,7 +13,7 @@ export default function DocsEnvVarsPage() {
       description="Canonical reference for AUREX_* variables. Prefer this page over duplicated env lists elsewhere."
       agentHint="Use for AUREX_API_KEY, AUREX_BASE_URL, AUREX_LEDGER_PATH, AUREX_WORKER_ID, AUREX_ENABLED."
       scopeIn={["All AUREX_* variables", "Serverless /tmp ledger override"]}
-      scopeOut={["Full AurexConfig table — see AurexConfig page"]}
+      scopeOut={["Full AurexConfig table - see AurexConfig page"]}
     >
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
         <table className="w-full text-sm text-white/60 text-left border-collapse">

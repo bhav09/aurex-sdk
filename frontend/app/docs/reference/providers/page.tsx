@@ -2,7 +2,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Supported Providers — Aurex SDK",
+  title: "Supported Providers - Aurex SDK",
   description: "LLM provider auto-patch coverage for Python and Node.js SDKs.",
 };
 
@@ -13,7 +13,7 @@ export default function DocsProvidersPage() {
       description="Features intercepted by SDK auto-patching and install-hook."
       agentHint="Use when choosing patch_openai vs patch_litellm or checking Google Gemini Python-only support."
       scopeIn={["Provider patch matrix", "patch_* method names"]}
-      scopeOut={["Manual log_event — see Manual Integration", "Resilience fallbacks — customer-owned clients"]}
+      scopeOut={["Manual log_event - see Manual Integration", "Resilience fallbacks - customer-owned clients"]}
     >
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
         <table className="w-full text-sm text-white/60 text-left border-collapse">

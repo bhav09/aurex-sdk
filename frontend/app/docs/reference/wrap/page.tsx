@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "wrap() Context — Aurex SDK",
+  title: "wrap() Context - Aurex SDK",
   description: "Request-scoped budget overrides and metadata via wrap() and awrap().",
 };
 
@@ -37,7 +37,7 @@ export default function DocsWrapPage() {
       description="Override budget guards, downgrade maps, and workflow metadata per call using contextvars (Python) or AsyncLocalStorage (Node)."
       agentHint="Use for multi-tenant wrap(), per-request budget_guard overrides, and avoiding global config mutation."
       scopeIn={["wrap() / awrap()", "Per-request budget_guard", "downgrade_map overrides"]}
-      scopeOut={["patch_all double-counting — see Harness Matrix", "Resilience retry — see Reliability"]}
+      scopeOut={["patch_all double-counting - see Harness Matrix", "Resilience retry - see Reliability"]}
     >
       <DualCodeBlock
         pythonCode={pythonWrapCode}

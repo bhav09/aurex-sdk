@@ -3,8 +3,8 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Real-Time Guards — Aurex SDK",
-  description: "pre_call_check decision engine for downgrade, compress, and block actions.",
+  title: "Runtime Guards - Aurex SDK",
+  description: "Evaluate each call before it's sent - route, compress, or block based on your policies.",
 };
 
 const pythonGuardsCode = `from aurex_sdk import AurexAuditor, AurexDecision
@@ -37,11 +37,11 @@ if (decision.action === "block") {
 export default function DocsGuardsPage() {
   return (
     <DocPageShell
-      title="Real-Time Guards"
-      description="Evaluate calls against cost efficiency and runaway policies locally. Returns an AurexDecision without network I/O."
+      title="Runtime Guards"
+      description="Evaluate each call before it's sent. Returns a routing decision - proceed, route to a different model, compress context, or block - without any network I/O."
       agentHint="Use for pre_call_check / preCallCheck, proceed/downgrade/compress/block actions."
       scopeIn={["pre_call_check API", "Decision actions", "auditor.ignore()"]}
-      scopeOut={["BudgetGuard config table — see BudgetGuard", "wrap() — see Context Wrappers"]}
+      scopeOut={["BudgetGuard config table - see BudgetGuard", "wrap() - see Context Wrappers"]}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
         {[

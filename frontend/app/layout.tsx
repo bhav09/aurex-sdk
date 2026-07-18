@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Aurex — Token Waste Prevention Platform',
+  title: 'Aurex - Token Waste Prevention Platform',
   description: 'Stop AI token waste before it fires. In-process SDK that detects loops, compresses prompts, routes to cheaper models, and fails over between providers.',
   generator: 'v0.app',
 }

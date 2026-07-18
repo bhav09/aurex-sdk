@@ -5,38 +5,38 @@ import { CodeBlock } from "@/components/ui/code-block";
 export const metadata = {
   title: "Aurex SDK Documentation",
   description:
-    "Token waste prevention SDK. Install, auto-patch all providers, and start preventing wasted tokens in under two minutes.",
+    "Runtime intelligence for AI agents. Install, auto-patch all providers, and start routing your first request in under two minutes.",
 };
 
 const cards = [
   {
     href: "/docs/installation",
     title: "Installation & Quick Start",
-    description: "Install the Python or Node SDK, configure API keys, and log your first event.",
+    description: "Install the Python or Node SDK and start routing your first request in under two minutes.",
     icon: Cpu,
   },
   {
     href: "/docs/deployment",
-    title: "Cloud Deployment",
-    description: "Serverless flush, filesystem fallbacks, cloud sync resilience, and ingest rate limits.",
+    title: "Deployment",
+    description: "Deploy in serverless, containers, or multi-worker environments.",
     icon: Cloud,
   },
   {
     href: "/docs/harness",
-    title: "Harness Integration",
-    description: "Choose patch vs wrap vs manual logging based on your observability stack.",
+    title: "Integration Patterns",
+    description: "Match integration depth to your existing stack - auto-patch, wrap, or manual.",
     icon: Layers,
   },
   {
     href: "/docs/reference",
     title: "API Reference",
-    description: "Focused pages for config, guards, providers, health, and CI — one topic per URL.",
+    description: "Focused pages for config, guards, providers, health, and CI - one topic per URL.",
     icon: BookOpen,
   },
   {
     href: "/docs/reliability",
-    title: "Reliability & Loss Recovery",
-    description: "Provider-call retry, fallbacks, observe/enforce modes, and loss_avoided accounting.",
+    title: "Reliability",
+    description: "Automatic failover, fallback routing, and provider health monitoring.",
     icon: Shield,
   },
 ];
@@ -58,7 +58,7 @@ export default function DocsOverviewPage() {
           language="BASH"
           code={"pip install aurex-sdk"}
         />
-        
+
         <CodeBlock
           language="PYTHON"
           code={`from aurex_sdk import AurexAuditor, patch_all
@@ -75,10 +75,10 @@ response = client.chat.completions.create(
     messages=[{"role": "user", "content": "Explain quantum entanglement."}]
 )
 
-# 3. Check your Token Credit Score
+# 3. View the runtime report
 score = auditor.get_score()
-print(f"Token Credit Score: {score.value}/100")
-# => Token Credit Score: 84/100
+print(f"Efficiency Score: {score.value}/100")
+# => Efficiency Score: 84/100
 # => Flags: ['cache_opportunity: $12.40/month saving on system prompt']`}
         />
 
@@ -89,7 +89,7 @@ print(f"Token Credit Score: {score.value}/100")
             <p className="text-sm text-white/50">
               <span className="text-white/70 font-medium">No data leaves your machine by default.</span>{" "}
               Cloud sync is opt-in. The ledger file at <code className="text-teal-400/70 text-xs">~/.aurex/ledger.jsonl</code> is
-              human-readable JSON and can be inspected at any time. It contains only numeric metadata — never raw prompt text.
+              human-readable JSON and can be inspected at any time. It contains only numeric metadata - never raw prompt text.
             </p>
           </div>
         </div>
@@ -104,9 +104,8 @@ print(f"Token Credit Score: {score.value}/100")
           Aurex SDK Documentation
         </h1>
         <p className="text-white/50 max-w-2xl leading-relaxed">
-          Aurex is a token waste prevention platform. The SDK sits in-process between your application code and LLM provider APIs,
-          intercepting and preventing the four root causes of AI token waste before a single wasted token is billed.
-          Budget guards and detection heuristics run locally without adding network latency.
+          Aurex is a runtime layer for AI agents. It sits in-process between your application code and LLM provider APIs,
+          routing each call to the right model, compressing context, and recovering from provider failures - automatically, in under 2ms.
         </p>
       </div>
 
@@ -127,7 +126,7 @@ print(f"Token Credit Score: {score.value}/100")
             <Link href="/docs/reliability/policy" className="text-teal-400 hover:text-teal-300">
               /docs/reliability/policy
             </Link>
-            ) — avoid loading hub pages for implementation detail.
+            ) - avoid loading hub pages for implementation detail.
           </p>
         </div>
       </div>

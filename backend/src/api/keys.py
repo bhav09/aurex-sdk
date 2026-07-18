@@ -56,7 +56,7 @@ def _generate_secret(env: str) -> tuple[str, str, str, str]:
         raise HTTPException(status_code=400, detail=f"Invalid environment: {env}")
     body = secrets.token_urlsafe(32)
     full = f"aux_{env}_{body}"
-    prefix = full[:8]  # e.g. "aux_dev_" / "aux_pro_" — narrow lookup space
+    prefix = full[:8]  # e.g. "aux_dev_" / "aux_pro_" - narrow lookup space
     last4 = full[-4:]
     salt = secrets.token_urlsafe(16)
     return full, prefix, last4, salt
@@ -156,7 +156,7 @@ async def create_key(
         salt=salt,
         name=body.name,
         owner_email=user.email,
-        company_name="",  # company_name kept for legacy NOT NULL — populate empty for v1 keys
+        company_name="",  # company_name kept for legacy NOT NULL - populate empty for v1 keys
         project_id=project.id,
         environment=body.environment.lower(),
         scopes=scopes,
@@ -247,7 +247,7 @@ async def revoke_key(
     if api_key is None:
         raise HTTPException(status_code=404, detail="API key not found")
     if api_key.project_id is None:
-        # Legacy key without project scoping — fall back to owner_email.
+        # Legacy key without project scoping - fall back to owner_email.
         if api_key.owner_email != user.email:
             raise HTTPException(status_code=403, detail="Cannot revoke this key")
     else:

@@ -3,24 +3,24 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "BudgetGuard — Aurex SDK",
-  description: "In-process spend and rate circuit breakers. Not the same as provider-call resilience.",
+  title: "BudgetGuard - Aurex SDK",
+  description: "Set spending and rate limits that are enforced automatically, in-process.",
 };
 
 export default function DocsBudgetGuardPage() {
   return (
     <DocPageShell
       title="BudgetGuard"
-      description="Prevent rogue agent cascades with client-side spend and rate limits. Evaluated locally with zero network latency."
+      description="Set spending and rate limits that are enforced automatically, in-process. Evaluated locally with zero network latency."
       agentHint="Use for max_cost_per_minute, max_cost_per_session, on_budget_exceeded throw/warn/webhook."
       scopeIn={["budget_guard / budgetGuard config", "Per-wrap() overrides", "AurexBudgetExceeded"]}
-      scopeOut={["Provider retry/fallback — see Reliability docs", "Backend ingest rate limits — see Rate Limits"]}
+      scopeOut={["Provider retry/fallback - see Reliability docs", "Backend ingest rate limits - see Rate Limits"]}
     >
       <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-sm text-white/60 mb-4">
-        <strong className="text-white">Not provider resilience.</strong> BudgetGuard blocks overspend before calls.
-        Provider-call retry and fallbacks live under{" "}
+        <strong className="text-white">Separate from provider reliability.</strong> BudgetGuard enforces spending limits before calls are sent.
+        Provider-call retry and fallbacks are configured under{" "}
         <Link href="/docs/reliability/overview" className="text-teal-400">
-          Reliability & Loss Recovery
+          Reliability
         </Link>
         .
       </div>

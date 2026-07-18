@@ -2,18 +2,18 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "CI Policy Gate — Aurex SDK",
-  description: "Fail CI builds when cost or efficiency thresholds are violated.",
+  title: "CI Policy Gate - Aurex SDK",
+  description: "Enforce cost and efficiency policies in your CI pipeline.",
 };
 
 export default function DocsCiPage() {
   return (
     <DocPageShell
       title="CI Policy Gate"
-      description="Run offline heuristics in CI and block merges when waste or efficiency scores exceed policy."
+      description="Run heuristics in CI and enforce cost and efficiency policies before merging. Supports warn and block modes."
       agentHint="Use for npx aurex ci, --mode warn|block, --github-comment, and Python audit --mode block."
       scopeIn={["CI flags and exit codes", "GitHub comment output"]}
-      scopeOut={["Heuristic categories — see Heuristics CLI"]}
+      scopeOut={["Heuristic categories - see Heuristics CLI"]}
     >
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
         <table className="w-full text-sm text-white/60 text-left border-collapse">
@@ -32,12 +32,12 @@ export default function DocsCiPage() {
             </tr>
             <tr>
               <td className="p-3 text-teal-400">--mode block</td>
-              <td className="p-3">—</td>
+              <td className="p-3">-</td>
               <td className="p-3 font-sans">Exit 1 when policies violated.</td>
             </tr>
             <tr>
               <td className="p-3 text-teal-400">--github-comment</td>
-              <td className="p-3">—</td>
+              <td className="p-3">-</td>
               <td className="p-3 font-sans">Markdown suitable for PR comments (Node).</td>
             </tr>
             <tr>

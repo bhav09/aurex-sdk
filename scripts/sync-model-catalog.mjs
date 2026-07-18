@@ -1,6 +1,6 @@
 /**
  * Download LiteLLM pricing map into public/ for offline or air-gapped builds.
- * Optional — by default the app fetches the same URL in the browser.
+ * Optional - by default the app fetches the same URL in the browser.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

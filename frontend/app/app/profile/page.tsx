@@ -6,18 +6,18 @@ import { aurexAPI } from "@/lib/api-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-    User, 
-    Shield, 
-    Building2, 
-    CheckCircle2, 
-    ArrowLeft, 
-    Key, 
-    Mail, 
-    Landmark, 
-    ChevronDown, 
-    ChevronUp, 
-    Loader2 
+import {
+    User,
+    Shield,
+    Building2,
+    CheckCircle2,
+    ArrowLeft,
+    Key,
+    Mail,
+    Landmark,
+    ChevronDown,
+    ChevronUp,
+    Loader2
 } from "lucide-react";
 
 const DEFAULT_SCOPES = ["ledger:write", "policy:read", "savings:write"];
@@ -59,8 +59,8 @@ export default function ProfilePage() {
     const projectId = aurexAPI.getProjectId();
 
     const username = userInfo?.user_name || "Workspace User";
-    const email = userInfo?.email || "—";
-    const company = userInfo?.company_name || "—";
+    const email = userInfo?.email || "-";
+    const company = userInfo?.company_name || "-";
 
     const initial = username.charAt(0).toUpperCase();
 
@@ -72,8 +72,8 @@ export default function ProfilePage() {
                     <h1 className="text-2xl font-serif uppercase tracking-wider font-semibold">User Profile</h1>
                     <p className="text-xs text-white/40 mt-1">Manage your identity credentials and security context.</p>
                 </div>
-                <Button 
-                    variant="outline" 
+                <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => router.push("/app")}
                     className="self-start md:self-auto border-white/10 hover:bg-white/10 text-xs font-semibold uppercase tracking-wider px-4 py-2 text-white h-auto"
@@ -155,7 +155,7 @@ export default function ProfilePage() {
                                         Default Org Context
                                     </span>
                                     <span className="font-mono text-[10px] text-white/70 bg-white/[0.02] border border-white/[0.06] px-2 py-0.5 rounded select-all break-all">
-                                        {orgId || "—"}
+                                        {orgId || "-"}
                                     </span>
                                 </div>
 
@@ -165,7 +165,7 @@ export default function ProfilePage() {
                                         Active Project Context
                                     </span>
                                     <span className="font-mono text-[10px] text-white/70 bg-white/[0.02] border border-white/[0.06] px-2 py-0.5 rounded select-all break-all">
-                                        {projectId || "—"}
+                                        {projectId || "-"}
                                     </span>
                                 </div>
                             </div>
@@ -173,14 +173,14 @@ export default function ProfilePage() {
                     </Card>
 
                     <div className="flex justify-end gap-3">
-                        <Button 
+                        <Button
                             variant="outline"
                             onClick={() => router.push("/app/settings")}
                             className="border-white/10 hover:bg-white/10 text-xs font-semibold uppercase tracking-wider px-4 py-2 text-white h-auto"
                         >
                             Configure Tenancy
                         </Button>
-                        <Button 
+                        <Button
                             onClick={() => router.push("/app/settings?tab=apikeys")}
                             className="bg-white hover:bg-white/90 text-black text-xs font-semibold uppercase tracking-wider px-4 py-2 h-auto"
                         >
@@ -220,15 +220,15 @@ export default function ProfilePage() {
                                     minute: "2-digit",
                                 });
                                 const score = session.credit_score !== null ? session.credit_score : 100;
-                                const scoreColor = score >= 90 
-                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                                    : score >= 70 
-                                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                                const scoreColor = score >= 90
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    : score >= 70
+                                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                                         : "bg-rose-500/10 text-rose-400 border-rose-500/20";
-                                
+
                                 return (
                                     <div key={session.id} className="pt-3 pb-2 first:pt-0">
-                                        <div 
+                                        <div
                                             onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
                                             className="flex items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.02] p-2.5 rounded-xl transition-all select-none"
                                         >
@@ -287,8 +287,8 @@ export default function ProfilePage() {
                                                         <span className="text-[9px] text-white/30 uppercase tracking-wider block font-semibold">Realized Efficiency</span>
                                                         <div className="flex items-center gap-2 mt-1.5">
                                                             <div className="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                                                                <div 
-                                                                    className="h-full bg-emerald-500 rounded-full" 
+                                                                <div
+                                                                    className="h-full bg-emerald-500 rounded-full"
                                                                     style={{ width: `${Math.max(0, 100 - (session.waste_percentage || 0))}%` }}
                                                                 />
                                                             </div>
@@ -309,13 +309,12 @@ export default function ProfilePage() {
                                                                     <div className="flex items-center gap-2 truncate pr-2">
                                                                         <span className="font-mono text-white/30">#{issue.rank}</span>
                                                                         <span className="text-white/80 font-medium truncate">{issue.title}</span>
-                                                                        <span className={`text-[8px] font-mono px-1 rounded-sm border ${
-                                                                            issue.severity === "CRITICAL"
+                                                                        <span className={`text-[8px] font-mono px-1 rounded-sm border ${issue.severity === "CRITICAL"
                                                                                 ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                                                                 : issue.severity === "HIGH"
                                                                                     ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
                                                                                     : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                                                        }`}>
+                                                                            }`}>
                                                                             {issue.severity.toLowerCase()}
                                                                         </span>
                                                                     </div>
@@ -337,7 +336,7 @@ export default function ProfilePage() {
                                                     <span className="text-[9px] font-mono text-white/30 select-all">
                                                         ID: {session.id}
                                                     </span>
-                                                    <Button 
+                                                    <Button
                                                         size="sm"
                                                         onClick={() => router.push(`/audit?session_id=${session.id}`)}
                                                         className="bg-white hover:bg-white/90 text-black text-[10px] font-semibold uppercase tracking-wider px-3.5 py-1.5 h-auto rounded-lg cursor-pointer"

@@ -3,24 +3,38 @@ import { FooterSection } from "@/components/landing/footer-section";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Changelog — Aurex",
+  title: "Changelog - Aurex",
   description:
-    "Latest updates to the Aurex token waste prevention platform. SDK releases, new detection capabilities, and platform improvements.",
+    "Latest updates to the Aurex AI runtime platform. SDK releases, runtime capabilities, and performance improvements.",
 };
 
 const entries = [
   {
+    date: "2026-07-18",
+    version: "v0.4.0",
+    title: "AI Runtime Layer & OpenAI-style Developer Documentation",
+    category: "Platform",
+    description:
+      "Reframed Aurex around three core runtime capabilities - Behavioral Awareness, Adaptive Routing, and Provider Continuity. Streamlined the entire documentation suite to match OpenAI developer documentation standards.",
+    highlights: [
+      "Three core runtime capabilities: Behavioral Awareness, Adaptive Routing, and Provider Continuity",
+      "Interactive vertical Live Request Trace visualization in the hero section",
+      "Complete rewrite of 29 documentation guides to OpenAI-style single-topic format",
+      "Guaranteed under 2ms in-process decision overhead with zero network hop penalty",
+    ],
+  },
+  {
     date: "2026-06-04",
     version: "v0.3.0",
-    title: "Infinite loop detection upgrade — F1 0.08 → 0.72",
+    title: "Behavioral Awareness - Hybrid Loop Detection (F1 0.72)",
     category: "SDK",
     description:
-      "Upgraded infinite loop detection from structural-only heuristic (F1 ≈ 0.08) to hybrid structural + semantic detection (F1 ≈ 0.72). The new implementation adds three detection layers: exact hash matching for identical tool calls, context growth threshold for runaway expansion, and semantic fuzzy detection using cosine similarity for rephrased repetition. Based on techniques from arXiv:2511.10650.",
+      "Upgraded loop detection from a structural-only heuristic (F1 ≈ 0.08) to hybrid structural + semantic detection (F1 ≈ 0.72). The new implementation adds three detection layers: exact hash matching for identical tool calls, context growth threshold for rapid expansion, and semantic fuzzy detection using cosine similarity for rephrased repetition. Based on techniques from arXiv:2511.10650.",
     highlights: [
       "3-layer detection: exact hash, context growth, semantic similarity",
       "30-second cooldown after loop detection to prevent double-tripping",
-      "Per-session mutable state — never persisted, no privacy impact",
-      "Backward compatible — existing structural checks preserved",
+      "Per-session mutable state - never persisted, no privacy impact",
+      "Backward compatible - existing structural checks preserved",
     ],
   },
   {
@@ -31,8 +45,8 @@ const entries = [
     description:
       "The existing patch_all() method now auto-detects and patches all installed LLM provider libraries with a single call. Previously only OpenAI was reliably auto-patched. Now supports OpenAI, Anthropic, Google Generative AI, LiteLLM, Ollama, and Hugging Face out of the box.",
     highlights: [
-      "Idempotent — safe to call multiple times",
-      "Fail-open — patching failures log warnings but never break LLM calls",
+      "Idempotent - safe to call multiple times",
+      "Fail-open - patching failures log warnings but never break LLM calls",
       "Returns dict of {provider: was_patched} for introspection",
       "patch_openai() preserved as backward-compatible alias",
     ],
@@ -40,7 +54,7 @@ const entries = [
   {
     date: "2026-06-04",
     version: "v0.3.0",
-    title: "Prompt optimization — caching opportunity detection",
+    title: "Prompt optimization - caching opportunity detection",
     category: "SDK",
     description:
       "New prompt optimization signal detects calls where the system prompt is identical across sessions (matched by token count + SHA-256 hash) and the provider supports prompt caching but no cache header was sent. Calculates estimated monthly savings at the provider's cached rate.",
@@ -86,11 +100,10 @@ export default function ChangelogPage() {
           {entries.map((entry, index) => (
             <div
               key={`${entry.version}-${entry.title}`}
-              className={`relative pl-8 pb-16 ${
-                index < entries.length - 1
+              className={`relative pl-8 pb-16 ${index < entries.length - 1
                   ? "border-l border-white/[0.08]"
                   : "border-l border-transparent"
-              }`}
+                }`}
             >
               {/* Timeline dot */}
               <div className="absolute left-0 top-0 -translate-x-1/2 w-3 h-3 rounded-full bg-[#2dd4bf] border-4 border-background" />

@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "AurexConfig — Aurex SDK",
+  title: "AurexConfig - Aurex SDK",
   description: "Core AurexConfig and getInstance options for Python and Node.js SDKs.",
 };
 
@@ -11,10 +11,10 @@ export default function DocsConfigPage() {
   return (
     <DocPageShell
       title="AurexConfig"
-      description="Configure the auditor singleton. Provider-call resilience uses the separate resilience key — see ResiliencePolicy."
+      description="Configure the auditor singleton. Provider-call resilience uses the separate resilience key - see ResiliencePolicy."
       agentHint="Use for api_key, ledger_path, cloud_sync, flush intervals, storage_mode, and pricing paths."
       scopeIn={["Core sync and ledger options", "Pricing and heuristic thresholds", "Link to resilience policy"]}
-      scopeOut={["BudgetGuard fields — see BudgetGuard", "ResiliencePolicy fields — see /docs/reliability/policy"]}
+      scopeOut={["BudgetGuard fields - see BudgetGuard", "ResiliencePolicy fields - see /docs/reliability/policy"]}
     >
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
         <table className="w-full text-sm text-white/60 text-left border-collapse">
@@ -128,7 +128,7 @@ export default function DocsConfigPage() {
               <td className="p-3 text-teal-400">budgetGuard</td>
               <td className="p-3">{"{}"}</td>
               <td className="p-3 font-sans">
-                Spend circuit breaker — see{" "}
+                Spend circuit breaker - see{" "}
                 <Link href="/docs/reference/budget-guard" className="text-teal-400">
                   BudgetGuard
                 </Link>
@@ -140,7 +140,7 @@ export default function DocsConfigPage() {
               <td className="p-3 text-teal-400">resilience</td>
               <td className="p-3">enabled: false</td>
               <td className="p-3 font-sans">
-                Provider-call retry/fallback — see{" "}
+                Provider-call retry/fallback - see{" "}
                 <Link href="/docs/reliability/policy" className="text-teal-400">
                   ResiliencePolicy
                 </Link>

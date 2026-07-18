@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Outcomes — Aurex SDK",
+  title: "Outcomes - Aurex SDK",
   description: "Record workflow success and failure for cost-efficiency analytics.",
 };
 
@@ -17,10 +17,10 @@ export default function DocsOutcomesPage() {
   return (
     <DocPageShell
       title="Success & Failure Signals"
-      description="Register logical workflow outcomes once per operation — token counts alone do not reveal task success."
+      description="Register logical workflow outcomes once per operation - token counts alone do not reveal task success."
       agentHint="Use for mark_success / markSuccess and mark_failure / markFailure after workflow completion."
       scopeIn={["Workflow outcome API", "Optional metadata dict"]}
-      scopeOut={["Resilience attempt logging — see Loss Accounting"]}
+      scopeOut={["Resilience attempt logging - see Loss Accounting"]}
     >
       <DualCodeBlock
         pythonCode={pythonOutcomesCode}

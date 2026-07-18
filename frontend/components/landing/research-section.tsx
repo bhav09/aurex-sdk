@@ -52,20 +52,18 @@ export function ResearchSection() {
             Research
           </span>
           <h2
-            className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-            }`}
+            className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              }`}
           >
             Built on
             <br />
             <span className="text-muted-foreground">peer-reviewed research.</span>
           </h2>
           <p
-            className={`mt-6 text-lg text-muted-foreground max-w-2xl transition-all duration-1000 delay-200 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`mt-6 text-lg text-muted-foreground max-w-2xl transition-all duration-1000 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              }`}
           >
-            Aurex packages peer-reviewed techniques into a single in-process SDK. We didn't invent these methods — we made them production-ready.
+            Aurex packages peer-reviewed techniques into a single in-process SDK. We didn't invent these methods - we made them production-ready.
           </p>
         </div>
 
@@ -77,9 +75,8 @@ export function ResearchSection() {
               href={paper.link}
               target="_blank"
               rel="noopener noreferrer"
-              className={`group relative bg-foreground/[0.02] border border-foreground/10 hover:border-foreground/25 p-8 lg:p-10 transition-all duration-700 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-              }`}
+              className={`group relative bg-foreground/[0.02] border border-foreground/10 hover:border-foreground/25 p-8 lg:p-10 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                }`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <div className="flex items-start justify-between mb-6">

@@ -456,7 +456,7 @@ class EnhancedDetectionEngine:
             issue = EnhancedIssue(
                 rank=0,  # Will be assigned later
                 issue_type="wasteful_prompts",
-                title=f"{workflow_id} — {wasteful_count}/{total_workflow_events} calls wasteful",
+                title=f"{workflow_id} - {wasteful_count}/{total_workflow_events} calls wasteful",
                 severity=severity,
                 weekly_cost=weekly_cost,
                 one_line_summary=f"{wasteful_count} wasteful requests detected in {workflow_id} workflow",

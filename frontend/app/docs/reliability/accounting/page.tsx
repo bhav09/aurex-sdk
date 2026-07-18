@@ -2,18 +2,18 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Loss Accounting — Aurex SDK",
-  description: "projected_cost, loss_avoided, ingest fields, and dashboard reliability metrics.",
+  title: "Cost Accounting - Aurex SDK",
+  description: "Cost tracking, projected savings, and dashboard metrics for provider reliability.",
 };
 
 export default function DocsAccountingPage() {
   return (
     <DocPageShell
-      title="Loss Accounting"
-      description="Counterfactual metrics quantify spend that would have been wasted without recovery, and billed-but-failed spend you still pay providers for."
+      title="Cost Accounting"
+      description="Track actual vs. projected cost, measure the impact of automatic recovery, and surface reliability metrics in your dashboard."
       agentHint="Use for loss_avoided, projected_cost, UNFULFILLED_SPEND, dashboard billed_but_failed_cost, migration 002."
       scopeIn={["SDK log_event fields", "Ingest payload fields", "Dashboard overview metrics", "DB migration note"]}
-      scopeOut={["ResiliencePolicy tuning — see Policy"]}
+      scopeOut={["ResiliencePolicy tuning - see Policy"]}
     >
       <h2 className="text-lg font-semibold text-white">SDK event fields</h2>
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-white/[0.01]">
@@ -60,13 +60,13 @@ export default function DocsAccountingPage() {
       <h2 className="text-lg font-semibold text-white">Dashboard overview</h2>
       <ul className="space-y-1 text-sm text-white/50 list-disc list-inside">
         <li>
-          <code className="text-teal-400">billed_but_failed_cost</code> — spend on unfulfilled/degraded outcomes
+          <code className="text-teal-400">billed_but_failed_cost</code> - spend on unfulfilled/degraded outcomes
         </li>
         <li>
-          <code className="text-teal-400">loss_avoided</code> — aggregated counterfactual recovery value
+          <code className="text-teal-400">loss_avoided</code> - aggregated counterfactual recovery value
         </li>
         <li>
-          <code className="text-teal-400">recovery_rate</code> — share of recoverable failures successfully retried
+          <code className="text-teal-400">recovery_rate</code> - share of recoverable failures successfully retried
         </li>
         <li>
           Savings timeline includes category <code className="text-teal-400">reliability_savings</code>

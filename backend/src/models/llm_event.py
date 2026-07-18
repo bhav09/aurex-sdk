@@ -56,7 +56,7 @@ class LLMEvent(Base):
     # Upload session tracking (to handle multiple uploads)
     upload_session_id = Column(String, nullable=True, index=True)
 
-    # Project scoping (Phase 1 — populated by SDK ingest via /api/v1/ledger/events).
+    # Project scoping (Phase 1 - populated by SDK ingest via /api/v1/ledger/events).
     project_id = Column(String, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     
     # Token usage

@@ -3,12 +3,15 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aurex-python"
-version = "0.1.0"
-description = "Aurex Python SDK — auto-instrument OpenAI, Anthropic, LiteLLM"
+name = "aurex-sdk"
+version = "0.4.1"
+description = "Aurex Python SDK - In-process AI runtime layer for AI applications and agents"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+
+[project.scripts]
+aurex = "aurex_sdk.cli:run_cli"
 
 [project.optional-dependencies]
 openai = ["openai>=1.0.0"]

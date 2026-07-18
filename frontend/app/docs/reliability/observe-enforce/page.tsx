@@ -2,7 +2,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Observe vs Enforce — Aurex SDK",
+  title: "Observe vs Enforce - Aurex SDK",
   description: "Detect-only resilience mode vs active retry with fail-open behavior.",
 };
 
@@ -13,13 +13,13 @@ export default function DocsObserveEnforcePage() {
       description="Observe classifies and accounts for loss without retrying. Enforce performs bounded retry and fallback under a cost ceiling."
       agentHint="Use when choosing resilience.mode, explaining fail-open, or proof_window_pct sampling."
       scopeIn={["observe semantics", "enforce semantics", "fail-open on auditor errors", "proof_window_pct"]}
-      scopeOut={["Fallback registration — see Fallbacks", "Event fields — see Loss Accounting"]}
+      scopeOut={["Fallback registration - see Fallbacks", "Event fields - see Loss Accounting"]}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
         <div className="p-4 rounded-xl border border-teal-500/20 bg-teal-500/5">
           <h2 className="font-semibold text-white mb-2">observe (default when enabled)</h2>
           <ul className="space-y-1 text-white/50 list-disc list-inside">
-            <li>Single provider call — no automatic retry</li>
+            <li>Single provider call - no automatic retry</li>
             <li>Classifies response/exception and logs counterfactual metrics</li>
             <li>Computes projected_cost and loss_avoided for analytics</li>
             <li>Safe for production shadow mode before enforce</li>

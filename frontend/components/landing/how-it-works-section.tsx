@@ -34,15 +34,14 @@ export function HowItWorksSection() {
         {/* Header */}
         <div className={`text-center max-w-3xl mx-auto mb-20 transition-all duration-1000 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-12 opacity-0"}`}>
           <p className="text-sm font-mono text-muted-foreground tracking-widest uppercase mb-6">
-            How You Integrate
+            How It Works
           </p>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-display tracking-tight mb-6">
             Drop Aurex between <br />
-            <span className="text-teal-500">your application</span> and your LLMs.
+            <span className="text-teal-500">your app</span> and your LLMs.
           </h2>
           <p className="text-lg text-muted-foreground">
-            Aurex sits as a thin intelligence layer over the tools and SDKs you already run. 
-            You don&apos;t rebuild your stack. You add protection and visibility on top.
+            Aurex is a thin SDK layer, not a gateway you route through. It intercepts calls in-process, decides in under 2ms, and lets your code stay exactly as it is. Works with LangChain, LlamaIndex, Vercel AI SDK, and every major provider out of the box.
           </p>
         </div>
 

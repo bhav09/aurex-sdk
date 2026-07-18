@@ -255,9 +255,9 @@ export class LocalHeuristicsEngine {
       // Check if caching is already active for these events
       const totalCached = evs.reduce((sum, item) => sum + (item.event.cached_tokens || 0), 0);
       const cachingActive = totalCached > 0;
-      
+
       if (cachingActive) {
-        // User is already following best practice — skip
+        // User is already following best practice - skip
         continue;
       }
 
@@ -320,13 +320,13 @@ export class LocalHeuristicsEngine {
           (sum, item) => sum + Math.max(0, (item.event.cost || 0.0) - baselineCost),
           0.0
         );
-        
+
         // Tier severity: 3+ doublings = CRITICAL, 2 = HIGH
         let severity = doublings >= 3 ? "CRITICAL" : "HIGH";
         if (evs.some(item => item.event.session_confidence === "low")) {
           severity = "MEDIUM";
         }
-        
+
         this.issues.push({
           issue_type: "agent_loop",
           title: "Agent Runaway Loop",
@@ -355,7 +355,7 @@ export class LocalHeuristicsEngine {
       const model = e.model || "";
       const [inputPrice] = getModelPricing(model);
       const isExpensive = inputPrice > 2.00;
-      
+
       // Subtract reasoning tokens from output when checking simplicity
       // Reasoning models (o1/o3) inflate output_tokens with internal thinking
       const effectiveOutput = (e.output_tokens || 0) - (e.reasoning_tokens || 0);

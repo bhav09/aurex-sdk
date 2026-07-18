@@ -481,7 +481,7 @@ await client.trackLLMCall({
                     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 mb-6 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-emerald-300 font-mono">COPY YOUR API KEY</span>
-                            <span className="text-[9px] text-emerald-400 font-mono">Copy now — this key will not be displayed again!</span>
+                            <span className="text-[9px] text-emerald-400 font-mono">Copy now - this key will not be displayed again!</span>
                         </div>
                         <div className="flex items-center gap-2 bg-black/40 rounded-lg p-2.5 border border-white/5 font-mono text-xs text-white">
                             <span className="flex-1 select-all break-all">{generatedKey}</span>
@@ -505,8 +505,8 @@ await client.trackLLMCall({
                             <div className="rounded-xl border border-white/10 bg-surface-sunken p-4 flex flex-col items-center justify-center text-center gap-3 h-full min-h-[140px]">
                                 <KeyRound className="h-6 w-6 text-white/20" />
                                 <p className="text-xs text-white/40 font-mono">Sign in to manage API credentials for this workspace.</p>
-                                <Button 
-                                    type="button" 
+                                <Button
+                                    type="button"
                                     className="w-full h-9 bg-white hover:bg-white/90 text-black text-xs font-semibold rounded-lg mt-1 flex items-center justify-center gap-2"
                                     onClick={async () => {
                                         const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;

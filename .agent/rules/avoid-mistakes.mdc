@@ -1,11 +1,11 @@
 ---
-description: Mandatory pre-coding anti-pattern framework — context-aware domain prioritization plus industry-agnostic scalable application rules
+description: Mandatory pre-coding anti-pattern framework - context-aware domain prioritization plus industry-agnostic scalable application rules
 alwaysApply: true
 ---
 
-# Avoid These Mistakes — Scalable & Adaptive Anti-Patterns
+# Avoid These Mistakes - Scalable & Adaptive Anti-Patterns
 
-> **Purpose:** Mandatory pre-coding checklist and design gate. Before writing or modifying ANY code, run **Section 0** (context discovery), apply **Section 1** domain priorities when detected, then enforce **Sections 2–12** (universal rules). Industry-specific rules never replace universal ones — they **stack and elevate** critical invariants.
+> **Purpose:** Mandatory pre-coding checklist and design gate. Before writing or modifying ANY code, run **Section 0** (context discovery), apply **Section 1** domain priorities when detected, then enforce **Sections 2–12** (universal rules). Industry-specific rules never replace universal ones - they **stack and elevate** critical invariants.
 
 **Related rules (do not contradict):** `no-hardcoded-env-vars` (config singleton), `test-driven-development`, `systems-thinking`, `safe-git-push`.
 
@@ -39,17 +39,17 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 | Scope | Minimum enforcement |
 |---|---|
-| Trivial (typo, comment) | Universal checklist §12 — quick pass |
+| Trivial (typo, comment) | Universal checklist §12 - quick pass |
 | Local (single module) | §2–3 for touched layers + active profile P0 items |
 | Feature / new API or contract | Full §2–11 + profile invariants + failure paths |
 | Architecture / multi-service | All sections + explicit tradeoff note + rollback |
 
 ### 0.4 Enforcement order
 
-1. **Profile P0 invariants** (Section 1) — never violate for detected domain  
-2. **Universal invariants** (Section 2) — always apply  
-3. **Layer-specific anti-patterns** (Sections 3–11) — apply to code you touch  
-4. **Master checklist** (Section 12) — before PR / task complete  
+1. **Profile P0 invariants** (Section 1) - never violate for detected domain  
+2. **Universal invariants** (Section 2) - always apply  
+3. **Layer-specific anti-patterns** (Sections 3–11) - apply to code you touch  
+4. **Master checklist** (Section 12) - before PR / task complete  
 
 ---
 
@@ -71,7 +71,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE A — Fintech, Payments & Ledgers
+### PROFILE A - Fintech, Payments & Ledgers
 
 **Detect when:** Wallets, ledgers, checkout, refunds, Stripe/Adyen/Plaid, double-entry, settlement, FX, invoicing, balance APIs.
 
@@ -85,20 +85,20 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 - Read-modify-write balances without locking, OCC version field, or atomic `UPDATE balance = balance - ?`
 - Missing client `idempotency_key` with DB/cache unique constraint on `(key, scope)`
-- `float` / `double` for currency — use integer minor units or `Decimal`
+- `float` / `double` for currency - use integer minor units or `Decimal`
 - Multi-account writes without single ACID transaction or compensating saga + reconciliation job
 - Treating payment webhooks as authoritative without signature verification and replay protection
 
 ---
 
-### PROFILE B — Healthcare, PHI & Clinical Systems
+### PROFILE B - Healthcare, PHI & Clinical Systems
 
 **Detect when:** EHR, FHIR, HL7, PHI/PII fields, diagnoses, prescriptions, imaging, lab results, HIPAA references.
 
 | Priority | Invariant |
 |---|---|
 | P0 | **Confidentiality:** PHI encrypted in transit/rest; masked in logs and non-clinical UIs |
-| P0 | **Fail-safe:** Clinical/API failure → human review or protocol fallback — never silent wrong defaults |
+| P0 | **Fail-safe:** Clinical/API failure → human review or protocol fallback - never silent wrong defaults |
 | P0 | **Audit:** Clinical actions non-repudiable (who, when, what, why) |
 
 **Critical anti-patterns:**
@@ -110,7 +110,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE C — AI / ML & Agentic Systems
+### PROFILE C - AI / ML & Agentic Systems
 
 **Detect when:** LLM SDKs, RAG, embeddings, tool-calling agents, prompt templates, guardrails, eval harnesses.
 
@@ -130,7 +130,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE D — B2B SaaS & Multi-Tenant
+### PROFILE D - B2B SaaS & Multi-Tenant
 
 **Detect when:** `tenant_id`, organizations, workspaces, RBAC, per-tenant config, row-level security.
 
@@ -145,11 +145,11 @@ Scan the **current task scope** (files touched, open files, user request) and **
 - Queries without `tenant_id` (or DB RLS) on shared tables
 - Cache keys without tenant prefix (`user:42` vs `tenant:9:user:42`)
 - `if role == "Admin"` instead of `can("resource:action")`
-- Global rate limits only — no per-tenant quotas on expensive endpoints
+- Global rate limits only - no per-tenant quotas on expensive endpoints
 
 ---
 
-### PROFILE E — Event-Driven & Streaming
+### PROFILE E - Event-Driven & Streaming
 
 **Detect when:** Kafka, Pub/Sub, SQS, RabbitMQ, Celery, consumers, outbox, sagas, CDC.
 
@@ -168,7 +168,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE F — E-Commerce, Inventory & Marketplaces
+### PROFILE F - E-Commerce, Inventory & Marketplaces
 
 **Detect when:** Carts, orders, SKUs, inventory reservation, shipping, promotions, sellers/buyers.
 
@@ -186,7 +186,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE G — IoT, Edge & Cyber-Physical
+### PROFILE G - IoT, Edge & Cyber-Physical
 
 **Detect when:** Device telemetry, MQTT, firmware OTA, sensors, actuators, time-series at scale.
 
@@ -204,7 +204,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE H — Government, Legal & High-Audit
+### PROFILE H - Government, Legal & High-Audit
 
 **Detect when:** Immutable audit logs, retention policies, approvals, FOIA, classification labels.
 
@@ -222,7 +222,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE I — Real-Time & Collaborative
+### PROFILE I - Real-Time & Collaborative
 
 **Detect when:** WebSockets, SSE, CRDT, presence, live cursors, shared documents.
 
@@ -240,7 +240,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE J — Analytics, ETL & Data Warehouse
+### PROFILE J - Analytics, ETL & Data Warehouse
 
 **Detect when:** dbt, Airflow, Spark, batch pipelines, BI exports, CDC to warehouse.
 
@@ -258,7 +258,7 @@ Scan the **current task scope** (files touched, open files, user request) and **
 
 ---
 
-### PROFILE Z — General Application (default)
+### PROFILE Z - General Application (default)
 
 **Use when:** No specific profile triggers, or greenfield with unknown domain.
 
@@ -286,8 +286,8 @@ State these as **testable claims** for non-trivial work:
 | U6 | Mutations idempotent or explicitly deduped | Duplicate records on retry |
 | U7 | Observability: correlation ID across hops | Un-debuggable production |
 | U8 | Tests assert behavior, not mock choreography | False confidence |
-| U9 | No silent `except` — failures visible | Hidden corruption |
-| U10 | Configuration single-sourced (`settings` / env — see `no-hardcoded-env-vars`) | Env drift, secret leak |
+| U9 | No silent `except` - failures visible | Hidden corruption |
+| U10 | Configuration single-sourced (`settings` / env - see `no-hardcoded-env-vars`) | Env drift, secret leak |
 
 ---
 
@@ -297,7 +297,7 @@ State these as **testable claims** for non-trivial work:
 
 - **Mistake:** Importing another service’s modules, ORM models, or DB helpers across deployable boundaries.
 - **Why:** Coordinated deploys, ripple breakage, hidden contracts.
-- **Rule:** Black-box services. Integrate via versioned APIs, events, or SDK generated from OpenAPI/Proto — never shared internal code paths.
+- **Rule:** Black-box services. Integrate via versioned APIs, events, or SDK generated from OpenAPI/Proto - never shared internal code paths.
 
 ### 3.2 God module / monolith-in-disguise
 
@@ -309,13 +309,13 @@ State these as **testable claims** for non-trivial work:
 
 - **Mistake:** Shared database tables across services; mandatory sync chain of 3+ calls per user action; deploy-all-together releases.
 - **Why:** Microservice ops cost without isolation benefit.
-- **Rule:** Database-per-service (logical or physical). Long workflows → async jobs, sagas, outbox — not blocking chains.
+- **Rule:** Database-per-service (logical or physical). Long workflows → async jobs, sagas, outbox - not blocking chains.
 
 ### 3.4 Chatty integration
 
 - **Mistake:** N+1 HTTP/RPC calls to assemble one response.
 - **Why:** Latency multiplies; failure combinations explode.
-- **Rule:** Batch APIs, materialized read models, BFF aggregation, or denormalized cache — measure p99 call fan-out.
+- **Rule:** Batch APIs, materialized read models, BFF aggregation, or denormalized cache - measure p99 call fan-out.
 
 ### 3.5 Missing API versioning
 
@@ -380,7 +380,7 @@ State these as **testable claims** for non-trivial work:
 ### 4.8 Hardcoded configuration
 
 - **Mistake:** URLs, keys, limits in source.
-- **Rule:** See `no-hardcoded-env-vars` — `settings` singleton only.
+- **Rule:** See `no-hardcoded-env-vars` - `settings` singleton only.
 
 ---
 
@@ -602,7 +602,7 @@ State these as **testable claims** for non-trivial work:
 
 ### 11.5 Missing failure-path tests
 
-- Timeouts, 409 conflicts, validation errors, partial saga — not only happy path.
+- Timeouts, 409 conflicts, validation errors, partial saga - not only happy path.
 
 ### 11.6 No load / soak for scale-critical features
 
@@ -655,7 +655,7 @@ Copy into PR description or task close-out when applicable:
 - [ ] No cross-boundary imports; APIs/events only
 - [ ] Transport thin; logic owns orchestration
 - [ ] Typed contracts at boundaries; no raw dicts through layers
-- [ ] Config via `settings` / env — no hardcoded secrets or URLs
+- [ ] Config via `settings` / env - no hardcoded secrets or URLs
 - [ ] Async-safe: no blocking in async handlers
 - [ ] No shared mutable module state
 
@@ -704,4 +704,4 @@ Copy into PR description or task close-out when applicable:
 | Git push / rebase safety | `safe-git-push` |
 | LMP microservice code review procedure | `lmp-code-review` skill |
 
-**This rule does not replace those** — it adds **actionable anti-patterns** and **automatic domain prioritization** before and during implementation.
+**This rule does not replace those** - it adds **actionable anti-patterns** and **automatic domain prioritization** before and during implementation.

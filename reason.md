@@ -1,4 +1,4 @@
-# Aurex — Design Decisions & Internal Architecture
+# Aurex - Design Decisions & Internal Architecture
 
 This document explains **what Aurex is**, **how the SDK and backend actually work inside**, and **why we built things the way we did**. It is not limited to one feature or one chat session. Use it before changing SDK behavior, ingest contracts, guards, or documentation.
 
@@ -289,13 +289,13 @@ Here is the full path for a patched OpenAI chat completion (non-streaming):
 3. Extract workflow_id, tags from kwargs or context
 4. pre_call_check(model, prompt, messages, workflow_id)
       → AurexDecision: proceed | downgrade | compress | block | cache_suggest
-5. apply_decision_to_call_params — may change model/messages or raise AurexBlocked
+5. apply_decision_to_call_params - may change model/messages or raise AurexBlocked
 6. _call_with_resilience (if resilience.enabled) OR direct original()
 7. Provider returns response OR throws
 8. Classify + log each resilience attempt (if enabled)
 9. Parse usage tokens from response
 10. log_event(model, tokens, cost, workflow_id, …)
-11. _check_budget — post-call budget reaction (warn/webhook/throw)
+11. _check_budget - post-call budget reaction (warn/webhook/throw)
 12. Return response to app (or raise)
 ```
 
@@ -356,10 +356,10 @@ Can **block before** the provider is invoked.
 
 Runs after `log_event` updates session totals. Reacts to **actual** spend:
 
-- `on_budget_exceeded: warn` — stderr log  
-- `webhook` — POST to customer URL  
-- `throw` — raise `AurexBudgetExceeded`  
-- `dry_run` — evaluate only  
+- `on_budget_exceeded: warn` - stderr log  
+- `webhook` - POST to customer URL  
+- `throw` - raise `AurexBudgetExceeded`  
+- `dry_run` - evaluate only  
 
 **Why two phases:** Pre-call prevents the next call; post-call catches drift when token estimates were wrong or multiple workers share a workflow id inconsistently.
 
@@ -382,7 +382,7 @@ Runs after `log_event` updates session totals. Reacts to **actual** spend:
 3. `calculate_cost(model, input_tokens, output_tokens, cache…)`  
 4. Build event dict (provider, model, workflow, outcome, resilience fields, tags)  
 5. Update in-memory session and minute windows (for guards)  
-6. `queue.put_nowait(event)` — or spill to overflow file if full  
+6. `queue.put_nowait(event)` - or spill to overflow file if full  
 
 ### On the worker thread (slow)
 
@@ -419,8 +419,8 @@ Runs after `log_event` updates session totals. Reacts to **actual** spend:
 
 ### Environment overrides
 
-- `AUREX_LEDGER_PATH` — force writable path in read-only containers  
-- `AUREX_WORKER_ID` — stable suffix instead of PID when workers restart  
+- `AUREX_LEDGER_PATH` - force writable path in read-only containers  
+- `AUREX_WORKER_ID` - stable suffix instead of PID when workers restart  
 
 ---
 
@@ -501,9 +501,9 @@ These log synthetic events (`model: aurex-outcome`, `cost_type: outcome_signal`)
 
 ### The problem
 
-1. **Hard failures** — timeouts, 429, 5xx (often not billed; manual retry costs money)  
-2. **Soft failures** — HTTP 200 but empty/filtered/truncated/refused (**still billed**)  
-3. **Manual reroute** — second provider call after failure (duplicate cost; invisible savings)  
+1. **Hard failures** - timeouts, 429, 5xx (often not billed; manual retry costs money)  
+2. **Soft failures** - HTTP 200 but empty/filtered/truncated/refused (**still billed**)  
+3. **Manual reroute** - second provider call after failure (duplicate cost; invisible savings)  
 
 ### What we built
 
@@ -533,8 +533,8 @@ Soft failures set `billed=true` and `cost_type=unfulfilled_spend`.
 
 | Mode | Calls provider | Changes behavior? |
 | :--- | :--- | :--- |
-| observe | Once | No — only extra telemetry + counterfactual `loss_avoided` |
-| enforce | Up to `max_attempts` | Yes — retry/backoff/fallback within cost cap |
+| observe | Once | No - only extra telemetry + counterfactual `loss_avoided` |
+| enforce | Up to `max_attempts` | Yes - retry/backoff/fallback within cost cap |
 
 **Rollout path:** enable → observe → prove dashboard ROI → enforce.
 
@@ -548,19 +548,19 @@ auditor.register_fallback("mini", call_fn, provider="openai", model="gpt-4o-mini
 
 ### Counterfactual accounting
 
-- `projected_cost` — what a naive manual reroute would cost  
-- `loss_avoided` — value recovered or preventable waste  
+- `projected_cost` - what a naive manual reroute would cost  
+- `loss_avoided` - value recovered or preventable waste  
 
 Backend dashboard: `billed_but_failed_cost`, `loss_avoided`, `recovery_rate`.
 
 ### Fail-open (again)
 
-If resilience code bugs out → single raw provider call. If provider already failed → re-raise that error (never double-call in observe mode — we fixed this bug in Node and Python).
+If resilience code bugs out → single raw provider call. If provider already failed → re-raise that error (never double-call in observe mode - we fixed this bug in Node and Python).
 
 ### Exceptions
 
-- `AurexResilienceExhausted` — enforce mode, ladder exhausted  
-- `AurexRecovered` — informational recovery signal  
+- `AurexResilienceExhausted` - enforce mode, ladder exhausted  
+- `AurexRecovered` - informational recovery signal  
 
 ---
 
@@ -581,7 +581,7 @@ Outputs a **credit score** (100 − waste%) and ranked issues.
 
 ### CI flags
 
-- `--fail-under`, `--max-waste-usd`, `--mode block` — fail pipeline on policy breach  
+- `--fail-under`, `--max-waste-usd`, `--mode block` - fail pipeline on policy breach  
 
 **Decision:** Default CI mode is `warn` (exit 0) so adoption doesn’t break builds on day one.
 
@@ -627,7 +627,7 @@ FastAPI app at `/api/v1` with routers:
 `POST /api/v1/ledger/events`
 
 - Auth: API key with `ledger:write` scope  
-- Project id from key — **never trust body**  
+- Project id from key - **never trust body**  
 - Batch up to 500 events  
 - Rate limit ~600 events/minute per key  
 - Sets `LLMEvent.project_id`  
@@ -643,7 +643,7 @@ FastAPI app at `/api/v1` with routers:
 
 ### Ingest service (`services/ledger.py`)
 
-- Per-event try/except — one bad row doesn’t reject batch  
+- Per-event try/except - one bad row doesn’t reject batch  
 - Server calculates cost if client omitted it  
 - Maps resilience fields to columns + metadata  
 - Optional Pub/Sub publish for realtime dashboard  
@@ -654,14 +654,14 @@ FastAPI app at `/api/v1` with routers:
 
 ### Auth modes
 
-1. **JWT** — dashboard users (OTP email / Google OAuth)  
-2. **API key** — SDK (`aux_*` Argon2; legacy `ax_live_*` SHA-256)  
-3. **Hybrid** — some routes accept either  
+1. **JWT** - dashboard users (OTP email / Google OAuth)  
+2. **API key** - SDK (`aux_*` Argon2; legacy `ax_live_*` SHA-256)  
+3. **Hybrid** - some routes accept either  
 
 ### Security decisions (from security remediation work)
 
 - Default JWT secret blocked in production startup  
-- Company access checks use exact domain match (not substring — IDOR fix)  
+- Company access checks use exact domain match (not substring - IDOR fix)  
 - OTP: disposable email blocklist, rate limits  
 - API key revocation cached in Redis with in-process fallback when Redis absent  
 - Keys with `scopes=null` grandfathered (backward compat)  
@@ -686,7 +686,7 @@ Dashboard queries filter by `project_id` from JWT or org membership. SDK events 
 
 Categories include `reliability_savings` separate from `runaway_loop`, `expensive_model_misuse`, etc.
 
-**Why split categories:** Different fixes — reliability needs fallbacks; misuse needs downgrade rules.
+**Why split categories:** Different fixes - reliability needs fallbacks; misuse needs downgrade rules.
 
 ### Realtime SSE
 
@@ -726,7 +726,7 @@ Single `NEXT_PUBLIC_API_URL`; JWT in localStorage; typed interfaces mirroring ba
 
 ### Theme
 
-Dark-first **oklch** semantic tokens (`--shell`, `--surface`, …). Recent work **lightened** near-black backgrounds for readability — cosmetic, not structural.
+Dark-first **oklch** semantic tokens (`--shell`, `--surface`, …). Recent work **lightened** near-black backgrounds for readability - cosmetic, not structural.
 
 ### Docs as product
 
@@ -734,7 +734,7 @@ Dual Python/Node code blocks; `/llms.txt` agent routing table; reliability docs 
 
 ### Testimonials / savings UX
 
-ROI figures updated to conservative numbers ($650/mo) — marketing honesty decision, not SDK logic.
+ROI figures updated to conservative numbers ($650/mo) - marketing honesty decision, not SDK logic.
 
 ---
 
@@ -742,7 +742,7 @@ ROI figures updated to conservative numbers ($650/mo) — marketing honesty deci
 
 ### Problem we solved
 
-One 890-line reference page caused **context rot** for AI agents — too much irrelevant text per task.
+One 890-line reference page caused **context rot** for AI agents - too much irrelevant text per task.
 
 ### Solution
 
@@ -798,8 +798,8 @@ AurexConfig(cloud_sync=False)  # or local_only=True
 
 ### Backend migrations
 
-1. `migrate_001_extend_event_schema` (if needed) — status, latency, finish_reason, …  
-2. `migrate_002_reliability_fields` — projected_cost, recovery_provider, attempt_index  
+1. `migrate_001_extend_event_schema` (if needed) - status, latency, finish_reason, …  
+2. `migrate_002_reliability_fields` - projected_cost, recovery_provider, attempt_index  
 
 ### Serverless checklist
 
@@ -878,7 +878,7 @@ AurexConfig(cloud_sync=False)  # or local_only=True
 
 - **Integrating the SDK?** Start with [§6 Three ways to integrate](#6-three-ways-to-integrate) and [§9 step by step](#9-what-happens-on-every-llm-call-step-by-step).  
 - **Debugging missing events?** [§13 Local ledger](#13-the-local-ledger) and [§14 Cloud sync](#14-cloud-sync-sdk--backend).  
-- **Turning on retry/fallback?** [§17 Provider resilience](#17-provider-resilience-retry--fallbacks) — start in **observe** mode.  
+- **Turning on retry/fallback?** [§17 Provider resilience](#17-provider-resilience-retry--fallbacks) - start in **observe** mode.  
 - **AI agent loading docs?** `/llms.txt` first, then **one** sub-page URL per task.  
 - **Changing ingest schema?** [§21 Two ways events enter](#21-two-ways-events-enter-the-database) and migration scripts.
 

@@ -1,8 +1,9 @@
 """
-Aurex Zero-Trust, Local-First SDK
-Provides asynchronous, zero-PII auditing for LLM costs and credit scoring.
-Token waste prevention platform — detects loops, compresses prompts, routes
-to cheaper models, and fails over between providers.
+Aurex Python SDK - AI Runtime Layer
+
+An in-process runtime layer for AI applications and autonomous agents.
+Automatically routes requests, compresses context, detects behavioral loops,
+and handles provider failovers with sub-2ms overhead.
 """
 
 import warnings
@@ -21,7 +22,7 @@ def patch_all(client=None):
     """Auto-detect and patch all installed LLM provider libraries.
     
     Convenience wrapper around AurexAuditor.patch_all(). Safe to call
-    multiple times — idempotent.
+    multiple times - idempotent.
     
     Args:
         client: An AurexAuditor instance. If None, uses the singleton.

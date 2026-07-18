@@ -12,7 +12,6 @@ import { useTheme } from "next-themes";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navLinks = [
-  { name: "Pricing", href: "/#pricing" },
   { name: "Docs", href: "/docs" },
   { name: "Changelog", href: "/changelog" },
 ];

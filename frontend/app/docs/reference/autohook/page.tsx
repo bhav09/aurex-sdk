@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Zero-Code Auto-Hook — Aurex SDK",
+  title: "Zero-Code Auto-Hook - Aurex SDK",
   description: "Install Aurex runtime hooks for OpenAI, Anthropic, LiteLLM, and more without code changes.",
 };
 
@@ -30,7 +30,7 @@ export default function DocsAutohookPage() {
       description="Inject Aurex at import time so standard LLM client libraries are tracked without modifying call sites."
       agentHint="Use this page when the user wants install-hook, AUREX_ENABLED, or zero-code provider tracking."
       scopeIn={["aurex install-hook / npx aurex install-hook", "AUREX_ENABLED activation", "Uninstall commands"]}
-      scopeOut={["Manual singleton setup — see Manual Integration", "Provider matrix details — see Supported Providers"]}
+      scopeOut={["Manual singleton setup - see Manual Integration", "Provider matrix details - see Supported Providers"]}
     >
       <DualCodeBlock
         pythonCode={pythonHookCode}

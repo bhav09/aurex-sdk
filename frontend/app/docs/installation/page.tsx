@@ -3,7 +3,7 @@ import { DocHashRedirect } from "@/components/docs/doc-hash-redirect";
 import { Terminal } from "lucide-react";
 
 export const metadata = {
-  title: "Installation — Aurex SDK",
+  title: "Installation - Aurex SDK",
   description: "Install and configure the Aurex Python and Node.js SDKs.",
 };
 
@@ -48,7 +48,7 @@ export default function DocsInstallationPage() {
           Installation & Quick Start
         </h1>
         <p className="text-white/50 mt-2">
-          Install either SDK, set your project API key, and start logging metadata-only telemetry.
+          Install either SDK, set your API key, and start routing requests in under two minutes.
         </p>
       </div>
 

@@ -1,5 +1,5 @@
 """
-Provider pricing catalog — May 2026.
+Provider pricing catalog - May 2026.
 
 Loads structured per-model pricing from backend/data/pricing/<provider>.json
 files (scraped from official provider docs by scripts/scrape_pricing.py).

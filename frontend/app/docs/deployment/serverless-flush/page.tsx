@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Serverless Flush — Aurex SDK",
+  title: "Serverless Flush - Aurex SDK",
   description: "Flush telemetry before Lambda and short-lived handlers return.",
 };
 
@@ -31,9 +31,9 @@ export default function DocsServerlessFlushPage() {
     <DocPageShell
       title="Serverless Flush"
       description="Background sync may not finish before a frozen Lambda or Edge runtime. Flush explicitly at handler end."
-      agentHint="Use when deploying to Lambda, Cloud Functions, or Vercel — call flush() or await flushAndWait()."
+      agentHint="Use when deploying to Lambda, Cloud Functions, or Vercel - call flush() or await flushAndWait()."
       scopeIn={["flush() Python", "flushAndWait() Node", "Handler exit pattern"]}
-      scopeOut={["Ledger path on read-only FS — see Filesystem", "HTTP retry — see Cloud Sync"]}
+      scopeOut={["Ledger path on read-only FS - see Filesystem", "HTTP retry - see Cloud Sync"]}
     >
       <DualCodeBlock
         pythonCode={pythonServerless}

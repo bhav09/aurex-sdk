@@ -1,7 +1,7 @@
 # Alembic migrations
 
 DB schema is owned by Alembic going forward. `init_db()` (raw `create_all`) still
-runs at startup for fresh dev databases and is idempotent — Alembic handles the
+runs at startup for fresh dev databases and is idempotent - Alembic handles the
 deltas for already-provisioned databases.
 
 ## Common commands

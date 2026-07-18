@@ -344,7 +344,7 @@ export function SavingsPanel({
                     <div className="space-y-2 flex-1">
                         <h3 className="font-semibold text-white text-sm">Savings audit framework</h3>
                         <p className="text-xs text-white/60 leading-relaxed font-mono">
-                            Tracks realized dollar savings from baseline leakage through optimized spend — cache hits,
+                            Tracks realized dollar savings from baseline leakage through optimized spend - cache hits,
                             model downgrades, and loop prevention.
                         </p>
                     </div>
@@ -386,7 +386,7 @@ export function SavingsPanel({
                         <p className="text-2xl font-display font-bold text-[#2dd4bf] tabular-nums">
                             {displayData.annualized_savings_run_rate > 0
                                 ? `${Math.max(3, Math.round(displayData.annualized_savings_run_rate / 600))}×`
-                                : "—"}
+                                : "-"}
                         </p>
                         <p className="text-[10px] font-mono text-white/25">vs tooling cost baseline</p>
                     </div>

@@ -1,7 +1,7 @@
 {
   "name": "aurex-sdk",
   "version": "0.1.0",
-  "description": "Aurex AI FinOps SDK — zero-code LLM cost auditing.",
+  "description": "Aurex AI FinOps SDK - zero-code LLM cost auditing.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -27,11 +27,21 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependenciesMeta": {
-    "@anthropic-ai/sdk": { "optional": true },
-    "litellm": { "optional": true },
-    "@google/genai": { "optional": true },
-    "ollama": { "optional": true },
-    "@huggingface/inference": { "optional": true }
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "litellm": {
+      "optional": true
+    },
+    "@google/genai": {
+      "optional": true
+    },
+    "ollama": {
+      "optional": true
+    },
+    "@huggingface/inference": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18"

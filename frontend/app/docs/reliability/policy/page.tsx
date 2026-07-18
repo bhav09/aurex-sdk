@@ -3,7 +3,7 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "ResiliencePolicy — Aurex SDK",
+  title: "ResiliencePolicy - Aurex SDK",
   description: "resilience configuration under AurexConfig for Python and Node.js.",
 };
 
@@ -44,7 +44,7 @@ export default function DocsReliabilityPolicyPage() {
       description="Configure provider-call resilience under the resilience key on AurexConfig."
       agentHint="Use for resilience.enabled, mode, max_attempts, max_extra_cost_usd, retry_on, backoff, idempotency."
       scopeIn={["All ResiliencePolicy fields", "Minimal config example"]}
-      scopeOut={["Mode semantics — see Observe vs Enforce", "Fallback registration — see Fallbacks"]}
+      scopeOut={["Mode semantics - see Observe vs Enforce", "Fallback registration - see Fallbacks"]}
     >
       <DualCodeBlock pythonCode={pythonConfig} nodeCode={nodeConfig} pythonId="rel-config-py" nodeId="rel-config-node" />
 

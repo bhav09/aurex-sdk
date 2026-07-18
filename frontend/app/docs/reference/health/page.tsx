@@ -3,8 +3,8 @@ import { DocPageShell } from "@/components/docs/doc-page-shell";
 import { DocSeeAlso } from "@/components/docs/doc-see-also";
 
 export const metadata = {
-  title: "Health & Recovery — Aurex SDK",
-  description: "get_health status, sync errors, crash recovery via pending.jsonl.",
+  title: "Health & Status - Aurex SDK",
+  description: "Runtime health, sync status, and recovery state.",
 };
 
 const pythonHealthCode = `health = auditor.get_health()
@@ -18,11 +18,11 @@ const nodeHealthCode = `const health = auditor.getHealth();
 export default function DocsHealthPage() {
   return (
     <DocPageShell
-      title="Health & Crash Recovery"
-      description="Inspect sync thread health and recover telemetry buffered to pending.jsonl after crashes."
+      title="Health & Status"
+      description="Inspect runtime health, sync status, and recovery state. Events buffered during crashes are replayed automatically on next startup."
       agentHint="Use for get_health / getHealth, events_dropped, patch_status, and pending file recovery."
       scopeIn={["Health dict fields", "Crash durability via pending.jsonl", "patch_status visibility"]}
-      scopeOut={["Cloud sync retry config — see Cloud Sync Resilience", "Serverless flush — see Serverless Flush"]}
+      scopeOut={["Cloud sync config - see Cloud Sync", "Serverless flush - see Serverless"]}
     >
       <p className="text-white/50 text-sm">
         On unclean shutdown, events spill to <code className="text-teal-400">pending.jsonl</code> and replay on next
