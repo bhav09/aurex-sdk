@@ -6,7 +6,7 @@
 
 Aurex is an in-process runtime layer for artificial intelligence applications and autonomous agent systems. Operating directly within application host processes, Aurex monitors, routes, compresses, and safeguards every large language model (LLM) interaction in real time with under 2 milliseconds of overhead.
 
-Designed for enterprise engineering teams and technology leadership, Aurex provides high-reliability execution, intelligent model routing, and automated cost optimization without compromising data privacy or application responsiveness.
+Designed for enterprise engineering teams and technology leadership, Aurex provides high-reliability execution, intelligent model routing, and automated cost optimization without compromising data privacy or application responsiveness. 
 
 ---
 
