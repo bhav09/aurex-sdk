@@ -80,6 +80,29 @@ def find_first_mutating_offset(prev_text: str, curr_text: str) -> Tuple[Optional
     return offset, kind
 
 
+def extract_effective_system(
+    system_prompt: Optional[Any] = None,
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """Extract canonicalized system/developer instruction layer (preserving cache_control metadata)."""
+    if system_prompt:
+        if isinstance(system_prompt, str):
+            return system_prompt
+        return json.dumps(canonicalize_json_keys(system_prompt), default=str)
+    if messages:
+        parts: List[str] = []
+        for m in messages:
+            if isinstance(m, dict) and m.get("role") in ("system", "developer"):
+                content = m.get("content")
+                if isinstance(content, str):
+                    parts.append(content)
+                elif content is not None:
+                    parts.append(json.dumps(canonicalize_json_keys(content), default=str))
+        if parts:
+            return "\n".join(parts)
+    return ""
+
+
 def inspect_pre_call_shield(
     *,
     state_store: StateStore,
@@ -87,7 +110,7 @@ def inspect_pre_call_shield(
     model: str,
     estimated_tokens: int,
     now: float,
-    system_prompt: Optional[str] = None,
+    system_prompt: Optional[Any] = None,
     messages: Optional[List[Dict[str, Any]]] = None,
     tools: Optional[Any] = None,
     default_pricing: Optional[Dict[str, float]] = None,
@@ -97,13 +120,7 @@ def inspect_pre_call_shield(
     report = PrefixShieldReport()
     resolved_prov = provider or extract_provider(model)
 
-    # Extract effective system text
-    effective_system = system_prompt or ""
-    if not effective_system and messages:
-        for m in messages:
-            if isinstance(m, dict) and m.get("role") == "system" and isinstance(m.get("content"), str):
-                effective_system = m["content"]
-                break
+    effective_system = extract_effective_system(system_prompt, messages)
 
     canon_tools_str = json.dumps(canonicalize_json_keys(tools), default=str) if tools else ""
     tools_hash = _sha256(canon_tools_str)
@@ -184,13 +201,41 @@ def inspect_pre_call_shield(
 
 
 def append_tail_instruction(params: Dict[str, Any], instruction: str) -> Dict[str, Any]:
-    """Append runtime guidance at the tail of messages so static prefix caches never break."""
+    """Append runtime guidance at the tail of messages/input/contents so static prefix caches never break."""
     if not instruction:
         return params
     next_params = dict(params)
-    messages = list(next_params.get("messages") or [])
     suffix = f"\n\n[Aurex Guidance: {instruction}]"
 
+    # OpenAI Responses API uses `input` instead of `messages`
+    if "input" in next_params and "messages" not in next_params:
+        raw_in = next_params.get("input")
+        if isinstance(raw_in, str):
+            next_params["input"] = f"{raw_in}{suffix}"
+        elif isinstance(raw_in, list):
+            items = list(raw_in)
+            if items and isinstance(items[-1], dict) and items[-1].get("role") == "user" and isinstance(items[-1].get("content"), str):
+                items[-1] = {**items[-1], "content": f"{items[-1]['content']}{suffix}"}
+            else:
+                items.append({"role": "user", "content": instruction})
+            next_params["input"] = items
+        return next_params
+
+    # Google Gemini API uses `contents` instead of `messages`
+    if "contents" in next_params and "messages" not in next_params:
+        raw_c = next_params.get("contents")
+        if isinstance(raw_c, str):
+            next_params["contents"] = f"{raw_c}{suffix}"
+        elif isinstance(raw_c, list):
+            items = list(raw_c)
+            if items and isinstance(items[-1], str):
+                items[-1] = f"{items[-1]}{suffix}"
+            else:
+                items.append(suffix.strip())
+            next_params["contents"] = items
+        return next_params
+
+    messages = list(next_params.get("messages") or [])
     if messages and isinstance(messages[-1], dict) and messages[-1].get("role") == "user":
         last_msg = dict(messages[-1])
         if isinstance(last_msg.get("content"), str):

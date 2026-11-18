@@ -80,13 +80,13 @@ def is_expensive_model(model: str) -> bool:
 
 
 def compress_messages(messages: Any) -> Any:
-    """Deduplicate consecutive identical system messages within a single messages list."""
+    """Deduplicate consecutive identical system/developer messages within a single messages list."""
     if not isinstance(messages, list) or len(messages) < 2:
         return messages
     out = []
     last_system_hash = None
     for m in messages:
-        if isinstance(m, dict) and m.get("role") == "system" and isinstance(m.get("content"), str):
+        if isinstance(m, dict) and m.get("role") in ("system", "developer") and isinstance(m.get("content"), str):
             h = m["content"][:64]
             if h == last_system_hash:
                 continue
@@ -112,12 +112,6 @@ def apply_decision_to_call_params(params: Dict[str, Any], decision: AurexDecisio
 
     if decision.action == "downgrade" and decision.suggested_model:
         next_params["model"] = decision.suggested_model
-        extra_metadata = next_params.get("extra_metadata", {})
-        if not isinstance(extra_metadata, dict):
-            extra_metadata = {}
-        extra_metadata["aurex_original_model"] = decision.original_model or params.get("model")
-        extra_metadata["aurex_model_downgraded"] = True
-        next_params["extra_metadata"] = extra_metadata
 
     if decision.compressed_messages is not None:
         next_params["messages"] = decision.compressed_messages
@@ -134,11 +128,5 @@ def apply_decision_to_call_params(params: Dict[str, Any], decision: AurexDecisio
         is_downgraded=(decision.action == "downgrade" and bool(decision.suggested_model)),
         max_thinking_tokens=decision.max_thinking_tokens,
     )
-
-    if decision.shield_meta:
-        extra_metadata = next_params.get("extra_metadata")
-        extra_dict = dict(extra_metadata) if isinstance(extra_metadata, dict) else {}
-        extra_dict["stage1_shield"] = decision.shield_meta
-        next_params["extra_metadata"] = extra_dict
 
     return next_params

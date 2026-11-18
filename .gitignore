@@ -18,8 +18,10 @@ __pycache__/
 # Google service accounts
 aurex-*.json
 
-# Coverage & backend data
+# Coverage, pytest cache & backend data
 .coverage
+.pytest_cache/
+**/.pytest_cache/
 backend/data/
 backend/.venv/
 
@@ -39,6 +41,14 @@ Features Aurex.pdf
 # Log files
 *.log
 **/*.log
+
+# Environment secrets (keep .env.example templates tracked)
+.env
+.env.local
+.env.*.local
+**/.env
+!.env.example
+!**/.env.example
 
 # JSON results
 session.json

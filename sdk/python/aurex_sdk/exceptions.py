@@ -88,3 +88,33 @@ class AurexResilienceExhausted(AurexError):
         super().__init__(message, workflow_id=workflow_id, last_error=last_error)
         self.workflow_id = workflow_id
         self.last_error = last_error
+
+
+class AurexProviderDriftError(AurexError):
+    """Raised in strict mode when an upstream provider SDK changes expected symbols or schemas."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider: str,
+        provider_version: str | None = None,
+        sdk_version: str | None = None,
+        missing_symbol: str | None = None,
+    ):
+        resolved_ver = provider_version or sdk_version
+        super().__init__(
+            message,
+            provider=provider,
+            provider_version=resolved_ver,
+            sdk_version=resolved_ver,
+            missing_symbol=missing_symbol,
+        )
+        self.provider = provider
+        self.provider_version = resolved_ver
+        self.sdk_version = resolved_ver
+        self.missing_symbol = missing_symbol
+
+
+class AurexProviderWarning(UserWarning):
+    """Emitted in fail-open production mode when an upstream provider SDK contract drifts."""

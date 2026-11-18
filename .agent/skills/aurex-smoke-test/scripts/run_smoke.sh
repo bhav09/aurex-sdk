@@ -23,14 +23,14 @@ AurexAuditor.reset()
 print('   Python SDK core import & lifecycle OK')
 "
 
-if ls "$ROOT_DIR/sdk/python"/test_*.py >/dev/null 2>&1; then
-  (cd "$ROOT_DIR/sdk/python" && PYTHONPATH="$ROOT_DIR/sdk/python" "$PYTHON_BIN" -m pytest -q)
+if [ -d "$ROOT_DIR/sdk/python/tests" ] || ls "$ROOT_DIR/sdk/python"/test_*.py >/dev/null 2>&1; then
+  (cd "$ROOT_DIR/sdk/python" && PYTHONPATH="$ROOT_DIR/sdk/python:$ROOT_DIR/sdk/python/tests" "$PYTHON_BIN" -m pytest -q)
 fi
 
-# 2. Node.js SDK build & smoke check
+# 2. Node.js SDK build, real-usage Vitest suite & smoke check
 echo "-> [2/3] Checking Node.js SDK..."
 if [ -d "$ROOT_DIR/sdk/node/node_modules" ]; then
-  (cd "$ROOT_DIR/sdk/node" && npm run build)
+  (cd "$ROOT_DIR/sdk/node" && npm run build && npm test)
 fi
 if [ -f "$ROOT_DIR/sdk/node/scripts/run-smoke.mjs" ]; then
   (cd "$ROOT_DIR/sdk/node" && node scripts/run-smoke.mjs)

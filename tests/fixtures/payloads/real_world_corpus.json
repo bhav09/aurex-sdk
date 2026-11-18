@@ -1,0 +1,135 @@
+{
+  "coding_agent_tools": [
+    {"type": "function", "function": {"name": "read_file", "description": "Read a file from workspace", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start_line": {"type": "integer"}, "end_line": {"type": "integer"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "edit_file", "description": "Replace exact target text in file", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "target": {"type": "string"}, "replacement": {"type": "string"}}, "required": ["path", "target", "replacement"]}}},
+    {"type": "function", "function": {"name": "bash", "description": "Execute shell command", "parameters": {"type": "object", "properties": {"cmd": {"type": "string"}, "timeout_ms": {"type": "integer"}}, "required": ["cmd"]}}},
+    {"type": "function", "function": {"name": "grep_search", "description": "Regex search across repository", "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "glob": {"type": "string"}}, "required": ["pattern"]}}},
+    {"type": "function", "function": {"name": "run_pytest", "description": "Run pytest suite", "parameters": {"type": "object", "properties": {"target": {"type": "string"}, "markers": {"type": "string"}}, "required": ["target"]}}},
+    {"type": "function", "function": {"name": "git_diff", "description": "Show git diff", "parameters": {"type": "object", "properties": {"staged": {"type": "boolean"}}, "required": []}}},
+    {"type": "function", "function": {"name": "query_postgres", "description": "Run read-only SQL", "parameters": {"type": "object", "properties": {"sql": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["sql"]}}},
+    {"type": "function", "function": {"name": "fetch_docs", "description": "Fetch internal API spec", "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}}},
+    {"type": "function", "function": {"name": "check_ci", "description": "Inspect GitHub Actions workflow status", "parameters": {"type": "object", "properties": {"pr_number": {"type": "integer"}}, "required": ["pr_number"]}}},
+    {"type": "function", "function": {"name": "lint_code", "description": "Run ruff and mypy", "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}, "required": ["paths"]}}},
+    {"type": "function", "function": {"name": "list_dir", "description": "List directory entries", "parameters": {"type": "object", "properties": {"dir_path": {"type": "string"}}, "required": ["dir_path"]}}},
+    {"type": "function", "function": {"name": "create_pr", "description": "Open pull request", "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]}}}
+  ],
+  "developer_prompt": "You are Principal SWE Agent v4.2 operating inside a production monorepo. Always run unit tests after editing SQLAlchemy connection pooling or FastAPI middleware. Never modify migration hashes.",
+  "anthropic_claude_code": {
+    "system_blocks_1h": [
+      {
+        "type": "text",
+        "text": "You are Claude Code operating on the payments-ledger service. Respect strict idempotency invariants.",
+        "cache_control": {"type": "ephemeral", "ttl": "1h"}
+      },
+      {
+        "type": "text",
+        "text": "Repository map: src/ledger/pool.py, src/ledger/models.py, src/api/routes.py, tests/test_ledger.py.",
+        "cache_control": {"type": "ephemeral"}
+      }
+    ],
+    "extended_thinking_response": {
+      "id": "msg_01RealThinkingResp",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-sonnet-4-20250514",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "Let me inspect pool_pre_ping and max_overflow in src/ledger/pool.py. Under burst traffic, stale connections cause QueuePool TimeoutError unless pool_recycle=1800 is configured.",
+          "signature": "ErUBCkYICBgCIkD9realSignatureBytes=="
+        },
+        {
+          "type": "text",
+          "text": "Set `pool_pre_ping=True` and `pool_recycle=1800` in `src/ledger/pool.py` to prevent stale PostgreSQL socket exhaustion."
+        }
+      ],
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 140,
+        "output_tokens": 820,
+        "cache_read_input_tokens": 18500,
+        "cache_creation_input_tokens": 4200,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 1200,
+          "ephemeral_1h_input_tokens": 3000
+        }
+      }
+    },
+    "thinking_exhausted_response": {
+      "id": "msg_02ExhaustedThinking",
+      "type": "message",
+      "role": "assistant",
+      "model": "claude-sonnet-4-20250514",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "Analyzing all 48 deadlock permutations across shards 0..47 before emitting any user-visible answer...",
+          "signature": "ErUBCkYICBgCIkD9exhaustedSig=="
+        }
+      ],
+      "stop_reason": "max_tokens",
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 320,
+        "output_tokens": 4096,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      }
+    },
+    "sse_stream_events": [
+      {"event": "message_start", "data": {"type": "message_start", "message": {"id": "msg_stream_01", "type": "message", "role": "assistant", "model": "claude-sonnet-4-20250514", "content": [], "stop_reason": null, "stop_sequence": null, "usage": {"input_tokens": 120, "output_tokens": 1, "cache_read_input_tokens": 12000, "cache_creation_input_tokens": 2000, "cache_creation": {"ephemeral_5m_input_tokens": 500, "ephemeral_1h_input_tokens": 1500}}}}},
+      {"event": "content_block_start", "data": {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}}},
+      {"event": "content_block_delta", "data": {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "Checking cache hit ratio and pool settings..."}}},
+      {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 0}},
+      {"event": "content_block_start", "data": {"type": "content_block_start", "index": 1, "content_block": {"type": "text", "text": ""}}},
+      {"event": "content_block_delta", "data": {"type": "content_block_delta", "index": 1, "delta": {"type": "text_delta", "text": "Fixed connection pool "}}},
+      {"event": "content_block_delta", "data": {"type": "content_block_delta", "index": 1, "delta": {"type": "text_delta", "text": "leak in production."}}},
+      {"event": "content_block_stop", "data": {"type": "content_block_stop", "index": 1}},
+      {"event": "message_delta", "data": {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": null}, "usage": {"output_tokens": 95}}},
+      {"event": "message_stop", "data": {"type": "message_stop"}}
+    ]
+  },
+  "openai_payloads": {
+    "structured_invoice_json": "{\"invoice_id\":\"INV-2026-991\",\"vendor\":\"CloudGPU Inc\",\"line_items\":[{\"sku\":\"H200-SXM\",\"qty\":4,\"unit_usd\":3200.0}],\"total_usd\":12800.0}",
+    "grammar_newline_flood": "{\"invoice_id\":\"INV-2026-991\"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "grammar_repeated_keys": "{\"item\": 1, \"item\": 1, \"item\": 1, \"item\": 1, \"item\": 1, \"item\": 1, \"item\": 1, \"item\": 1, \"item\": 1}",
+    "responses_api_json": {
+      "id": "resp_01RealResponsesAPI",
+      "object": "response",
+      "created_at": 1763470000,
+      "status": "completed",
+      "model": "gpt-4.1",
+      "output": [
+        {
+          "type": "message",
+          "id": "msg_resp_01",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {"type": "output_text", "text": "Deployed canary release v2.8.4 with zero error spikes.", "annotations": []}
+          ]
+        }
+      ],
+      "usage": {
+        "input_tokens": 1250,
+        "input_tokens_details": {"cached_tokens": 1024},
+        "output_tokens": 180,
+        "output_tokens_details": {"reasoning_tokens": 64},
+        "total_tokens": 1430
+      }
+    },
+    "responses_sse_events": [
+      {"event": "response.created", "data": {"type": "response.created", "response": {"id": "resp_stream_01", "object": "response", "status": "in_progress", "model": "o4-mini", "output": []}}},
+      {"event": "response.output_text.delta", "data": {"type": "response.output_text.delta", "item_id": "msg_1", "output_index": 0, "content_index": 0, "delta": "Canary metrics "}},
+      {"event": "response.output_text.delta", "data": {"type": "response.output_text.delta", "item_id": "msg_1", "output_index": 0, "content_index": 0, "delta": "look healthy."}},
+      {"event": "response.completed", "data": {"type": "response.completed", "response": {"id": "resp_stream_01", "object": "response", "status": "completed", "model": "o4-mini", "output": [{"type": "message", "id": "msg_1", "status": "completed", "role": "assistant", "content": [{"type": "output_text", "text": "Canary metrics look healthy.", "annotations": []}]}], "usage": {"input_tokens": 900, "input_tokens_details": {"cached_tokens": 512}, "output_tokens": 140, "output_tokens_details": {"reasoning_tokens": 96}, "total_tokens": 1040}}}}
+    ]
+  },
+  "multilingual_samples": {
+    "hindi": "नमस्ते, कृपया इस उत्पादन भुगतान सेवा के सभी त्रुटि लॉग और विलंबता मेट्रिक्स का विश्लेषण करें।",
+    "japanese": "本番環境のPostgreSQLコネクションプールが枯渇し、504タイムアウトが発生しています。至急調査してください。",
+    "arabic": "يرجى مراجعة تكلفة استدعاءات نماذج الذكاء الاصطناعي وتحديد التسريبات في ذاكرة التخزين المؤقت.",
+    "emoji_and_code": "🚨 P0 Incident 👨‍💻🔥: SELECT count(*) FROM ledger_events WHERE cost_usd > 10.0 AND status = 'degraded'; -- trace_id=9f8e7d6c"
+  }
+}

@@ -273,8 +273,13 @@ def calculate_cost(
         elif "8b" in norm:
             input_price, output_price = 0.05, 0.08
 
-    # >200k 2x whole-request context pricing cliff on Claude & Gemini
-    if provider in ("anthropic", "google") and input_tokens > 200_000 and input_price > 0:
+    # >200k 2x whole-request context pricing cliff on 1M-context Claude 4+ & Gemini 2.5+ models
+    norm_m = normalize_model_name(model)
+    has_cliff = (
+        (provider == "anthropic" and not norm_m.startswith("claude-3"))
+        or (provider == "google" and not norm_m.startswith(("gemini-1.", "gemini-2.0")))
+    )
+    if has_cliff and input_tokens > 200_000 and input_price > 0:
         input_price *= 2.0
         output_price *= 2.0
     

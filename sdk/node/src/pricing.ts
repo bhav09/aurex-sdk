@@ -86,12 +86,12 @@ export const HOSTED_OPEN_WEIGHT_PRICING: Record<string, { input: number; output:
 
 let tiktokenEncoder: any = undefined;
 
-import { fileURLToPath } from "url";
+import path from "path";
 
 function getTiktokenEncoder(): any {
   if (tiktokenEncoder !== undefined) return tiktokenEncoder;
   try {
-    const base = typeof __filename !== "undefined" ? __filename : fileURLToPath(import.meta.url);
+    const base = typeof __filename !== "undefined" ? __filename : path.join(process.cwd(), "package.json");
     const req = createRequire(base);
     const mod = req("js-tiktoken");
     tiktokenEncoder = mod.getEncoding("o200k_base");
@@ -113,9 +113,29 @@ export function countTextTokens(text?: string): number {
   return Math.max(1, pieces ? pieces.length : 0, Math.floor(text.length / 4));
 }
 
+function serializeSchema(schemaObj: any): string {
+  if (!schemaObj) return "";
+  if (typeof schemaObj === "object") {
+    if (typeof schemaObj.toJSONSchema === "function") {
+      try {
+        return JSON.stringify(schemaObj.toJSONSchema());
+      } catch {}
+    }
+    if (schemaObj._zod || schemaObj._def) {
+      try {
+        return JSON.stringify(schemaObj._zod?.def || schemaObj._def);
+      } catch {}
+    }
+    try {
+      return JSON.stringify(schemaObj);
+    } catch {}
+  }
+  return "";
+}
+
 export function countRequestTokens(params: {
   prompt?: string;
-  systemPrompt?: string;
+  systemPrompt?: string | any[];
   messages?: any[];
   tools?: any;
   responseFormat?: any;
@@ -129,7 +149,7 @@ export function countRequestTokens(params: {
         total += countTextTokens(String(msg));
         continue;
       }
-      if (msg.role === "system") hasSystemInMessages = true;
+      if (msg.role === "system" || msg.role === "developer") hasSystemInMessages = true;
       const content = msg.content;
       if (typeof content === "string") {
         total += countTextTokens(content) + 4;
@@ -158,13 +178,16 @@ export function countRequestTokens(params: {
   }
 
   if (params.systemPrompt && !hasSystemInMessages) {
-    total += countTextTokens(params.systemPrompt);
+    total += countTextTokens(
+      typeof params.systemPrompt === "string" ? params.systemPrompt : JSON.stringify(params.systemPrompt),
+    );
   }
   if (params.tools) {
-    total += countTextTokens(JSON.stringify(params.tools));
+    total += countTextTokens(serializeSchema(params.tools));
   }
-  if (params.responseFormat && typeof params.responseFormat === "object") {
-    total += countTextTokens(JSON.stringify(params.responseFormat));
+  if (params.responseFormat) {
+    const schemaStr = serializeSchema(params.responseFormat);
+    if (schemaStr) total += countTextTokens(schemaStr);
   }
   return Math.max(1, total);
 }
@@ -264,7 +287,10 @@ export function getModelPricing(
 export function has200kCliff(model: string, provider?: string): boolean {
   const prov = provider || extractProvider(model);
   const norm = normalizeModelName(model);
-  if (prov === "anthropic" || prov === "google") {
+  if (prov === "anthropic" && !norm.startsWith("claude-3")) {
+    return (MODEL_PRICING[norm]?.input ?? 1.0) > 0;
+  }
+  if (prov === "google" && !norm.startsWith("gemini-1.") && !norm.startsWith("gemini-2.0")) {
     return (MODEL_PRICING[norm]?.input ?? 1.0) > 0;
   }
   return false;
@@ -306,6 +332,7 @@ export function calculateCost(
   cacheTtl: "5m" | "1h" = "5m",
   defaultPricing?: { input: number; output: number },
   provider?: string,
+  cacheWrite1hTokens: number = 0,
 ): number {
   const resolvedProv = provider || extractProvider(model);
   let [inPrice, outPrice] = getModelPricing(model, defaultPricing, resolvedProv);
@@ -315,22 +342,31 @@ export function calculateCost(
     outPrice *= 2.0;
   }
 
-  const nonCached = Math.max(0, inputTokens - cachedTokens - cacheWriteTokens);
+  const totalWrite = Math.max(cacheWriteTokens, cacheWrite1hTokens);
+  const nonCached = Math.max(0, inputTokens - cachedTokens - totalWrite);
 
   let readMult = 0.25;
-  let writeMult = 1.0;
+  let writeCost = (totalWrite / 1_000_000) * inPrice * 1.0;
   if (resolvedProv === "anthropic") {
     readMult = 0.10;
-    writeMult = cacheTtl === "1h" ? 2.0 : 1.25;
+    if (cacheWrite1hTokens > 0) {
+      const write5m = Math.max(0, totalWrite - cacheWrite1hTokens);
+      writeCost =
+        (write5m / 1_000_000) * inPrice * 1.25 +
+        (cacheWrite1hTokens / 1_000_000) * inPrice * 2.0;
+    } else {
+      const writeMult = cacheTtl === "1h" ? 2.0 : 1.25;
+      writeCost = (totalWrite / 1_000_000) * inPrice * writeMult;
+    }
   } else if (resolvedProv === "openai") {
     readMult = 0.50;
-    writeMult = 1.0;
+    writeCost = (totalWrite / 1_000_000) * inPrice * 1.0;
   }
 
   const cost =
     (nonCached / 1_000_000) * inPrice +
     (cachedTokens / 1_000_000) * inPrice * readMult +
-    (cacheWriteTokens / 1_000_000) * inPrice * writeMult +
+    writeCost +
     (outputTokens / 1_000_000) * outPrice;
 
   return isBatch ? cost * 0.5 : cost;

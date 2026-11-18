@@ -80,13 +80,34 @@ export function findFirstMutatingOffset(
   return { offset, kind };
 }
 
+export function extractEffectiveSystem(systemPrompt?: any, messages?: any[]): string {
+  if (systemPrompt) {
+    if (typeof systemPrompt === "string") return systemPrompt;
+    return JSON.stringify(canonicalizeJsonKeys(systemPrompt));
+  }
+  if (Array.isArray(messages)) {
+    const parts: string[] = [];
+    for (const m of messages) {
+      if (m && typeof m === "object" && (m.role === "system" || m.role === "developer")) {
+        if (typeof m.content === "string") {
+          parts.push(m.content);
+        } else if (m.content !== undefined && m.content !== null) {
+          parts.push(JSON.stringify(canonicalizeJsonKeys(m.content)));
+        }
+      }
+    }
+    if (parts.length > 0) return parts.join("\n");
+  }
+  return "";
+}
+
 export function inspectPreCallShield(params: {
   stateStore: StateStore;
   workflowId: string;
   model: string;
   estimatedTokens: number;
   nowMs: number;
-  systemPrompt?: string;
+  systemPrompt?: any;
   messages?: any[];
   tools?: any;
   defaultPricing?: { input: number; output: number };
@@ -102,16 +123,7 @@ export function inspectPreCallShield(params: {
   };
 
   const resolvedProv = params.provider || extractProvider(params.model);
-
-  let effectiveSystem = params.systemPrompt || "";
-  if (!effectiveSystem && Array.isArray(params.messages)) {
-    for (const m of params.messages) {
-      if (m && typeof m === "object" && m.role === "system" && typeof m.content === "string") {
-        effectiveSystem = m.content;
-        break;
-      }
-    }
-  }
+  const effectiveSystem = extractEffectiveSystem(params.systemPrompt, params.messages);
 
   const canonToolsStr = params.tools ? JSON.stringify(canonicalizeJsonKeys(params.tools)) : "";
   const toolsHash = sha256(canonToolsStr);
@@ -192,9 +204,42 @@ export function appendTailInstruction<T extends Record<string, unknown>>(
 ): T {
   if (!instruction) return params;
   const next: Record<string, unknown> = { ...params };
-  const messages = Array.isArray(next.messages) ? [...next.messages] : [];
   const suffix = `\n\n[Aurex Guidance: ${instruction}]`;
 
+  if ("input" in next && !("messages" in next)) {
+    const rawIn = next.input;
+    if (typeof rawIn === "string") {
+      next.input = `${rawIn}${suffix}`;
+    } else if (Array.isArray(rawIn)) {
+      const items = [...rawIn];
+      const last = items[items.length - 1];
+      if (last && typeof last === "object" && last.role === "user" && typeof last.content === "string") {
+        items[items.length - 1] = { ...last, content: `${last.content}${suffix}` };
+      } else {
+        items.push({ role: "user", content: instruction });
+      }
+      next.input = items;
+    }
+    return next as T;
+  }
+
+  if ("contents" in next && !("messages" in next)) {
+    const rawC = next.contents;
+    if (typeof rawC === "string") {
+      next.contents = `${rawC}${suffix}`;
+    } else if (Array.isArray(rawC)) {
+      const items = [...rawC];
+      if (items.length > 0 && typeof items[items.length - 1] === "string") {
+        items[items.length - 1] = `${items[items.length - 1]}${suffix}`;
+      } else {
+        items.push(suffix.trim());
+      }
+      next.contents = items;
+    }
+    return next as T;
+  }
+
+  const messages = Array.isArray(next.messages) ? [...next.messages] : [];
   if (messages.length > 0) {
     const last = messages[messages.length - 1];
     if (last && typeof last === "object" && last.role === "user" && typeof last.content === "string") {

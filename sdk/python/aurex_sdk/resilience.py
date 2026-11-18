@@ -76,6 +76,21 @@ def _extract_reasoning_or_output_tokens(resp: Any) -> Tuple[int, int]:
     )
     if details is not None:
         reasoning = reasoning or _int_attr(details, "reasoning_tokens")
+    if reasoning == 0:
+        # Check OpenAI-compatible reasoning_content or Anthropic ThinkingBlock
+        if hasattr(resp, "choices") and resp.choices:
+            msg = getattr(resp.choices[0], "message", None)
+            rc = getattr(msg, "reasoning_content", None) if msg else None
+            if isinstance(rc, str) and rc:
+                reasoning = max(1, len(rc) // 4)
+        content = getattr(resp, "content", None) if not isinstance(resp, dict) else resp.get("content")
+        if isinstance(content, list):
+            for block in content:
+                btype = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
+                if btype == "thinking":
+                    t_str = block.get("thinking", "") if isinstance(block, dict) else getattr(block, "thinking", "")
+                    if t_str:
+                        reasoning += max(1, len(str(t_str)) // 4)
     return reasoning, out_toks
 
 
@@ -162,14 +177,16 @@ def _extract_text(resp: Any) -> str:
             parts = []
             for block in content:
                 if isinstance(block, dict):
-                    if block.get("type") == "tool_use":
+                    btype = block.get("type")
+                    if btype == "tool_use":
                         parts.append("[tool_call]")
-                    else:
+                    elif btype in (None, "text"):
                         parts.append(str(block.get("text", "")))
                 else:
-                    if getattr(block, "type", None) == "tool_use":
+                    btype = getattr(block, "type", None)
+                    if btype == "tool_use":
                         parts.append("[tool_call]")
-                    else:
+                    elif btype in (None, "text"):
                         parts.append(str(getattr(block, "text", "") or ""))
             return "".join(parts)
         return str(content or "")
@@ -347,7 +364,7 @@ def _resolve_fallback(
     if idx < 0 or idx >= len(policy.fallbacks):
         return None
     entry = dict(policy.fallbacks[idx])
-    call_name = entry.get("call")
+    call_name = entry.get("call") or entry.get("name")
     if call_name and call_name in registered:
         entry["_callable"] = registered[call_name]
     return entry
@@ -413,7 +430,7 @@ def execute_with_resilience(
                     resp = current_call()
                 latency_ms = int((time.time() - started) * 1000)
                 classification = classify_response(
-                    provider,
+                    recovery_provider,
                     resp,
                     override=policy.classify_response_override,
                 )
@@ -617,7 +634,7 @@ async def async_execute_with_resilience(
                 resp = await _invoke(current_call)
                 latency_ms = int((time.time() - started) * 1000)
                 classification = classify_response(
-                    provider,
+                    recovery_provider,
                     resp,
                     override=policy.classify_response_override,
                 )

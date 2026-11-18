@@ -138,44 +138,53 @@ const recordedEvents: any[] = [];
 const origRequire = Module.prototype.require;
 let lastOptionsArg: any = null;
 let lastCreateParams: any = null;
+class FakeCompletions {
+  _client: any;
+  constructor(client: any) {
+    this._client = client;
+  }
+  async create(params: any, opts?: any) {
+    lastCreateParams = params;
+    lastOptionsArg = opts;
+    if (params.stream) {
+      async function* gen() {
+        yield { choices: [{ delta: { content: "Part 1 " } }] };
+        yield { choices: [{ delta: { content: "Part 2 " } }] };
+        yield { choices: [{ delta: { content: "Part 3 " } }] };
+      }
+      return gen();
+    }
+    return {
+      choices: [{ message: { role: "assistant", content: "Groq ok" } }],
+      usage: { prompt_tokens: 1000, completion_tokens: 200 },
+    };
+  }
+}
+
+class FakeResponses {
+  _client: any;
+  constructor(client: any) {
+    this._client = client;
+  }
+  async create(_params: any, opts?: any) {
+    lastOptionsArg = opts;
+    return {
+      output_text: "Responses API ok",
+      usage: {
+        input_tokens: 500,
+        output_tokens: 100,
+        input_tokens_details: { cached_tokens: 250 },
+        output_tokens_details: { reasoning_tokens: 40 },
+      },
+    };
+  }
+}
+
 const fakeOpenaiMod: any = {
   OpenAI: class FakeOpenAI {
-    static __aurex_patched__ = false;
     baseURL = "https://api.groq.com/openai/v1";
-    chat = {
-      completions: {
-        create: async (params: any, opts?: any) => {
-          lastCreateParams = params;
-          lastOptionsArg = opts;
-          if (params.stream) {
-            async function* gen() {
-              yield { choices: [{ delta: { content: "Part 1 " } }] };
-              yield { choices: [{ delta: { content: "Part 2 " } }] };
-              yield { choices: [{ delta: { content: "Part 3 " } }] };
-            }
-            return gen();
-          }
-          return {
-            choices: [{ message: { role: "assistant", content: "Groq ok" } }],
-            usage: { prompt_tokens: 1000, completion_tokens: 200 },
-          };
-        },
-      },
-    };
-    responses = {
-      create: async (_params: any, opts?: any) => {
-        lastOptionsArg = opts;
-        return {
-          output_text: "Responses API ok",
-          usage: {
-            input_tokens: 500,
-            output_tokens: 100,
-            input_tokens_details: { cached_tokens: 250 },
-            output_tokens_details: { reasoning_tokens: 40 },
-          },
-        };
-      },
-    };
+    chat = { completions: new FakeCompletions(this) };
+    responses = new FakeResponses(this);
   },
 };
 
@@ -358,4 +367,5 @@ try {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 
+AurexAuditor.reset();
 console.log("   Node.js Stage 3 Outcomes, Soft-Failure & CI Diff smoke tests PASSED");

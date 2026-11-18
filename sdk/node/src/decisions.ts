@@ -76,13 +76,13 @@ export function isExpensiveModel(model: string): boolean {
   return EXPENSIVE_HINTS.some((h) => norm.includes(h));
 }
 
-/** Deduplicate consecutive system messages within a single chat payload. */
+/** Deduplicate consecutive system/developer messages within a single chat payload. */
 export function compressMessages(messages: any[]): any[] {
   if (!Array.isArray(messages) || messages.length < 2) return messages;
   const out: any[] = [];
   let lastSystemHash: string | undefined;
   for (const m of messages) {
-    if (m?.role === "system" && typeof m.content === "string") {
+    if ((m?.role === "system" || m?.role === "developer") && typeof m.content === "string") {
       const h = m.content.slice(0, 64);
       if (h === lastSystemHash) continue;
       lastSystemHash = h;
@@ -108,17 +108,19 @@ export function applyDecisionToCallParams<T extends Record<string, unknown>>(
   if ("tools" in next && next.tools !== undefined) {
     next.tools = canonicalizeJsonKeys(next.tools);
   }
-  if ("response_format" in next && next.response_format && typeof next.response_format === "object") {
+  if (
+    "response_format" in next &&
+    next.response_format &&
+    typeof next.response_format === "object" &&
+    !(next.response_format as any)._def &&
+    !(next.response_format as any)._zod &&
+    typeof (next.response_format as any).__parse !== "function"
+  ) {
     next.response_format = canonicalizeJsonKeys(next.response_format);
   }
 
   if (decision.action === "downgrade" && decision.suggestedModel) {
     next.model = decision.suggestedModel;
-    next.extra_metadata = {
-      ...((next.extra_metadata as Record<string, unknown>) || {}),
-      aurex_original_model: decision.originalModel || (params.model as string | undefined),
-      aurex_model_downgraded: true,
-    };
   }
   if (decision.compressedMessages) {
     next.messages = decision.compressedMessages;
@@ -136,13 +138,6 @@ export function applyDecisionToCallParams<T extends Record<string, unknown>>(
     isDowngraded: decision.action === "downgrade" && Boolean(decision.suggestedModel),
     maxThinkingTokens: decision.maxThinkingTokens,
   });
-
-  if (decision.shieldMeta && Object.keys(decision.shieldMeta).length > 0) {
-    next.extra_metadata = {
-      ...((next.extra_metadata as Record<string, unknown>) || {}),
-      stage1_shield: decision.shieldMeta,
-    };
-  }
 
   return next as T;
 }

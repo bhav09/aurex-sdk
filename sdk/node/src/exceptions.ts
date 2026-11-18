@@ -73,3 +73,22 @@ export class AurexResilienceExhausted extends AurexError {
     this.lastError = opts.lastError;
   }
 }
+
+export class AurexProviderDriftError extends AurexError {
+  provider: string;
+  providerVersion?: string;
+  sdkVersion?: string;
+  missingSymbol?: string;
+
+  constructor(
+    message: string,
+    opts: { provider: string; providerVersion?: string; sdkVersion?: string; missingSymbol?: string },
+  ) {
+    super(message, opts);
+    this.name = "AurexProviderDriftError";
+    this.provider = opts.provider;
+    this.providerVersion = opts.providerVersion ?? opts.sdkVersion;
+    this.sdkVersion = opts.sdkVersion ?? opts.providerVersion;
+    this.missingSymbol = opts.missingSymbol;
+  }
+}

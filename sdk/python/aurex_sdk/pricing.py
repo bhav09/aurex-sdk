@@ -120,6 +120,25 @@ def count_text_tokens(text: Optional[str]) -> int:
     return max(1, len(pieces), len(text) // 4)
 
 
+def _serialize_schema(schema_obj: Any) -> str:
+    """Serialize dict/list JSON schemas, Pydantic BaseModel classes, or SDK format wrappers."""
+    if schema_obj is None:
+        return ""
+    if isinstance(schema_obj, (dict, list)):
+        return json.dumps(schema_obj, sort_keys=True, default=str)
+    if hasattr(schema_obj, "model_json_schema") and callable(schema_obj.model_json_schema):
+        try:
+            return json.dumps(schema_obj.model_json_schema(), sort_keys=True, default=str)
+        except Exception:
+            pass
+    if hasattr(schema_obj, "schema") and callable(schema_obj.schema):
+        try:
+            return json.dumps(schema_obj.schema(), sort_keys=True, default=str)
+        except Exception:
+            pass
+    return ""
+
+
 def count_request_tokens(
     prompt: Optional[str] = None,
     system_prompt: Optional[str] = None,
@@ -127,7 +146,7 @@ def count_request_tokens(
     tools: Optional[Any] = None,
     response_format: Optional[Any] = None,
 ) -> int:
-    """Estimate total input tokens across messages, multimodal blocks, and schemas."""
+    """Estimate total input tokens across messages, developer/system blocks, multimodal blocks, and schemas."""
     total = 0
     has_system_in_messages = False
 
@@ -136,7 +155,7 @@ def count_request_tokens(
             if not isinstance(msg, dict):
                 total += count_text_tokens(str(msg))
                 continue
-            if msg.get("role") == "system":
+            if msg.get("role") in ("system", "developer"):
                 has_system_in_messages = True
             content = msg.get("content")
             if isinstance(content, str):
@@ -159,11 +178,20 @@ def count_request_tokens(
         total += count_text_tokens(prompt)
 
     if system_prompt and not has_system_in_messages:
-        total += count_text_tokens(system_prompt)
+        if isinstance(system_prompt, list):
+            total += count_text_tokens(json.dumps(system_prompt, sort_keys=True, default=str))
+        else:
+            total += count_text_tokens(str(system_prompt))
     if tools:
-        total += count_text_tokens(json.dumps(tools, sort_keys=True, default=str))
-    if response_format and isinstance(response_format, (dict, list)):
-        total += count_text_tokens(json.dumps(response_format, sort_keys=True, default=str))
+        if isinstance(tools, list):
+            serialized_tools = [_serialize_schema(t) or json.dumps(t, sort_keys=True, default=str) for t in tools]
+            total += count_text_tokens("[{}]".format(",".join(serialized_tools)))
+        else:
+            total += count_text_tokens(_serialize_schema(tools) or json.dumps(tools, sort_keys=True, default=str))
+    if response_format is not None:
+        schema_str = _serialize_schema(response_format)
+        if schema_str:
+            total += count_text_tokens(schema_str)
 
     return max(1, total)
 
@@ -257,7 +285,9 @@ def get_model_pricing(
 def has_200k_cliff(model: str, provider: Optional[str] = None) -> bool:
     prov = provider or extract_provider(model)
     norm = normalize_model_name(model)
-    if prov in ("anthropic", "google"):
+    if prov == "anthropic" and not norm.startswith("claude-3"):
+        return MODEL_PRICING.get(norm, {"input": 1.0}).get("input", 1.0) > 0
+    if prov == "google" and not norm.startswith(("gemini-1.", "gemini-2.0")):
         return MODEL_PRICING.get(norm, {"input": 1.0}).get("input", 1.0) > 0
     return False
 
@@ -292,6 +322,7 @@ def calculate_cost(
     cache_ttl: str = "5m",
     default_pricing: Optional[Dict[str, float]] = None,
     provider: Optional[str] = None,
+    cache_write_1h_tokens: int = 0,
 ) -> float:
     """Cache-aware and >200k-cliff-aware LLM cost calculation."""
     resolved_prov = provider or extract_provider(model)
@@ -301,20 +332,30 @@ def calculate_cost(
     in_price *= cliff_mult
     out_price *= cliff_mult
 
-    non_cached = max(0, input_tokens - cached_tokens - cache_write_tokens)
+    total_write = max(cache_write_tokens, cache_write_1h_tokens)
+    non_cached = max(0, input_tokens - cached_tokens - total_write)
 
     if resolved_prov == "anthropic":
         read_mult = 0.10
-        write_mult = 2.00 if cache_ttl == "1h" else 1.25
+        if cache_write_1h_tokens > 0:
+            write_5m = max(0, total_write - cache_write_1h_tokens)
+            write_cost = (write_5m / 1_000_000 * in_price * 1.25) + (
+                cache_write_1h_tokens / 1_000_000 * in_price * 2.00
+            )
+        else:
+            write_mult = 2.00 if cache_ttl == "1h" else 1.25
+            write_cost = total_write / 1_000_000 * in_price * write_mult
     elif resolved_prov == "openai":
-        read_mult, write_mult = 0.50, 1.00
+        read_mult = 0.50
+        write_cost = total_write / 1_000_000 * in_price * 1.00
     else:
-        read_mult, write_mult = 0.25, 1.00
+        read_mult = 0.25
+        write_cost = total_write / 1_000_000 * in_price * 1.00
 
     cost = (
         (non_cached / 1_000_000 * in_price)
         + (cached_tokens / 1_000_000 * in_price * read_mult)
-        + (cache_write_tokens / 1_000_000 * in_price * write_mult)
+        + write_cost
         + (output_tokens / 1_000_000 * out_price)
     )
     return cost * 0.50 if is_batch else cost

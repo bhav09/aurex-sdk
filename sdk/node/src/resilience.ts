@@ -55,13 +55,25 @@ function extractReasoningOrOutputTokens(resp: any): { reasoningTokens: number; o
   const outputTokens = Number(
     usage.completion_tokens || usage.output_tokens || usage.candidatesTokenCount || usage.candidates_token_count || 0,
   );
-  const reasoningTokens = Number(
+  let reasoningTokens = Number(
     usage.thoughtsTokenCount ||
       usage.thoughts_token_count ||
       usage.completion_tokens_details?.reasoning_tokens ||
       usage.output_tokens_details?.reasoning_tokens ||
       0,
   );
+  if (reasoningTokens === 0) {
+    const rc = resp?.choices?.[0]?.message?.reasoning_content;
+    if (typeof rc === "string" && rc.length > 0) {
+      reasoningTokens = Math.max(1, Math.floor(rc.length / 4));
+    } else if (Array.isArray(resp?.content)) {
+      for (const b of resp.content) {
+        if (b?.type === "thinking" && typeof b.thinking === "string" && b.thinking.length > 0) {
+          reasoningTokens += Math.max(1, Math.floor(b.thinking.length / 4));
+        }
+      }
+    }
+  }
   return { reasoningTokens, outputTokens };
 }
 
@@ -158,7 +170,11 @@ function extractText(resp: any): string {
   if (resp.content) {
     if (Array.isArray(resp.content)) {
       return resp.content
-        .map((b: any) => (b?.type === "tool_use" ? "[tool_call]" : (b?.text ?? "")))
+        .map((b: any) => {
+          if (b?.type === "tool_use") return "[tool_call]";
+          if (!b?.type || b.type === "text") return b?.text ?? "";
+          return "";
+        })
         .join("");
     }
     return String(resp.content);
@@ -201,17 +217,22 @@ export function classifyResponse(
   if (override) return override({ provider, resp, exc });
   if (exc) return classifyException(exc);
   if (!resp) return { usable: false, kind: "empty", billed: false, status: "degraded" };
+  const unwrapped =
+    resp && typeof resp === "object" && "data" in (resp as any) && "response" in (resp as any)
+      ? (resp as any).data
+      : resp;
+  if (!unwrapped) return { usable: false, kind: "empty", billed: false, status: "degraded" };
   if (
-    typeof (resp as any)?.[Symbol.asyncIterator] === "function" ||
-    typeof (resp as any)?.[Symbol.iterator] === "function"
+    typeof (unwrapped as any)?.[Symbol.asyncIterator] === "function" ||
+    typeof (unwrapped as any)?.[Symbol.iterator] === "function"
   ) {
     return { usable: true, kind: "success", billed: true, finishReason: "stream", status: "ok" };
   }
 
-  const finish = (extractFinishReason(resp) || "").toLowerCase();
-  const rawText = extractText(resp);
+  const finish = (extractFinishReason(unwrapped) || "").toLowerCase();
+  const rawText = extractText(unwrapped);
   const text = rawText.trim();
-  const { reasoningTokens, outputTokens } = extractReasoningOrOutputTokens(resp);
+  const { reasoningTokens, outputTokens } = extractReasoningOrOutputTokens(unwrapped);
 
   if (finish === "content_filter" || finish === "content-filter") {
     return {
@@ -339,7 +360,7 @@ function resolveFallback(
   const idx = attemptIndex - 1;
   if (idx < 0 || idx >= policy.fallbacks.length) return undefined;
   const entry = { ...policy.fallbacks[idx] };
-  const callName = entry.call as string;
+  const callName = (entry.call || entry.name) as string;
   if (callName && registered[callName]) {
     entry._callable = registered[callName];
   }

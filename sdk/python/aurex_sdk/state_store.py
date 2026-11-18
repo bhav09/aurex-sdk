@@ -112,19 +112,26 @@ class InMemoryStateStore:
 class RedisStateStore:
     """Multi-worker Redis/Valkey StateStore with automatic fail-open fallback to InMemoryStateStore."""
 
-    def __init__(self, redis_url: str, namespace: str = "aurex", ttl_seconds: int = 7200):
+    def __init__(
+        self,
+        redis_url: Optional[str] = None,
+        namespace: str = "aurex",
+        ttl_seconds: int = 7200,
+        redis_client: Optional[Any] = None,
+    ):
         self._fallback = InMemoryStateStore()
         self._ns = namespace
         self._ttl = ttl_seconds
-        self._client: Any = None
-        try:
-            import redis  # type: ignore
+        self._client: Any = redis_client
+        if self._client is None and redis_url:
+            try:
+                import redis  # type: ignore
 
-            self._client = redis.Redis.from_url(
-                redis_url, decode_responses=True, socket_connect_timeout=0.5, socket_timeout=0.5
-            )
-        except Exception:
-            self._client = None
+                self._client = redis.Redis.from_url(
+                    redis_url, decode_responses=True, socket_connect_timeout=0.5, socket_timeout=0.5
+                )
+            except Exception:
+                self._client = None
 
     def get_prefix_state(self, workflow_id: str) -> Optional[Dict[str, Any]]:
         if self._client is not None:
@@ -206,7 +213,9 @@ class RedisStateStore:
         self._fallback.clear()
 
 
-def build_state_store(redis_url: Optional[str] = None) -> StateStore:
+def build_state_store(redis_url: Optional[str] = None, redis_client: Optional[Any] = None) -> StateStore:
+    if redis_client is not None:
+        return RedisStateStore(redis_client=redis_client)
     resolved_url = redis_url or os.environ.get("AUREX_REDIS_URL")
     if resolved_url:
         return RedisStateStore(resolved_url)

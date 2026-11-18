@@ -9,6 +9,8 @@ from .exceptions import (
     AurexBudgetExceeded,
     AurexBlocked,
     AurexConfigError,
+    AurexProviderDriftError,
+    AurexProviderWarning,
     AurexRecovered,
     AurexResilienceExhausted,
 )
@@ -36,6 +38,8 @@ __all__ = [
     "AurexBudgetExceeded",
     "AurexBlocked",
     "AurexConfigError",
+    "AurexProviderDriftError",
+    "AurexProviderWarning",
     "AurexRecovered",
     "AurexResilienceExhausted",
     "ResiliencePolicy",
