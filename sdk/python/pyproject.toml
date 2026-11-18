@@ -4,11 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aurex-python"
-version = "0.1.0"
-description = "Aurex Python SDK — auto-instrument OpenAI, Anthropic, LiteLLM"
+version = "0.2.0"
+description = "Aurex Python SDK — local-first LLM cost shield, circuit breaker, and outcome gate"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "tiktoken>=0.7.0",
+]
 
 [project.optional-dependencies]
 openai = ["openai>=1.0.0"]
@@ -17,6 +19,8 @@ litellm = ["litellm>=1.0.0"]
 google = ["google-genai>=1.0.0"]
 google-legacy = ["google-generativeai>=0.3.0"]
 huggingface = ["huggingface_hub>=0.19.0"]
+redis = ["redis>=5.0.0"]
+otel = ["opentelemetry-api>=1.20.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

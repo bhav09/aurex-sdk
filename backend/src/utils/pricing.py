@@ -250,13 +250,33 @@ def calculate_cost(
     output_tokens: int,
     cache_read_tokens: int = 0,
     cache_creation_tokens: int = 0,
+    cache_ttl: str = "5m",
     pricing_overrides: Optional[Dict[str, Tuple[float, float]]] = None
 ) -> float:
     """
-    Calculate cost for a given model and token usage, accounting for prompt caching
+    Calculate cost for a given model and token usage, accounting for prompt caching,
+    cache TTL (5m vs 1h), and >200k 2x whole-request context pricing cliffs.
     """
     input_price, output_price = get_model_pricing(model, pricing_overrides=pricing_overrides)
     provider = extract_provider_from_model(model)
+
+    # Hosted cloud open-weight override (prevents $0.00 billing on Groq/Together/Bedrock/OpenRouter)
+    ml = (model or "").strip().lower()
+    if any(ml.startswith(p) for p in ("groq/", "together/", "together_ai/", "fireworks/", "openrouter/", "bedrock/", "amazon.")) and input_price == 0.0:
+        norm = normalize_model_name(model)
+        if "maverick" in norm:
+            input_price, output_price = 0.27, 0.85
+        elif "scout" in norm:
+            input_price, output_price = 0.18, 0.60
+        elif "70b" in norm:
+            input_price, output_price = 0.59, 0.79
+        elif "8b" in norm:
+            input_price, output_price = 0.05, 0.08
+
+    # >200k 2x whole-request context pricing cliff on Claude & Gemini
+    if provider in ("anthropic", "google") and input_tokens > 200_000 and input_price > 0:
+        input_price *= 2.0
+        output_price *= 2.0
     
     standard_input = max(0, input_tokens - cache_read_tokens - cache_creation_tokens)
     
@@ -266,7 +286,7 @@ def calculate_cost(
     
     if provider == "anthropic":
         cache_read_mult = 0.10
-        cache_create_mult = 1.25
+        cache_create_mult = 2.00 if cache_ttl == "1h" else 1.25
     elif provider == "openai":
         cache_read_mult = 0.50
         cache_create_mult = 1.0

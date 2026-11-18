@@ -2,19 +2,10 @@
  * Pre-call decision types and helpers for applying guard actions.
  */
 import { AurexAuditor, aurexContext } from "./index";
-
-function normalizeModelName(m: string): string {
-  let model = m.trim().toLowerCase();
-  const ftMatch = model.match(/^ft:([^:]+)/);
-  if (ftMatch) model = ftMatch[1];
-  let prev = "";
-  const prefixRegex = /^(models\/|publishers\/google\/models\/|anthropic\.|amazon\.|bedrock\/|openrouter\/|google\/|anthropic\/|meta-llama\/|deepseek\/|mistralai\/|openai\/|qwen\/)/;
-  while (model !== prev) {
-    prev = model;
-    model = model.replace(prefixRegex, "");
-  }
-  return model.replace(/[\s_]+/g, "-");
-}
+import { AurexBlocked } from "./exceptions";
+import { appendTailInstruction, canonicalizeJsonKeys } from "./prefix_shield";
+import { normalizeModelName } from "./pricing";
+import { sanitizeThinkingParams } from "./runtime_guard";
 
 export type AurexAction = "proceed" | "downgrade" | "compress" | "block" | "cache_suggest";
 
@@ -27,6 +18,9 @@ export interface AurexDecision {
   injectSystemInstruction?: string;
   originalModel?: string;
   response?: string;
+  shieldMeta?: Record<string, any>;
+  warnings?: string[];
+  maxThinkingTokens?: number;
 }
 
 export const MODEL_DOWNGRADE_MAP: Record<string, string> = {
@@ -53,22 +47,19 @@ export const MODEL_DOWNGRADE_MAP: Record<string, string> = {
 export function suggestCheaperModel(model: string): string | undefined {
   const norm = normalizeModelName(model);
 
-  // Check context first
   try {
     const ctx = aurexContext.getStore();
-    if (ctx && ctx.downgradeMap) {
-      if (ctx.downgradeMap[norm]) return ctx.downgradeMap[norm];
+    if (ctx && ctx.downgradeMap && ctx.downgradeMap[norm]) {
+      return ctx.downgradeMap[norm];
     }
-  } catch (e) {}
+  } catch {}
 
-  // Check instance config
   try {
     const instance = AurexAuditor.getInstance();
-    if (instance) {
-      const dm = instance.downgradeMap;
-      if (dm && dm[norm]) return dm[norm];
+    if (instance?.downgradeMap?.[norm]) {
+      return instance.downgradeMap[norm];
     }
-  } catch (e) {}
+  } catch {}
 
   if (MODEL_DOWNGRADE_MAP[norm]) return MODEL_DOWNGRADE_MAP[norm];
   if (norm.includes("gpt") || norm.startsWith("o1") || norm.startsWith("o3") || norm.startsWith("o4")) return "gpt-4o-mini";
@@ -85,7 +76,7 @@ export function isExpensiveModel(model: string): boolean {
   return EXPENSIVE_HINTS.some((h) => norm.includes(h));
 }
 
-/** Deduplicate consecutive system messages in a chat payload. */
+/** Deduplicate consecutive system messages within a single chat payload. */
 export function compressMessages(messages: any[]): any[] {
   if (!Array.isArray(messages) || messages.length < 2) return messages;
   const out: any[] = [];
@@ -106,13 +97,25 @@ export function applyDecisionToCallParams<T extends Record<string, unknown>>(
   decision: AurexDecision,
 ): T {
   if (decision.action === "block") {
-    throw new Error(`[Aurex] Blocked: ${decision.reason}`);
+    throw new AurexBlocked(`[Aurex] Blocked: ${decision.reason}`, {
+      reason: decision.reason,
+      action: decision.action,
+    });
   }
-  const next: Record<string, unknown> = { ...params };
+  let next: Record<string, unknown> = { ...params };
+
+  // Stage 1: Deterministically canonicalize schema keys so dict ordering never breaks caches
+  if ("tools" in next && next.tools !== undefined) {
+    next.tools = canonicalizeJsonKeys(next.tools);
+  }
+  if ("response_format" in next && next.response_format && typeof next.response_format === "object") {
+    next.response_format = canonicalizeJsonKeys(next.response_format);
+  }
+
   if (decision.action === "downgrade" && decision.suggestedModel) {
     next.model = decision.suggestedModel;
     next.extra_metadata = {
-      ...(next.extra_metadata || {}),
+      ...((next.extra_metadata as Record<string, unknown>) || {}),
       aurex_original_model: decision.originalModel || (params.model as string | undefined),
       aurex_model_downgraded: true,
     };
@@ -122,10 +125,24 @@ export function applyDecisionToCallParams<T extends Record<string, unknown>>(
   } else if (decision.action === "compress" && Array.isArray(next.messages)) {
     next.messages = compressMessages(next.messages);
   }
+
+  // Stage 1 Cache-Safety Invariant: Always append runtime instructions at the TAIL (never index 0!)
   if (decision.injectSystemInstruction) {
-    const messages = Array.isArray(next.messages) ? [...next.messages] : [];
-    messages.unshift({ role: "system", content: decision.injectSystemInstruction });
-    next.messages = messages;
+    next = appendTailInstruction(next, decision.injectSystemInstruction);
   }
+
+  // Stage 2: Clamp thinking budgets & strip incompatible reasoning params on downgrade
+  next = sanitizeThinkingParams(next, {
+    isDowngraded: decision.action === "downgrade" && Boolean(decision.suggestedModel),
+    maxThinkingTokens: decision.maxThinkingTokens,
+  });
+
+  if (decision.shieldMeta && Object.keys(decision.shieldMeta).length > 0) {
+    next.extra_metadata = {
+      ...((next.extra_metadata as Record<string, unknown>) || {}),
+      stage1_shield: decision.shieldMeta,
+    };
+  }
+
   return next as T;
 }

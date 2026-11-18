@@ -1,274 +1,119 @@
-# 🛡️ Aurex
+# Aurex — Stop AI Token Waste Before, During, and After Every Call
 
-**The enterprise-grade, local-first AI cost-optimization and budget circuit-breaker platform.**
-
-Aurex helps engineering teams detect and block LLM cost waste in real-time. It provides deep visibility into LLM usage, surfaces inefficiencies (such as prompt waste, agent loop cascades, tool bloat, and output verbosity), and calculates a Token Credit Score for optimization profiling.
+Aurex is a local-first Python and Node.js SDK (+ optional FinOps dashboard) that protects your LLM bill in-process with **0 ms proxy latency** and **zero raw prompts leaving your servers**.
 
 ---
 
-## 🏗️ Architecture Overview
+## 1. What Problems Are People Facing?
 
-```
-                      +───────────────────────────+
-                      │    Your LLM Application   │
-                      │  (Python / Node.js Apps)  │
-                      +─────────────┬─────────────+
-                                    │
-                       (Auto-Hook / Manual SDK)
-                                    │
-                                    ▼
-                      +───────────────────────────+
-                      │    Aurex Auditor SDK      │
-                      │  (Local Heuristics Engine)│
-                      +─────────────┬─────────────+
-                                    │
-                    (Asynchronous local write < 0.1ms)
-                                    ▼
-                      +───────────────────────────+
-                      │ Local Ledger (.jsonl file)│
-                      +─────────────┬─────────────+
-                                    │
-                        (Asynchronous Sync Queue)
-                                    ▼
-                      +───────────────────────────+
-                      │   Aurex Cloud/Self-Host   │
-                      │    (FastAPI Backend)      │
-                      +─────────────┬─────────────+
-                                    │
-                         (REST API / PostgreSQL)
-                                    ▼
-                      +───────────────────────────+
-                      │      Aurex Dashboard      │
-                      │ (Next.js Optimization UI) │
-                      +───────────────────────────+
-```
+- **Before the call:** Putting a changing timestamp or unsorted JSON dictionary at the top of a system prompt silently breaks 90% prompt-cache discounts—and crossing `200,000` input tokens on Claude or Gemini suddenly **doubles the price of the entire request**.
+- **During the call:** Cloud providers lack real-time per-session kill switches. A looping agent, an aborted stream (`stream=True`), a `6x` retry storm, or 25,000 hidden "thinking" tokens can burn thousands of dollars overnight.
+- **After the call:** Models return HTTP `200 OK` with empty thinking-exhausted text or `\n\n\n` JSON loops that you still pay for, and teams cannot tell which code change doubled their **cost per completed task**.
 
-Aurex is built with a **local-first control plane**:
-- **Local SDK Ledger**: Metadata is written locally to disk first.
-- **Asynchronous Batching**: Telemetry sync runs in a separate background thread/event-loop, introducing `<0.1ms` latency overhead to critical path calls.
-- **Privacy First**: Prompts and responses are hashed locally and never sent to the server unless explicitly enabled.
-- **In-Memory Circuit Breaking**: Real-time guards run entirely local to the host application without blocking on network roundtrips.
+## 2. What Does Aurex Solve?
+
+Aurex wraps your existing OpenAI, Anthropic, Google Gemini, LiteLLM, and Llama clients in one continuous 3-stage pipeline:
+1. **Stage 1 — Before the Call (Prefix Cache-Shield & `200k` Cliff Guard):** Sorts JSON keys so caches stay warm, pinpoints the exact character offset breaking your prefix cache, warns after `>5 min` cache-TTL idle gaps, and reprices/warns before the `200k` 2x cliff.
+2. **Stage 2 — During the Call (Session, Thinking & Stream Circuit Breaker):** Isolates sessions automatically, shares spend state across workers via optional Redis, caps hidden thinking tokens, tracks aborted streams, disables duplicate SDK retries, and raises `AurexBlocked` before budgets blow up.
+3. **Stage 3 — After the Call + CI (Outcome Cost & Soft-Failure Gate):** Flags empty/looped HTTP-200 responses as `unfulfilled_spend`, joins spend with `mark_success()` to measure true **cost per successful outcome**, auto-downgrades over-budget SaaS tenants, and posts baseline cost diffs on Pull Requests.
 
 ---
 
-## 📋 Prerequisites
+## 3. How to Use It (Step-by-Step)
 
-- **Node.js** 18+ (for frontend and Node.js SDK)
-- **Python** 3.10+ (for backend and Python SDK)
-- **Database**: SQLite (default for development) or PostgreSQL
-
----
-
-## ⚡ Quick Start
-
-### 1. Start the Backend API
-
-From the `backend/` directory:
+### Step 1: Install the SDK
 
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate  # Or your platform's equivalent
-pip install -r requirements.txt
-python main.py
-```
-* API playground and Swagger docs are available at [http://localhost:8000/docs](http://localhost:8000/docs).
+# Python
+pip install aurex-sdk
 
-### 2. Start the Frontend Dashboard
-
-From the `frontend/` directory:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-* Access the dashboard at [http://localhost:3000](http://localhost:3000).
-
----
-
-## 🛠️ SDK Usage
-
-Detailed documentation and examples are available on the frontend docs page at [http://localhost:3000/docs](http://localhost:3000/docs).
-
-### 1. Installation
-
-| Language | Package Install Command |
-| :--- | :--- |
-| **Python** | `pip install aurex-sdk` |
-| **Node.js** | `npm install aurex-sdk` |
-
-### 2. Zero-Code Auto-Hook (Recommended)
-
-Intercept and track LLM SDK calls automatically with zero code changes.
-
-#### Python Setup
-```bash
-# Install the hook into your active site-packages
-aurex install-hook
-
-# Configure env vars and run your app
-export AUREX_ENABLED=1
-export AUREX_API_KEY=aux_dev_yourkey
-python your_app.py
+# Node.js / TypeScript
+npm install aurex-sdk
 ```
 
-#### Node.js Setup
-```bash
-# Generate the env file
-npx aurex install-hook
+*(Optional multi-worker & trace extras: `pip install "aurex-sdk[redis,otel]"` or `npm install ioredis @opentelemetry/api`.)*
 
-# Source environment variables and run your app
-source .env.aurex
-export AUREX_API_KEY=aux_dev_yourkey
-node your_app.js
-```
+### Step 2: Patch Your LLM Clients & Set a Budget Cap
 
----
-
-### 3. Manual Instrumentation
-
-Initialize the SDK and auto-patch LLM clients directly in your codebase.
-
-#### Python
+**Python**
 ```python
-from aurex_sdk import AurexAuditor, AurexConfig
+from aurex_sdk import AurexAuditor, AurexConfig, patch_all
+import openai
 
-# Initialize singleton with configuration
-auditor = AurexAuditor(AurexConfig(
-    api_key="aux_dev_yourkey",
-    project="my-project",
-    storage_mode="file",                  # "file" or "memory"
-    ledger_path=".aurex/ledger.jsonl",
-    cloud_sync=True                       # Enable backend sync
-))
+auditor = AurexAuditor(
+    AurexConfig(
+        budget_guard={
+            "max_cost_per_session": 1.50,
+            "max_thinking_tokens": 4096,
+            "on_budget_exceeded": "throw",
+        },
+        enable_loop_guard=True,
+    )
+)
+patch_all(auditor)
 
-# Patch all supported providers (OpenAI, Anthropic, Google Gemini, LiteLLM)
-auditor.patch_all()
-```
-
-#### Node.js
-```typescript
-import { AurexAuditor } from "aurex-sdk";
-
-// Initialize singleton with configuration
-const auditor = AurexAuditor.getInstance({
-  apiKey: "aux_dev_yourkey",
-  project: "my-project",
-  ledgerPath: ".aurex/ledger.jsonl",
-  cloudSync: true                        // Enable backend sync
-});
-
-// Patch all supported clients (OpenAI, Anthropic, LiteLLM)
-auditor.patchAll();
-```
-
----
-
-### 4. Real-Time Guards & Circuit Breakers
-
-Enforce budgets and prevent runaway loops before making API calls.
-
-#### Python
-```python
-from aurex_sdk import AurexAuditor, AurexConfig
-
-auditor = AurexAuditor()
-auditor.configure_circuit_breaker({
-    "max_cost_per_minute": 5.00,
-    "max_cost_per_session": 50.00,
-    "on_budget_exceeded": "throw"  # "throw" | "warn" | "webhook"
-})
-
-# Run pre-call check
-decision = auditor.pre_call_check(
+client = openai.OpenAI()
+resp = client.chat.completions.create(
     model="gpt-4o",
-    prompt="Hello!",
-    workflow_id="user-session-123"
+    messages=[{"role": "user", "content": "Summarize this ticket."}],
+    workflow_id="support-ticket-42",
 )
 
-if decision.action == "block":
-    raise Exception(f"Blocked: {decision.reason}")
-elif decision.action == "downgrade":
-    model = decision.suggested_model # Use cheaper alternative
+# Stage 3: Record when the user's task actually succeeded
+auditor.mark_success("support-ticket-42")
+auditor.flush()
 ```
 
-#### Node.js
+**Node.js / TypeScript**
 ```typescript
 import { AurexAuditor } from "aurex-sdk";
+import OpenAI from "openai";
 
-const auditor = AurexAuditor.getInstance();
-auditor.configureCircuitBreaker({
-  maxCostPerMinute: 5.00,
-  maxCostPerSession: 50.00,
-  onBudgetExceeded: "throw"  // "throw" | "warn" | "webhook"
+const auditor = AurexAuditor.getInstance({
+  budgetGuard: {
+    maxCostPerSession: 1.5,
+    maxThinkingTokens: 4096,
+    onBudgetExceeded: "throw",
+  },
+  enableLoopGuard: true,
 });
+auditor.patchAll();
 
-// Run pre-call check
-const decision = auditor.preCallCheck({
+const client = new OpenAI();
+const resp = await client.chat.completions.create({
   model: "gpt-4o",
-  prompt: "Hello!",
-  workflowId: "user-session-123"
+  messages: [{ role: "user", content: "Summarize this ticket." }],
+  metadata: { workflow_id: "support-ticket-42" },
 });
 
-if (decision.action === "block") {
-  throw new Error(`Blocked: ${decision.reason}`);
-} else if (decision.action === "downgrade") {
-  const model = decision.suggestedModel; // Use cheaper alternative
-}
+auditor.markSuccess("support-ticket-42");
+auditor.flush();
 ```
 
----
+### Step 3: Audit Locally & Gate Pull Requests in CI
 
-## 🎛️ Environment Variables Reference
-
-Configure SDK and CLI behavior globally via environment variables:
-
-| Variable | Type | Description |
-| :--- | :--- | :--- |
-| `AUREX_ENABLED` | `0` / `1` | Globally enable or disable Aurex instrumentation. |
-| `AUREX_API_KEY` | `string` | Your project-specific API key (e.g. `aux_dev_...`). |
-| `AUREX_BASE_URL` | `string` | The API root URL of your Aurex backend (default: `http://localhost:8000/api/v1`). |
-| `AUREX_WORKFLOW_ID` | `string` | Logical workflow identifier to track cost attribution. |
-| `AUREX_SYNC_PROMPT_HASHES` | `0` / `1` | Opt-in to hash and sync prompts/responses to dashboard. |
-| `AUREX_PRICING_PATH` | `string` | Path to a custom JSON pricing configuration. |
-
----
-
-## 🚀 CI/CD Build Breaker Policies
-
-Analyze local telemetries offline or in your CI/CD pipelines to fail builds when efficiency falls or cost limits are exceeded.
-
-#### Python CLI (`aurex audit`)
 ```bash
-# Fail build if Token Credit Score is below 85 or waste exceeds $5
-aurex audit --ledger .aurex/ledger.jsonl --fail-under 85 --max-waste-usd 5.00 --mode block
-```
+# Inspect your local zero-PII ledger (.aurex/ledger.jsonl)
+aurex audit
 
-#### Node.js CLI (`npx aurex ci`)
-```bash
-# Fail build in CI if critical cost leaks are found
-npx aurex ci --mode=block
+# Compare current branch against main (warns by default; add --fail-on-regression to fail CI)
+aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comment
 ```
 
 ---
 
-## 🔌 Supported Providers Matrix
+## 4. How Can You Improve Your Setup?
 
-| Provider | Python SDK | Node.js SDK | Auto-Patch Support |
-| :--- | :---: | :---: | :--- |
-| **OpenAI** (v1.0+) | ✅ | ✅ | Yes (`patch_openai()` / `patchOpenAI()`) |
-| **Anthropic** (v0.18+) | ✅ | ✅ | Yes (`patch_anthropic()` / `patchAnthropic()`) |
-| **Google Gemini** | ✅ | ❌ | Yes (`patch_google()`, Python Only) |
-| **LiteLLM** / **Portkey** | ✅ | ✅ | Yes (`patch_litellm()` / `patchLiteLLM()`) |
-| **Ollama** / **Llama.cpp** | ✅ | ✅ | Yes (`patch_ollama()` / `patchOllama()`) |
-| **Hugging Face** | ✅ | ✅ | Yes (`patch_huggingface()` / `patchHuggingFace()`) |
+1. **Move timestamps & user IDs to the end of prompts:** When Stage 1 logs `[Aurex Shield] Prefix cache broken in 'system' at char ...`, move changing dates or request IDs to the last user message so your static system prompt gets 50%–90% cache discounts.
+2. **Trim history before `185k` tokens:** Keep long RAG/agent threads under `200,000` input tokens on Claude and Gemini to avoid paying 2x on the entire prompt.
+3. **Turn on Redis in multi-worker production:** Set `AUREX_REDIS_URL=redis://...` so Gunicorn, FastAPI, or Kubernetes pods share one live session budget instead of per-process counters.
+4. **Track `cost_per_success` in CI:** Call `mark_success(workflow_id)` when a job finishes and run `aurex ci --baseline main_ledger.jsonl --fail-on-regression` on every PR so prompt bloat never ships to production.
 
 ---
 
-## 📄 License & Documentation
+## Repository Layout
 
-For details on API options, custom pricing overrides, and alerts setup:
-- Full interactive docs are at [http://localhost:3000/docs](http://localhost:3000/docs)
-- Python SDK source: [sdk/python/](file:///Users/bhavishya/VSC%20Projects/tbank/sdk/python)
-- Node.js SDK source: [sdk/node/](file:///Users/bhavishya/VSC%20Projects/tbank/sdk/node)
+- `sdk/python/` — Python SDK (`aurex_sdk`)
+- `sdk/node/` — Node.js / TypeScript SDK (`aurex-sdk`)
+- `backend/` — FastAPI FinOps ingest, SQL outcome rollups, and `/api/v1/policies` sync
+- `frontend/` — Next.js dashboard, `/audit` CSV analyzer, and `/docs`

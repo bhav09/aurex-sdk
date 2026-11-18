@@ -9,9 +9,61 @@ export const DEFAULT_RETRY_ON = [
   "empty",
   "content_filter",
   "truncated",
+  "thinking_exhausted",
+  "grammar_loop",
   "refusal",
   "tool_error",
 ];
+
+const REPEATED_KV_RE = /("[^"\n]{1,40}"\s*:\s*[^,}\n]{1,30})(?:\s*,\s*\1){6,}/;
+const REPEATED_WORD_RE = /\b(\w{2,})\b(?:\s*[,;]?\s*\1\b){7,}/;
+
+export function detectGrammarLoop(rawText?: string | null): boolean {
+  if (!rawText) return false;
+  if (rawText.includes("\n".repeat(32)) || rawText.includes("\t".repeat(32)) || rawText.includes(" ".repeat(128))) {
+    return true;
+  }
+  if (rawText.length >= 120 && rawText.trim().length < rawText.length * 0.15) {
+    return true;
+  }
+  const nonEmptyLines = rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (nonEmptyLines.length >= 10) {
+    const counts = new Map<string, number>();
+    let maxCount = 0;
+    for (const ln of nonEmptyLines) {
+      const c = (counts.get(ln) || 0) + 1;
+      counts.set(ln, c);
+      if (c > maxCount) maxCount = c;
+    }
+    if (maxCount >= Math.max(8, Math.floor(nonEmptyLines.length * 0.8))) {
+      return true;
+    }
+  }
+  const sample = rawText.slice(0, 4000);
+  if (sample.length >= 50 && (REPEATED_KV_RE.test(sample) || REPEATED_WORD_RE.test(sample))) {
+    return true;
+  }
+  return false;
+}
+
+function extractReasoningOrOutputTokens(resp: any): { reasoningTokens: number; outputTokens: number } {
+  const usage = resp?.usage || resp?.usageMetadata || resp?.usage_metadata;
+  if (!usage) return { reasoningTokens: 0, outputTokens: 0 };
+  const outputTokens = Number(
+    usage.completion_tokens || usage.output_tokens || usage.candidatesTokenCount || usage.candidates_token_count || 0,
+  );
+  const reasoningTokens = Number(
+    usage.thoughtsTokenCount ||
+      usage.thoughts_token_count ||
+      usage.completion_tokens_details?.reasoning_tokens ||
+      usage.output_tokens_details?.reasoning_tokens ||
+      0,
+  );
+  return { reasoningTokens, outputTokens };
+}
 
 export interface ResiliencePolicy {
   enabled: boolean;
@@ -97,14 +149,23 @@ function defaultPolicy(): ResiliencePolicy {
 
 function extractText(resp: any): string {
   if (!resp) return "";
+  if (typeof resp.output_text === "string" && resp.output_text) return resp.output_text;
   if (resp.choices?.[0]?.message?.content) return resp.choices[0].message.content || "";
+  if (Array.isArray(resp.choices?.[0]?.message?.tool_calls) && resp.choices[0].message.tool_calls.length > 0) {
+    return "[tool_call]";
+  }
   if (resp.choices?.[0]?.text) return resp.choices[0].text || "";
   if (resp.content) {
     if (Array.isArray(resp.content)) {
-      return resp.content.map((b: any) => b.text ?? String(b)).join("");
+      return resp.content
+        .map((b: any) => (b?.type === "tool_use" ? "[tool_call]" : (b?.text ?? "")))
+        .join("");
     }
     return String(resp.content);
   }
+  if (typeof resp.text === "string" && resp.text) return resp.text;
+  if (typeof resp.message?.content === "string" && resp.message.content) return resp.message.content;
+  if (typeof resp.response === "string" && resp.response) return resp.response;
   return "";
 }
 
@@ -140,9 +201,17 @@ export function classifyResponse(
   if (override) return override({ provider, resp, exc });
   if (exc) return classifyException(exc);
   if (!resp) return { usable: false, kind: "empty", billed: false, status: "degraded" };
+  if (
+    typeof (resp as any)?.[Symbol.asyncIterator] === "function" ||
+    typeof (resp as any)?.[Symbol.iterator] === "function"
+  ) {
+    return { usable: true, kind: "success", billed: true, finishReason: "stream", status: "ok" };
+  }
 
   const finish = (extractFinishReason(resp) || "").toLowerCase();
-  const text = extractText(resp).trim();
+  const rawText = extractText(resp);
+  const text = rawText.trim();
+  const { reasoningTokens, outputTokens } = extractReasoningOrOutputTokens(resp);
 
   if (finish === "content_filter" || finish === "content-filter") {
     return {
@@ -154,7 +223,17 @@ export function classifyResponse(
       errorCode: "content_filter",
     };
   }
-  if (finish === "length" || finish === "max_tokens") {
+  if (finish === "length" || finish === "max_tokens" || finish === "max_output_tokens") {
+    if (!text && (reasoningTokens > 0 || outputTokens > 0)) {
+      return {
+        usable: false,
+        kind: "thinking_exhausted",
+        billed: true,
+        finishReason: finish,
+        status: "degraded",
+        errorCode: "thinking_exhausted",
+      };
+    }
     return {
       usable: false,
       kind: "truncated",
@@ -174,7 +253,27 @@ export function classifyResponse(
       errorCode: "refusal",
     };
   }
+  if (detectGrammarLoop(rawText)) {
+    return {
+      usable: false,
+      kind: "grammar_loop",
+      billed: true,
+      finishReason: finish || "stop",
+      status: "degraded",
+      errorCode: "grammar_loop",
+    };
+  }
   if (!text) {
+    if (reasoningTokens > 0) {
+      return {
+        usable: false,
+        kind: "thinking_exhausted",
+        billed: true,
+        finishReason: finish || "empty",
+        status: "degraded",
+        errorCode: "thinking_exhausted",
+      };
+    }
     return { usable: false, kind: "empty", billed: true, finishReason: finish || "empty", status: "degraded" };
   }
   return { usable: true, kind: "success", billed: true, finishReason: finish || "stop", status: "ok" };
@@ -201,11 +300,21 @@ function idempotencyAllowsRetry(
   idempotencyKey: string | undefined,
   kind: string,
 ): boolean {
+  const safeKinds = [
+    "timeout",
+    "429",
+    "5xx",
+    "network",
+    "empty",
+    "grammar_loop",
+    "thinking_exhausted",
+    "truncated",
+  ];
   if (policy.idempotency === "off") return false;
   if (policy.idempotency === "require_key") {
-    return Boolean(idempotencyKey) && ["timeout", "429", "5xx", "network"].includes(kind);
+    return Boolean(idempotencyKey) && safeKinds.includes(kind);
   }
-  return ["timeout", "429", "5xx", "network"].includes(kind);
+  return safeKinds.includes(kind);
 }
 
 export function estimateProjectedRerouteCost(

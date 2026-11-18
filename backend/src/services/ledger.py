@@ -135,6 +135,7 @@ async def ingest_events(
             output_tokens = int(raw.get("output_tokens", 0) or 0)
             cached_tokens = int(raw.get("cached_tokens", 0) or 0)
             cache_write_tokens = int(raw.get("cache_write_tokens", 0) or 0)
+            reasoning_tokens = int(raw.get("reasoning_tokens", 0) or 0)
 
             # Accept either the v1 spec name (`cost_usd`) or the legacy `cost`.
             cost = raw.get("cost_usd")
@@ -178,6 +179,7 @@ async def ingest_events(
                 total_tokens=input_tokens + output_tokens,
                 cached_tokens=cached_tokens,
                 cache_write_tokens=cache_write_tokens,
+                reasoning_tokens=reasoning_tokens,
                 cost=float(cost or 0.0),
                 prompt=None,
                 response=None,
@@ -187,8 +189,8 @@ async def ingest_events(
                 outcome=_parse_outcome(raw.get("outcome")),
                 cost_type=_parse_cost_type(raw.get("cost_type")),
                 loop_score=raw.get("loop_score"),
-                team=raw.get("team"),
-                tenant_id=raw.get("tenant_id"),
+                team=raw.get("team") or (raw.get("tags") or {}).get("team"),
+                tenant_id=raw.get("tenant_id") or (raw.get("tags") or {}).get("tenant_id") or metadata.get("tenant_id"),
                 status=raw.get("status"),
                 error_code=raw.get("error_code"),
                 latency_ms=raw.get("latency_ms"),

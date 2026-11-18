@@ -51,3 +51,24 @@ export async function syncBatchWithRetry(
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export async function fetchRemotePolicies(
+  policyEndpoint: string,
+  apiKey: string,
+  timeoutMs = 8000,
+): Promise<Record<string, any> | null> {
+  try {
+    const resp = await fetch(policyEndpoint, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as Record<string, any>;
+  } catch {
+    return null;
+  }
+}

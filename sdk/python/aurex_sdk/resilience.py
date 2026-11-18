@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import hashlib
 import random
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -21,9 +22,61 @@ DEFAULT_RETRY_ON = [
     "empty",
     "content_filter",
     "truncated",
+    "thinking_exhausted",
+    "grammar_loop",
     "refusal",
     "tool_error",
 ]
+
+_REPEATED_KV_RE = re.compile(r'("[^"\n]{1,40}"\s*:\s*[^,}\n]{1,30})(?:\s*,\s*\1){6,}')
+_REPEATED_WORD_RE = re.compile(r"\b(\w{2,})\b(?:\s*[,;]?\s*\1\b){7,}")
+
+
+def detect_grammar_loop(raw_text: Optional[str]) -> bool:
+    """Detect constrained-decoding whitespace/newline floods or repeated JSON key/token loops."""
+    if not raw_text:
+        return False
+    if "\n" * 32 in raw_text or "\t" * 32 in raw_text or " " * 128 in raw_text:
+        return True
+    if len(raw_text) >= 120 and len(raw_text.strip()) < len(raw_text) * 0.15:
+        return True
+    non_empty_lines = [ln.strip() for ln in raw_text.splitlines() if ln.strip()]
+    if len(non_empty_lines) >= 10:
+        most_common = max(non_empty_lines.count(ln) for ln in set(non_empty_lines))
+        if most_common >= max(8, int(len(non_empty_lines) * 0.8)):
+            return True
+    sample = raw_text[:4000]
+    if len(sample) >= 50 and (_REPEATED_KV_RE.search(sample) or _REPEATED_WORD_RE.search(sample)):
+        return True
+    return False
+
+
+def _extract_reasoning_or_output_tokens(resp: Any) -> Tuple[int, int]:
+    """Return (reasoning_tokens, output_tokens) from any supported provider response."""
+    usage = getattr(resp, "usage", None) or getattr(resp, "usage_metadata", None)
+    if usage is None and isinstance(resp, dict):
+        usage = resp.get("usage") or resp.get("usage_metadata")
+    if usage is None:
+        return 0, 0
+
+    def _int_attr(obj: Any, key: str) -> int:
+        val = obj.get(key, 0) if isinstance(obj, dict) else getattr(obj, key, 0)
+        return val if isinstance(val, int) and not isinstance(val, bool) else 0
+
+    out_toks = (
+        _int_attr(usage, "completion_tokens")
+        or _int_attr(usage, "output_tokens")
+        or _int_attr(usage, "candidates_token_count")
+    )
+    reasoning = _int_attr(usage, "thoughts_token_count")
+    details = (
+        usage.get("completion_tokens_details") or usage.get("output_tokens_details")
+        if isinstance(usage, dict)
+        else getattr(usage, "completion_tokens_details", None) or getattr(usage, "output_tokens_details", None)
+    )
+    if details is not None:
+        reasoning = reasoning or _int_attr(details, "reasoning_tokens")
+    return reasoning, out_toks
 
 
 @dataclass
@@ -91,28 +144,49 @@ def parse_resilience_config(raw: Optional[Dict[str, Any]]) -> ResiliencePolicy:
 def _extract_text(resp: Any) -> str:
     if resp is None:
         return ""
+    if hasattr(resp, "output_text") and isinstance(resp.output_text, str) and resp.output_text:
+        return resp.output_text
     if hasattr(resp, "choices") and resp.choices:
         choice = resp.choices[0]
         if hasattr(choice, "message") and choice.message:
             content = getattr(choice.message, "content", None)
-            return content or ""
-        if hasattr(choice, "text"):
-            return choice.text or ""
-    if hasattr(resp, "content"):
+            if content:
+                return str(content)
+            if getattr(choice.message, "tool_calls", None):
+                return "[tool_call]"
+        if hasattr(choice, "text") and choice.text:
+            return str(choice.text)
+    if hasattr(resp, "content") and resp.content is not None:
         content = resp.content
         if isinstance(content, list):
             parts = []
             for block in content:
                 if isinstance(block, dict):
-                    parts.append(str(block.get("text", "")))
+                    if block.get("type") == "tool_use":
+                        parts.append("[tool_call]")
+                    else:
+                        parts.append(str(block.get("text", "")))
                 else:
-                    parts.append(getattr(block, "text", str(block)))
+                    if getattr(block, "type", None) == "tool_use":
+                        parts.append("[tool_call]")
+                    else:
+                        parts.append(str(getattr(block, "text", "") or ""))
             return "".join(parts)
         return str(content or "")
+    if hasattr(resp, "text") and isinstance(resp.text, str) and resp.text:
+        return resp.text
     if isinstance(resp, dict):
+        if resp.get("output_text"):
+            return str(resp["output_text"])
+        if isinstance(resp.get("message"), dict) and resp["message"].get("content"):
+            return str(resp["message"]["content"])
+        if resp.get("response"):
+            return str(resp["response"])
         choices = resp.get("choices") or []
         if choices:
             msg = choices[0].get("message") or {}
+            if msg.get("tool_calls"):
+                return "[tool_call]"
             return str(msg.get("content") or "")
     return ""
 
@@ -159,15 +233,28 @@ def classify_response(
         return classify_exception(exc)
     if resp is None:
         return ClassificationResult(False, "empty", billed=False, status="degraded")
+    if hasattr(resp, "__next__") or hasattr(resp, "__aiter__"):
+        return ClassificationResult(True, "success", billed=True, finish_reason="stream", status="ok")
 
     finish = (_extract_finish_reason(resp, provider) or "").lower()
-    text = _extract_text(resp).strip()
+    raw_text = _extract_text(resp)
+    text = raw_text.strip()
+    reasoning_toks, out_toks = _extract_reasoning_or_output_tokens(resp)
 
     if finish in ("content_filter", "content-filter"):
         return ClassificationResult(
             False, "content_filter", billed=True, finish_reason=finish, status="degraded", error_code="content_filter"
         )
-    if finish in ("length", "max_tokens"):
+    if finish in ("length", "max_tokens", "max_output_tokens"):
+        if not text and (reasoning_toks > 0 or out_toks > 0):
+            return ClassificationResult(
+                False,
+                "thinking_exhausted",
+                billed=True,
+                finish_reason=finish,
+                status="degraded",
+                error_code="thinking_exhausted",
+            )
         return ClassificationResult(
             False, "truncated", billed=True, finish_reason=finish, status="degraded", error_code="truncated"
         )
@@ -175,7 +262,25 @@ def classify_response(
         return ClassificationResult(
             False, "refusal", billed=True, finish_reason=finish, status="degraded", error_code="refusal"
         )
+    if detect_grammar_loop(raw_text):
+        return ClassificationResult(
+            False,
+            "grammar_loop",
+            billed=True,
+            finish_reason=finish or "stop",
+            status="degraded",
+            error_code="grammar_loop",
+        )
     if not text:
+        if reasoning_toks > 0:
+            return ClassificationResult(
+                False,
+                "thinking_exhausted",
+                billed=True,
+                finish_reason=finish or "empty",
+                status="degraded",
+                error_code="thinking_exhausted",
+            )
         return ClassificationResult(False, "empty", billed=True, finish_reason=finish or "empty", status="degraded")
 
     if hasattr(resp, "choices") and resp.choices:
@@ -209,12 +314,12 @@ def _should_skip_recovery(policy: ResiliencePolicy, workflow_id: str, attempt_ke
 
 
 def _idempotency_allows_retry(policy: ResiliencePolicy, idempotency_key: Optional[str], kind: str) -> bool:
+    safe_kinds = ("timeout", "429", "5xx", "network", "empty", "grammar_loop", "thinking_exhausted", "truncated")
     if policy.idempotency == "off":
         return False
     if policy.idempotency == "require_key":
-        return bool(idempotency_key) and kind in ("timeout", "429", "5xx", "network")
-    # auto: conservative — only hard failures without side effects
-    return kind in ("timeout", "429", "5xx", "network")
+        return bool(idempotency_key) and kind in safe_kinds
+    return kind in safe_kinds
 
 
 def estimate_projected_reroute_cost(

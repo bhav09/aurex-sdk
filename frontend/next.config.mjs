@@ -9,22 +9,24 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: "/docs/reference/config-reference", destination: "/docs/reference/config", permanent: true },
-      { source: "/docs/reference/budget-guard-config", destination: "/docs/reference/budget-guard", permanent: true },
-      { source: "/docs/reference/provider-matrix", destination: "/docs/reference/providers", permanent: true },
-      { source: "/docs/reference/context-wrappers", destination: "/docs/reference/wrap", permanent: true },
-      { source: "/docs/reference/health-monitoring", destination: "/docs/reference/health", permanent: true },
-      { source: "/docs/deployment/readonly-fs", destination: "/docs/deployment/filesystem", permanent: true },
-      { source: "/docs/deployment/network-resilience", destination: "/docs/deployment/cloud-sync", permanent: true },
+      { source: "/docs/installation/env-vars", destination: "/docs/reference", permanent: true },
+      { source: "/docs/harness/:path*", destination: "/docs/installation", permanent: true },
+      { source: "/docs/deployment/:path*", destination: "/docs/reference", permanent: true },
+      { source: "/docs/reliability/:path*", destination: "/docs/stage-3-outcomes", permanent: true },
+      { source: "/docs/reference/autohook", destination: "/docs/installation", permanent: true },
+      { source: "/docs/reference/integration", destination: "/docs/installation", permanent: true },
+      { source: "/docs/reference/guards", destination: "/docs/stage-2-breaker", permanent: true },
+      { source: "/docs/reference/budget-guard", destination: "/docs/stage-2-breaker", permanent: true },
+      { source: "/docs/reference/outcomes", destination: "/docs/stage-3-outcomes", permanent: true },
+      { source: "/docs/reference/ci", destination: "/docs/stage-3-outcomes", permanent: true },
+      { source: "/docs/reference/:slug", destination: "/docs/reference", permanent: true },
     ];
   },
-  serverExternalPackages: [
-    "@mlc-ai/web-llm"
-  ],
+  serverExternalPackages: ["@mlc-ai/web-llm"],
   turbopack: {},
   webpack: (config) => {
     return config;
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

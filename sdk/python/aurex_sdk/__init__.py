@@ -1,11 +1,7 @@
 """
 Aurex Zero-Trust, Local-First SDK
-Provides asynchronous, zero-PII auditing for LLM costs and credit scoring.
-Token waste prevention platform — detects loops, compresses prompts, routes
-to cheaper models, and fails over between providers.
+Protects LLM spend before, during, and after every call.
 """
-
-import warnings
 
 from .auditor import AurexAuditor, AurexConfig
 from .exceptions import (
@@ -13,22 +9,14 @@ from .exceptions import (
     AurexBudgetExceeded,
     AurexBlocked,
     AurexConfigError,
+    AurexRecovered,
+    AurexResilienceExhausted,
 )
-from .compressor import AurexCompressor
+from .resilience import ResiliencePolicy
 
 
 def patch_all(client=None):
-    """Auto-detect and patch all installed LLM provider libraries.
-    
-    Convenience wrapper around AurexAuditor.patch_all(). Safe to call
-    multiple times — idempotent.
-    
-    Args:
-        client: An AurexAuditor instance. If None, uses the singleton.
-    
-    Returns:
-        The AurexAuditor instance that was patched.
-    """
+    """Auto-detect and patch all installed LLM provider libraries."""
     if client is None:
         client = AurexAuditor()
     if isinstance(client, AurexAuditor):
@@ -48,6 +36,8 @@ __all__ = [
     "AurexBudgetExceeded",
     "AurexBlocked",
     "AurexConfigError",
+    "AurexRecovered",
+    "AurexResilienceExhausted",
+    "ResiliencePolicy",
     "patch_all",
-    "AurexCompressor",
 ]

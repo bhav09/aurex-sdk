@@ -100,19 +100,23 @@ export function Omnibar() {
             <CommandGroup heading="Documentation">
               <CommandItem onSelect={() => runCommand(() => router.push("/docs/installation"))}>
                 <FileText className="mr-2 h-4 w-4" />
-                Installation & Quick Start
+                Quickstart & Installation
               </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => router.push("/docs/deployment"))}>
+              <CommandItem onSelect={() => runCommand(() => router.push("/docs/stage-1-shield"))}>
                 <FileText className="mr-2 h-4 w-4" />
-                Cloud Deployment
+                Stage 1: Prefix & 200k Cliff Shield
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => router.push("/docs/stage-2-breaker"))}>
+                <FileText className="mr-2 h-4 w-4" />
+                Stage 2: Spend, Thinking & Stream Breaker
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => router.push("/docs/stage-3-outcomes"))}>
+                <FileText className="mr-2 h-4 w-4" />
+                Stage 3: Outcome Cost & CI Gate
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => router.push("/docs/reference"))}>
                 <FileText className="mr-2 h-4 w-4" />
-                API Reference
-              </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => router.push("/docs/reliability"))}>
-                <FileText className="mr-2 h-4 w-4" />
-                Reliability & Loss Recovery
+                Config & Provider Reference
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />

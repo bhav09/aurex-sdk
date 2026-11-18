@@ -55,8 +55,12 @@ class PolicySyncThread:
                     for model, costs in data["pricing"].items():
                         self.auditor.register_model_pricing(model, costs.get("input", 0.0), costs.get("output", 0.0))
                 
-                if "budget_guard" in data:
+                if "budget_guard" in data and data["budget_guard"]:
                     self.auditor.configure_circuit_breaker(data["budget_guard"])
+
+                if "tenant_policies" in data and isinstance(data["tenant_policies"], dict):
+                    if hasattr(self.auditor, "configure_tenant_policies"):
+                        self.auditor.configure_tenant_policies(data["tenant_policies"])
                     
         except Exception as e:
             # Silently fail in background, optionally log in debug mode
