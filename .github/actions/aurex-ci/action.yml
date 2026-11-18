@@ -1,13 +1,29 @@
 name: Aurex CI
-description: Run Aurex waste scan on PR (warn-first by default)
+description: Run Aurex FinOps cost & soft-failure regression check on PRs (warn-first by default)
 inputs:
   mode:
     description: warn or block
     required: false
     default: warn
+  baseline:
+    description: Optional path to main-branch baseline ledger.jsonl
+    required: false
+    default: ""
+  fail_on_regression:
+    description: Set to "true" to fail CI when baseline diff detects a regression
+    required: false
+    default: "false"
 runs:
   using: composite
   steps:
     - name: Run Aurex CI
       shell: bash
-      run: npx aurex ci --mode=${{ inputs.mode }} --github-comment
+      run: |
+        EXTRA_ARGS=""
+        if [ -n "${{ inputs.baseline }}" ]; then
+          EXTRA_ARGS="$EXTRA_ARGS --baseline=${{ inputs.baseline }}"
+        fi
+        if [ "${{ inputs.fail_on_regression }}" = "true" ]; then
+          EXTRA_ARGS="$EXTRA_ARGS --fail-on-regression"
+        fi
+        npx aurex ci --mode=${{ inputs.mode }} --github-comment $EXTRA_ARGS

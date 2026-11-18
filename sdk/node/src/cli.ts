@@ -5,7 +5,7 @@
  * Subcommands:
  *   install-hook    Writes `.env.aurex` for NODE_OPTIONS=--require aurex-sdk/hook
  *   uninstall-hook  Removes the hook file
- *   ci              Scan local ledger; warn or block on waste thresholds
+ *   ci | audit      Scan local ledger & diff against --baseline=<main_ledger.jsonl>
  */
 
 import * as fs from "fs";
@@ -38,23 +38,38 @@ function uninstallHook(target?: string) {
   }
 }
 
+function parseFlag(args: string[], prefix: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith(`${prefix}=`)) return args[i].slice(prefix.length + 1);
+    if (args[i] === prefix && args[i + 1]) return args[i + 1];
+  }
+  return undefined;
+}
+
 function runCi(args: string[]) {
-  const modeArg = args.find((a) => a.startsWith("--mode="));
-  const githubComment = args.includes("--github-comment");
   const config = loadCiConfig();
-  if (modeArg) config.mode = modeArg.split("=")[1] as "warn" | "block";
+  const modeVal = parseFlag(args, "--mode");
+  const ledgerVal = parseFlag(args, "--ledger");
+  const baselineVal = parseFlag(args, "--baseline");
+  const failOnRegression = args.includes("--fail-on-regression");
+  const githubComment = args.includes("--github-comment");
+
+  if (modeVal) config.mode = modeVal as "warn" | "block";
+  if (ledgerVal) config.ledgerPath = ledgerVal;
+  if (baselineVal) config.baselinePath = baselineVal;
+  if (failOnRegression) config.failOnRegression = true;
+
   const result = runCiScan(config);
   const comment = formatGithubComment(result);
-  if (githubComment) {
-    console.log(comment);
-  } else {
-    console.log(comment);
-    if (result.issues.length) {
-      for (const i of result.issues) console.error(`[${i.severity}] ${i.title}`);
-    }
+  console.log(comment);
+  if (!githubComment && result.issues.length) {
+    for (const i of result.issues) console.error(`[${i.severity}] ${i.title}: ${i.detail}`);
   }
-  const critical = result.issues.filter((i) => i.severity === "CRITICAL");
-  if (config.mode === "block" && critical.length > 0) {
+
+  const shouldFail =
+    (config.mode === "block" && result.issues.some((i) => i.severity === "CRITICAL")) ||
+    Boolean(failOnRegression && result.diff?.hasRegression);
+  if (shouldFail) {
     process.exit(1);
   }
 }
@@ -70,9 +85,11 @@ if (cmd === "uninstall-hook") {
   uninstallHook(args[1]);
   process.exit(0);
 }
-if (cmd === "ci") {
+if (cmd === "ci" || cmd === "audit") {
   runCi(args.slice(1));
   process.exit(0);
 }
-console.log("Usage: aurex <install-hook|uninstall-hook|ci> [--mode=warn|block] [--github-comment]");
+console.log(
+  "Usage: aurex <install-hook|uninstall-hook|ci|audit> [--ledger=path] [--baseline=path] [--fail-on-regression] [--mode=warn|block] [--github-comment]",
+);
 process.exit(cmd ? 1 : 0);

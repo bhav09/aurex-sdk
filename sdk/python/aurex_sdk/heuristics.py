@@ -69,6 +69,7 @@ class LocalHeuristicsEngine:
         self.detect_prompt_drift()
         self.detect_cot_inflation()
         self.detect_cache_opportunity()
+        self.detect_context_cliff_waste()
 
         # Prevent double-counting: assign waste proportionally per event, capped at actual event cost
         event_waste_map = defaultdict(float)
@@ -660,4 +661,34 @@ class LocalHeuristicsEngine:
                     "cache_discount": f"{(1 - cache_rate) * 100:.0f}%",
                 }
             })
+
+    def detect_context_cliff_waste(self):
+        """Flag >200k 2x whole-request context pricing cliff crossings."""
+        from .pricing import check_cliff_status
+
+        affected = []
+        total_surcharge = 0.0
+        for idx, e in enumerate(self.events):
+            eid = e.get("id") or f"evt_{idx}"
+            in_toks = int(e.get("input_tokens", 0) or 0)
+            model = e.get("model", "")
+            status = check_cliff_status(model, in_toks, provider=e.get("provider"))
+            if status["crossed_cliff"]:
+                affected.append(eid)
+                total_surcharge += status["surcharge_usd"]
+
+        if affected and total_surcharge > 0:
+            self.issues.append({
+                "issue_type": "context_cliff_200k",
+                "title": "200k Context 2x Pricing Cliff Crossed",
+                "severity": "HIGH",
+                "cost_impact": round(total_surcharge, 4),
+                "summary": f"{len(affected)} call(s) exceeded 200k tokens, triggering 2x whole-request surcharge (${total_surcharge:.2f}).",
+                "fix_effort": "15 minutes",
+                "fix_confidence": "HIGH",
+                "cta": "Trim or summarize context below 200,000 tokens",
+                "affected_events": affected,
+                "metadata": {"call_count": len(affected), "surcharge_usd": round(total_surcharge, 4)},
+            })
+
 

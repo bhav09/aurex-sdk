@@ -14,21 +14,22 @@ export const docsNavGroups: DocsNavGroup[] = [
   {
     title: "Getting Started",
     items: [
-      { href: "/docs", label: "Overview", agentHint: "Product summary and doc map" },
-      { href: "/docs/installation", label: "Installation", agentHint: "pip/npm install, API key, first event" },
-      { href: "/docs/installation/env-vars", label: "Environment Variables", agentHint: "AUREX_API_KEY, AUREX_LEDGER_PATH" },
-      { href: "/docs/reference/autohook", label: "Zero-Code Auto-Hook", agentHint: "aurex install-hook" },
+      { href: "/docs", label: "Overview", agentHint: "3-stage pipeline summary & 60s quickstart" },
+      { href: "/docs/installation", label: "Quickstart & Install", agentHint: "pip/npm install, patch_all, auto-hook" },
     ],
   },
   {
-    title: "API Reference",
+    title: "3-Stage Protection Pipeline",
     items: [
-      { href: "/docs/reference", label: "API Reference Hub", agentHint: "Links to focused API pages" },
-      { href: "/docs/reference/integration", label: "Manual Integration", agentHint: "singleton init, flush, patch" },
-      { href: "/docs/reference/config", label: "AurexConfig", agentHint: "core config fields" },
-      { href: "/docs/reference/budget-guard", label: "BudgetGuard", agentHint: "spend circuit breaker limits" },
-      { href: "/docs/reference/providers", label: "Supported Providers", agentHint: "OpenAI, Anthropic, LiteLLM, etc." },
-      { href: "/docs/reference/guards", label: "Real-Time Guards", agentHint: "pre_call_check, LoopGuard, Compressor" },
+      { href: "/docs/stage-1-shield", label: "Stage 1: Before the Call", agentHint: "Prefix Cache-Shield & 200k Cliff Guard" },
+      { href: "/docs/stage-2-breaker", label: "Stage 2: During the Call", agentHint: "Session Spend, Thinking & Stream Breaker" },
+      { href: "/docs/stage-3-outcomes", label: "Stage 3: After the Call + CI", agentHint: "Cost per Outcome, Soft Failures & PR Diff" },
+    ],
+  },
+  {
+    title: "Reference",
+    items: [
+      { href: "/docs/reference", label: "Config & Providers", agentHint: "AurexConfig, BudgetGuard, env vars, providers" },
     ],
   },
 ];

@@ -122,7 +122,8 @@ const originalRequire = Module.prototype.require;
 };
 
 // Import Aurex SDK components
-import { AurexAuditor, AurexConfig, normalizeModelName, getModelPricing, calculateCost } from "./index";
+import { AurexAuditor, normalizeModelName, getModelPricing, calculateCost } from "./index";
+import type { AurexConfig } from "./index";
 
 async function runTests() {
   console.log("🚀 Running Node SDK Patcher & Integration Tests...");

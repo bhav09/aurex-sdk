@@ -1,153 +1,139 @@
 import Link from "next/link";
-import { Cpu, Cloud, Layers, BookOpen, ArrowRight, Bot, Rocket, Shield } from "lucide-react";
-import { CodeBlock } from "@/components/ui/code-block";
+import { Shield, Zap, BarChart3, Rocket, BookOpen, ArrowRight } from "lucide-react";
+import { DualCodeBlock } from "@/components/docs/dual-code-block";
+import { DocHashRedirect } from "@/components/docs/doc-hash-redirect";
 
 export const metadata = {
-  title: "Aurex SDK Documentation",
-  description:
-    "Token waste prevention SDK. Install, auto-patch all providers, and start preventing wasted tokens in under two minutes.",
+  title: "Aurex Documentation — Before, During & After Every LLM Call",
+  description: "Plain-English guide to preventing LLM token waste in Python and Node.js with zero proxy latency.",
 };
 
-const cards = [
+const guides = [
   {
     href: "/docs/installation",
-    title: "Installation & Quick Start",
-    description: "Install the Python or Node SDK, configure API keys, and log your first event.",
-    icon: Cpu,
+    title: "Quickstart & Install",
+    description: "Install in 60 seconds with 2 lines of code or zero-code auto-hook.",
+    icon: Rocket,
   },
   {
-    href: "/docs/deployment",
-    title: "Cloud Deployment",
-    description: "Serverless flush, filesystem fallbacks, cloud sync resilience, and ingest rate limits.",
-    icon: Cloud,
+    href: "/docs/stage-1-shield",
+    title: "Stage 1: Before the Call",
+    description: "Keep 90% prompt-cache discounts warm and stop >200k 2x context cliff surprises.",
+    icon: Shield,
   },
   {
-    href: "/docs/harness",
-    title: "Harness Integration",
-    description: "Choose patch vs wrap vs manual logging based on your observability stack.",
-    icon: Layers,
+    href: "/docs/stage-2-breaker",
+    title: "Stage 2: During the Call",
+    description: "Session-isolated dollar caps, thinking-token limits, and live stream accounting.",
+    icon: Zap,
+  },
+  {
+    href: "/docs/stage-3-outcomes",
+    title: "Stage 3: After the Call + CI",
+    description: "Track cost per completed task, catch HTTP-200 soft failures, and diff PRs in CI.",
+    icon: BarChart3,
   },
   {
     href: "/docs/reference",
-    title: "API Reference",
-    description: "Focused pages for config, guards, providers, health, and CI — one topic per URL.",
+    title: "Config & Providers",
+    description: "All AurexConfig fields, BudgetGuard options, environment variables, and providers.",
     icon: BookOpen,
-  },
-  {
-    href: "/docs/reliability",
-    title: "Reliability & Loss Recovery",
-    description: "Provider-call retry, fallbacks, observe/enforce modes, and loss_avoided accounting.",
-    icon: Shield,
   },
 ];
 
 export default function DocsOverviewPage() {
   return (
     <div className="space-y-10">
-      {/* Quickstart block */}
-      <div id="quickstart" className="scroll-mt-32">
-        <div className="flex items-center gap-2 mb-4">
-          <Rocket className="w-5 h-5 text-amber-400" />
-          <h2 className="text-2xl font-display font-bold text-white">Quickstart</h2>
-          <span className="ml-2 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 rounded text-amber-400">
-            2 minutes
-          </span>
-        </div>
-
-        <CodeBlock
-          language="BASH"
-          code={"pip install aurex-sdk"}
-        />
-        
-        <CodeBlock
-          language="PYTHON"
-          code={`from aurex_sdk import AurexAuditor, patch_all
-import openai
-
-# 1. Initialize and patch (no manual logging required)
-auditor = AurexAuditor()
-patch_all()
-
-# 2. Use your LLM library exactly as before
-client = openai.OpenAI()
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Explain quantum entanglement."}]
-)
-
-# 3. Check your Token Credit Score
-score = auditor.get_score()
-print(f"Token Credit Score: {score.value}/100")
-# => Token Credit Score: 84/100
-# => Flags: ['cache_opportunity: $12.40/month saving on system prompt']`}
-        />
-
-        {/* Privacy note */}
-        <div className="flex items-start gap-3 mt-4 p-4 rounded-xl border border-teal-500/10 bg-teal-500/[0.02]">
-          <Shield className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm text-white/50">
-              <span className="text-white/70 font-medium">No data leaves your machine by default.</span>{" "}
-              Cloud sync is opt-in. The ledger file at <code className="text-teal-400/70 text-xs">~/.aurex/ledger.jsonl</code> is
-              human-readable JSON and can be inspected at any time. It contains only numeric metadata — never raw prompt text.
-            </p>
-          </div>
-        </div>
-      </div>
+      <DocHashRedirect />
 
       <div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          <span className="text-xs font-mono text-teal-400 uppercase tracking-wider">SDK v0.3</span>
-        </div>
         <h1 className="text-4xl font-display font-bold tracking-tight text-white mb-3">
           Aurex SDK Documentation
         </h1>
-        <p className="text-white/50 max-w-2xl leading-relaxed">
-          Aurex is a token waste prevention platform. The SDK sits in-process between your application code and LLM provider APIs,
-          intercepting and preventing the four root causes of AI token waste before a single wasted token is billed.
-          Budget guards and detection heuristics run locally without adding network latency.
+        <p className="text-white/60 leading-relaxed">
+          Aurex protects your AI bill inside your own process—adding <strong>0 ms proxy latency</strong> and never sending raw prompt text outside your servers.
         </p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-white/[0.08] bg-white/[0.02]">
-        <Bot className="w-5 h-5 text-teal-400 mt-0.5 shrink-0" />
-        <div>
-          <h2 className="text-sm font-semibold text-white">Agent-friendly docs</h2>
-          <p className="text-xs text-white/40 mt-1">
-            Start at{" "}
-            <Link href="/llms.txt" className="text-teal-400 hover:text-teal-300">
-              /llms.txt
-            </Link>{" "}
-            for task → URL routing. Fetch one page per concern (e.g.{" "}
-            <Link href="/docs/reference/config" className="text-teal-400 hover:text-teal-300">
-              /docs/reference/config
-            </Link>
-            ,{" "}
-            <Link href="/docs/reliability/policy" className="text-teal-400 hover:text-teal-300">
-              /docs/reliability/policy
-            </Link>
-            ) — avoid loading hub pages for implementation detail.
-          </p>
-        </div>
-      </div>
+      <section className="space-y-3">
+        <h2 className="text-xl font-display font-semibold text-white">1. What problems are people facing?</h2>
+        <ul className="list-disc list-inside space-y-2 text-sm text-white/65">
+          <li><strong>Silent cache & cliff traps:</strong> Dynamic timestamps break 90% prompt-cache discounts, and crossing <code>200k</code> tokens doubles whole-request pricing on Claude and Gemini.</li>
+          <li><strong>Runaway runtime spend:</strong> Looping agents, 25,000 hidden thinking tokens, aborted streams, and multiplied SDK retries burn budget mid-run.</li>
+          <li><strong>Billed soft failures:</strong> Empty or looped HTTP <code>200 OK</code> outputs still cost money while hiding true cost per completed task.</li>
+        </ul>
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {cards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="group p-5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
-          >
-            <card.icon className="w-5 h-5 text-teal-400 mb-3" />
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              {card.title}
-              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-teal-400" />
-            </h2>
-            <p className="text-sm text-white/45 mt-2 leading-relaxed">{card.description}</p>
-          </Link>
-        ))}
-      </div>
+      <section className="space-y-3">
+        <h2 className="text-xl font-display font-semibold text-white">2. What does Aurex solve?</h2>
+        <p className="text-sm text-white/65 leading-relaxed">
+          One lightweight SDK connects three stages around every OpenAI, Anthropic, Gemini, LiteLLM, or Llama call: <strong>Stage 1</strong> shields your prefix cache and warns before pricing cliffs, <strong>Stage 2</strong> enforces live session and thinking-token circuit breakers across workers, and <strong>Stage 3</strong> measures real cost per outcome and flags cost regressions on Pull Requests.
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-display font-semibold text-white">3. How to use it (60-second setup)</h2>
+        <DualCodeBlock
+          pythonId="overview-py"
+          nodeId="overview-node"
+          pythonTitle="Python (pip install aurex-sdk)"
+          nodeTitle="Node.js (npm install aurex-sdk)"
+          pythonCode={`from aurex_sdk import AurexAuditor, AurexConfig, patch_all
+import openai
+
+auditor = AurexAuditor(AurexConfig(
+    budget_guard={"max_cost_per_session": 1.00, "max_thinking_tokens": 4096, "on_budget_exceeded": "throw"},
+    enable_loop_guard=True,
+))
+patch_all(auditor)
+
+client = openai.OpenAI()
+resp = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Summarize this ticket."}],
+    workflow_id="ticket-42",
+)
+auditor.mark_success("ticket-42")
+auditor.flush()`}
+          nodeCode={`import { AurexAuditor } from "aurex-sdk";
+import OpenAI from "openai";
+
+const auditor = AurexAuditor.getInstance({
+  budgetGuard: { maxCostPerSession: 1.0, maxThinkingTokens: 4096, onBudgetExceeded: "throw" },
+  enableLoopGuard: true,
+});
+auditor.patchAll();
+
+const client = new OpenAI();
+const resp = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Summarize this ticket." }],
+  metadata: { workflow_id: "ticket-42" },
+});
+auditor.markSuccess("ticket-42");
+auditor.flush();`}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-display font-semibold text-white">4. Explore the 3-Stage Pipeline</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {guides.map((g) => (
+            <Link
+              key={g.href}
+              href={g.href}
+              className="group p-4 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-teal-500/40 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <g.icon className="w-4 h-4 text-teal-400" />
+                <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-teal-400 transition-colors" />
+              </div>
+              <h3 className="text-sm font-semibold text-white mb-1">{g.title}</h3>
+              <p className="text-xs text-white/50 leading-relaxed">{g.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

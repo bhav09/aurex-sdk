@@ -19,6 +19,7 @@ import sysconfig
 from pathlib import Path
 from typing import List, Optional
 
+from .ci_diff import compare_ledgers, format_regression_markdown
 from .heuristics import LocalHeuristicsEngine
 
 PTH_FILENAME = "aurex.pth"
@@ -105,6 +106,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         (args.fail_under is not None and args.fail_under > 0)
         or (args.max_waste_usd is not None and args.max_waste_usd != float("inf"))
         or (args.max_spend_usd is not None and args.max_spend_usd != float("inf"))
+        or bool(getattr(args, "fail_on_regression", False))
     )
 
     if not os.path.exists(args.ledger):
@@ -130,33 +132,59 @@ def cmd_audit(args: argparse.Namespace) -> int:
     credit_score = report["credit_score"]
     issues = report["issues"]
 
+    baseline_path = getattr(args, "baseline", None)
+    fail_on_reg = bool(getattr(args, "fail_on_regression", False))
+    github_comment = bool(getattr(args, "github_comment", False))
+
+    if baseline_path and github_comment:
+        diff = compare_ledgers(
+            args.ledger,
+            baseline_path,
+            max_regression_pct=float(getattr(args, "max_regression_pct", 15.0)),
+        )
+        print(format_regression_markdown(diff))
+        if diff.has_regression and (fail_on_reg or getattr(args, "mode", "warn") == "block"):
+            return 1
+        return 0
+
     score_color = "\033[92m" if credit_score >= 85 else "\033[93m" if credit_score >= 70 else "\033[91m"
 
-    print("\n" + "=" * 55)
-    print("      🛡️  Aurex Local FinOps Audit Report")
-    print("=" * 55)
-    print(f"  • Local Ledger File:    {args.ledger}")
-    print(f"  • Total LLM Requests:   {total_events:,}")
-    print(f"  • Total Spend USD:      ${total_cost:.4f}")
-    print(f"  • Wasted Spend USD:     ${wasted_cost:.4f}")
-    print(f"  • Waste Ratio:          {waste_percentage}%")
-    print(f"  • Token Credit Score:   {score_color}{credit_score} / 100\033[0m")
-    print("=" * 55)
+    if not github_comment:
+        print("\n" + "=" * 55)
+        print("      🛡️  Aurex Local FinOps Audit Report")
+        print("=" * 55)
+        print(f"  • Local Ledger File:    {args.ledger}")
+        print(f"  • Total LLM Requests:   {total_events:,}")
+        print(f"  • Total Spend USD:      ${total_cost:.4f}")
+        print(f"  • Wasted Spend USD:     ${wasted_cost:.4f}")
+        print(f"  • Waste Ratio:          {waste_percentage}%")
+        print(f"  • Token Credit Score:   {score_color}{credit_score} / 100\033[0m")
+        print("=" * 55)
 
-    if issues:
-        print("\n🔎 Detected Waste Drivers:")
-        for idx, issue in enumerate(issues[:5], 1):
-            sev = issue["severity"]
-            sev_color = "\033[91m" if sev == "CRITICAL" else "\033[93m"
-            print(f"  {idx}. {sev_color}[{sev}]\033[0m \033[1m{issue['title']}\033[0m (-${issue['cost_impact']:.2f})")
-            print(f"     └─ {issue['summary']}")
-            print(f"     └─ CTA: \033[96m{issue['cta']}\033[0m")
-        if len(issues) > 5:
-            print(f"  ... and {len(issues) - 5} more issues.")
+        if issues:
+            print("\n🔎 Detected Waste Drivers:")
+            for idx, issue in enumerate(issues[:5], 1):
+                sev = issue["severity"]
+                sev_color = "\033[91m" if sev == "CRITICAL" else "\033[93m"
+                print(f"  {idx}. {sev_color}[{sev}]\033[0m \033[1m{issue['title']}\033[0m (-${issue['cost_impact']:.2f})")
+                print(f"     └─ {issue['summary']}")
+                print(f"     └─ CTA: \033[96m{issue['cta']}\033[0m")
+            if len(issues) > 5:
+                print(f"  ... and {len(issues) - 5} more issues.")
+        else:
+            print("\n\033[92m🎉 Excellent! No cost leakage or loop risks detected in the ledger.\033[0m")
+
+        print("=" * 55)
+
+    if baseline_path:
+        diff = compare_ledgers(
+            args.ledger,
+            baseline_path,
+            max_regression_pct=float(getattr(args, "max_regression_pct", 15.0)),
+        )
+        print("\n" + format_regression_markdown(diff) + "\n")
     else:
-        print("\n\033[92m🎉 Excellent! No cost leakage or loop risks detected in the ledger.\033[0m")
-
-    print("=" * 55)
+        diff = None
 
     failed = False
     fail_reasons: List[str] = []
@@ -169,9 +197,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
     if total_cost > args.max_spend_usd:
         failed = True
         fail_reasons.append(f"Total spend (${total_cost:.4f}) exceeds the maximum budget of ${args.max_spend_usd:.4f}.")
+    if diff is not None and diff.has_regression and fail_on_reg:
+        failed = True
+        fail_reasons.extend(diff.regressions)
 
     if failed:
-        if getattr(args, "mode", "warn") == "block":
+        if fail_on_reg or getattr(args, "mode", "warn") == "block":
             print("\n\033[91m🚨 BUILD BREAKER TRIPPED! CI/CD Audit Failed:\033[0m")
             for reason in fail_reasons:
                 print(f"  ❌ {reason}")
@@ -201,12 +232,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command")
 
-    p_audit = sub.add_parser("audit", help="Run local audit on .aurex/ledger.jsonl")
-    p_audit.add_argument("--ledger", default=".aurex/ledger.jsonl")
-    p_audit.add_argument("--fail-under", type=int, default=0)
-    p_audit.add_argument("--max-waste-usd", type=float, default=float("inf"))
-    p_audit.add_argument("--max-spend-usd", type=float, default=float("inf"))
-    p_audit.add_argument("--mode", choices=["warn", "block"], default="warn", help="CI/CD block/fail mode (default: warn)")
+    for sub_name in ("audit", "ci"):
+        p_audit = sub.add_parser(sub_name, help="Run local audit & optional baseline diff on .aurex/ledger.jsonl")
+        p_audit.add_argument("--ledger", default=".aurex/ledger.jsonl")
+        p_audit.add_argument("--baseline", default=None, help="Path to main-branch baseline ledger.jsonl")
+        p_audit.add_argument("--fail-on-regression", action="store_true", help="Exit 1 when baseline diff flags a regression")
+        p_audit.add_argument("--max-regression-pct", type=float, default=15.0)
+        p_audit.add_argument("--github-comment", action="store_true", help="Output clean PR Markdown diff")
+        p_audit.add_argument("--fail-under", type=int, default=0)
+        p_audit.add_argument("--max-waste-usd", type=float, default=float("inf"))
+        p_audit.add_argument("--max-spend-usd", type=float, default=float("inf"))
+        p_audit.add_argument("--mode", choices=["warn", "block"], default="warn", help="CI/CD block/fail mode (default: warn)")
 
     p_install = sub.add_parser(
         "install-hook",
@@ -222,6 +258,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Legacy flags at top level (kept so `aurex --ledger ...` still works).
     parser.add_argument("--ledger", default=argparse.SUPPRESS)
+    parser.add_argument("--baseline", default=argparse.SUPPRESS)
+    parser.add_argument("--fail-on-regression", action="store_true", default=argparse.SUPPRESS)
+    parser.add_argument("--max-regression-pct", type=float, default=argparse.SUPPRESS)
+    parser.add_argument("--github-comment", action="store_true", default=argparse.SUPPRESS)
     parser.add_argument("--fail-under", type=int, default=argparse.SUPPRESS)
     parser.add_argument("--max-waste-usd", type=float, default=argparse.SUPPRESS)
     parser.add_argument("--max-spend-usd", type=float, default=argparse.SUPPRESS)
@@ -239,9 +279,13 @@ def run_cli() -> None:
     if args.command == "uninstall-hook":
         sys.exit(cmd_uninstall_hook(args.target))
 
-    # Default: audit. Backfill legacy top-level flags into the audit namespace.
+    # Default: audit / ci. Backfill legacy top-level flags into the audit namespace.
     audit_args = argparse.Namespace(
         ledger=getattr(args, "ledger", ".aurex/ledger.jsonl"),
+        baseline=getattr(args, "baseline", None),
+        fail_on_regression=getattr(args, "fail_on_regression", False),
+        max_regression_pct=getattr(args, "max_regression_pct", 15.0),
+        github_comment=getattr(args, "github_comment", False),
         fail_under=getattr(args, "fail_under", 0),
         max_waste_usd=getattr(args, "max_waste_usd", float("inf")),
         max_spend_usd=getattr(args, "max_spend_usd", float("inf")),

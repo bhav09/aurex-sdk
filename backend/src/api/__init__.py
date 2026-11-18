@@ -13,6 +13,7 @@ from .ledger import router as ledger_router
 from .dashboard import router as dashboard_router
 from .escalations import router as escalations_router
 from .savings import router as savings_router
+from .policies import router as policies_router
 
 router = APIRouter()
 router.include_router(legacy_router)
@@ -22,5 +23,6 @@ router.include_router(ledger_router)
 router.include_router(dashboard_router)
 router.include_router(escalations_router)
 router.include_router(savings_router)
+router.include_router(policies_router)
 
 __all__ = ["router"]

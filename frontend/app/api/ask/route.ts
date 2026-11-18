@@ -30,8 +30,8 @@ This will automatically route traffic to your secondary provider if the primary 
       answer = `To install the Aurex SDK, simply run: \`pip install aurex-sdk\`. Then initialize it with \`patch_all()\`.`;
     } else if (q.includes("encrypt") || q.includes("privacy")) {
       answer = `Aurex supports Client-Side Encryption (CSE). By setting the \`AUREX_ENCRYPTION_KEY\` environment variable, the SDK will encrypt your raw prompts locally using AES-256-GCM before logging them. They are only decrypted in your browser session.`;
-    } else if (q.includes("compress") || q.includes("onnx")) {
-      answer = `The \`AurexCompressor\` runs locally within the SDK using ONNX runtime. It can prune up to 80% of tokens from long contexts while preserving intent.`;
+    } else if (q.includes("cache") || q.includes("prefix") || q.includes("cliff")) {
+      answer = `Aurex's Prefix Cache-Shield checks your prompt segments locally before every call to catch silent cache-breakers (like changing timestamps), idle TTL rewrites, and >200k context pricing cliffs.`;
     }
 
     // Simulate network delay
