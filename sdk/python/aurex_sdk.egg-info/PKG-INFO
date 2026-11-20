@@ -1,18 +1,142 @@
 Metadata-Version: 2.4
 Name: aurex-sdk
-Version: 0.1.0
-Summary: Aurex AI FinOps SDK — zero-code LLM cost auditing.
-Author: Aurex
-License: Apache-2.0
-Requires-Python: >=3.9
+Version: 0.5.0
+Summary: In-process LLM FinOps shield, runtime circuit breaker, and CI outcome gate for Python
+Author: Bhavishya Pandit
+Project-URL: Homepage, https://github.com/bhav09/aurex-sdk
+Project-URL: Repository, https://github.com/bhav09/aurex-sdk
+Project-URL: Documentation, https://github.com/bhav09/aurex-sdk#readme
+Project-URL: Issues, https://github.com/bhav09/aurex-sdk/issues
+Keywords: llm,finops,ai-agents,openai,anthropic,gemini,prompt-caching,circuit-breaker,guardrails,opentelemetry
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Typing :: Typed
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
+Requires-Dist: tiktoken>=0.7.0
 Provides-Extra: openai
-Requires-Dist: openai>=1.0; extra == "openai"
+Requires-Dist: openai>=1.0.0; extra == "openai"
 Provides-Extra: anthropic
-Requires-Dist: anthropic>=0.20; extra == "anthropic"
+Requires-Dist: anthropic>=0.25.0; extra == "anthropic"
 Provides-Extra: google
-Requires-Dist: google-generativeai>=0.5; extra == "google"
+Requires-Dist: google-genai>=1.0.0; extra == "google"
+Provides-Extra: google-legacy
+Requires-Dist: google-generativeai>=0.3.0; extra == "google-legacy"
 Provides-Extra: litellm
-Requires-Dist: litellm>=1.40; extra == "litellm"
-Provides-Extra: dev
-Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: litellm>=1.0.0; extra == "litellm"
+Provides-Extra: ollama
+Requires-Dist: ollama>=0.3.0; extra == "ollama"
+Provides-Extra: huggingface
+Requires-Dist: huggingface_hub>=0.19.0; extra == "huggingface"
+Provides-Extra: redis
+Requires-Dist: redis>=5.0.0; extra == "redis"
+Provides-Extra: otel
+Requires-Dist: opentelemetry-api>=1.20.0; extra == "otel"
+Provides-Extra: all
+Requires-Dist: openai>=1.0.0; extra == "all"
+Requires-Dist: anthropic>=0.25.0; extra == "all"
+Requires-Dist: google-genai>=1.0.0; extra == "all"
+Requires-Dist: litellm>=1.0.0; extra == "all"
+Requires-Dist: ollama>=0.3.0; extra == "all"
+Requires-Dist: huggingface_hub>=0.19.0; extra == "all"
+Requires-Dist: redis>=5.0.0; extra == "all"
+Requires-Dist: opentelemetry-api>=1.20.0; extra == "all"
+
+# Aurex Python SDK (`aurex-sdk`)
+
+Open-source, in-process LLM FinOps shield, runtime circuit breaker, and CI regression gate for Python (`<0.1 ms` overhead, zero proxy hops, zero-PII local ledger).
+
+## 1. What Problems Are People Facing?
+
+- **Silent cache & cliff traps:** Dynamic timestamps or unsorted JSON tool schemas in `system`/`developer` prompts break 50%–90% prompt-cache discounts, and crossing `200,000` input tokens doubles whole-request pricing on Claude 4+ and Gemini 2.5+.
+- **Unbounded runtime spend:** Looping tool calls, hidden reasoning tokens (`o3`/`o4-mini`, Claude Extended Thinking, Gemini `thoughts_token_count`), aborted SSE streams, and multiplied SDK retries drain budgets mid-flight.
+- **Billed HTTP-200 soft failures:** Thinking-exhausted empty outputs and `\n\n\n` JSON grammar loops return HTTP `200 OK` and bill full output rates while producing nothing usable.
+
+## 2. What Does Aurex Solve?
+
+`aurex-sdk` instruments `openai` (`.create`, `.parse`, `.stream`, `responses.create`, plus Groq/Together/Fireworks/OpenRouter/Ollama `base_url` clients), `anthropic` (`messages.create`, `.parse`, `.stream`, `1h`/`5m` prompt caching, `ThinkingBlock`), `google-genai` (sync & `.aio` async), `litellm`, `ollama`, and `huggingface_hub` across three stages:
+1. **Before the call (Stage 1):** Deterministically sorts tool/schema JSON keys, pinpoints prefix-cache mutations by character offset, flags `>5m` Anthropic idle TTL gaps, and warns before the `200k` 2x cliff.
+2. **During the call (Stage 2):** Isolates workflows via `workflow_id` / `contextvars` / OpenTelemetry `trace_id`, shares spend across workers via optional Redis, clamps thinking budgets, injects stream usage & bills aborted streams, disables duplicate SDK retries, and raises `AurexBlocked`.
+3. **After the call + CI (Stage 3):** Tags HTTP-200 soft failures as `unfulfilled_spend`, pairs spend with `mark_success()` to measure true `cost_per_success`, and diffs PR ledgers in CI.
+
+## 3. How to Use It in Any Python Codebase (Step-by-Step)
+
+### Step 1: Install
+
+```bash
+pip install aurex-sdk
+# Optional Redis multi-worker state + OpenTelemetry trace correlation:
+pip install "aurex-sdk[redis,otel]"
+```
+
+### Step 2: Initialize Once at Startup (FastAPI, Django, Celery, LangGraph, Scripts)
+
+```python
+from aurex_sdk import AurexAuditor, AurexBlocked, AurexConfig, patch_all
+import openai
+
+auditor = AurexAuditor(
+    AurexConfig(
+        redis_url="redis://localhost:6379/0",  # Optional: omit for in-memory single-process mode
+        enable_loop_guard=True,
+        budget_guard={
+            "max_cost_per_session": 1.50,
+            "max_thinking_tokens": 4096,
+            "on_budget_exceeded": "throw",
+        },
+    )
+)
+patch_all(auditor)
+
+client = openai.OpenAI()
+try:
+    # Works identically for sync, AsyncOpenAI, .parse(response_format=Model), .stream(), and client.responses.create()
+    resp = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "developer", "content": "You are a concise support engineer."},
+            {"role": "user", "content": "Draft release notes for v0.5.0."},
+        ],
+        workflow_id="release-job-1",  # Stripped cleanly before hitting provider HTTP wire
+        tags={"tenant_id": "acme"},
+    )
+    auditor.mark_success("release-job-1")
+except AurexBlocked as err:
+    print(f"Blocked runaway workflow {err.workflow_id}: {err.reason}")
+finally:
+    auditor.flush()  # Call on app shutdown or AWS Lambda / Cloud Run request exit
+```
+
+### Step 3: Run Local Audit & CI PR Gate
+
+```bash
+aurex audit
+aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comment --fail-on-regression
+```
+
+*(Zero-code startup hook: run `aurex install-hook` once in your virtualenv/image, then run with `AUREX_ENABLED=1`.)*
+
+## 4. How Can You Improve Your Setup?
+
+- **Move dynamic values to the tail:** Keep `messages[0]` / `system` static and append timestamps or request IDs at the end of the user turn.
+- **Guard the `200k` cliff:** Set `"max_context_tokens": 195000` in `budget_guard` on Claude 4+ and Gemini 2.5+ workflows.
+- **Enable Redis across workers:** Set `AUREX_REDIS_URL=redis://localhost:6379/0` so Gunicorn/Uvicorn workers share live session spend.
+- **Fail CI on upstream SDK drift:** Set `AUREX_STRICT_DRIFT=1` in CI to raise `AurexProviderDriftError` if a future `openai` / `anthropic` / `google-genai` major bump renames internal classes (production always fails open and logs `auditor.get_health()["drift_warnings"]`).
+
+---
+
+## Quick Reference for AI Coding Agents
+
+- **Singleton lifecycle:** Initialize `AurexAuditor(AurexConfig(...))` + `patch_all(auditor)` **once** at process startup (e.g., FastAPI `lifespan`). Call `AurexAuditor.reset()` between unit tests.
+- **Auto-stripped call kwargs:** `workflow_id`, `tags`, `tenant_id`, and `quality_score` can be passed directly to any patched provider `.create()`, `.parse()`, or `.stream()` call—Aurex removes them before HTTP serialization.
+- **Read-only containers / Lambda:** Use `storage_mode="memory"` (or let Aurex auto-fallback when the filesystem is read-only) and call `auditor.flush()` (or `auditor.flush_async()`) before exit.
+- **Typed exceptions:** Catch `AurexBlocked` / `AurexBudgetExceeded` (from `aurex_sdk`). Real provider exceptions (`openai.APIError`, `anthropic.APIError`) pass through unchanged.

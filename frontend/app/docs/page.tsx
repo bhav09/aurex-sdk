@@ -102,16 +102,17 @@ const auditor = AurexAuditor.getInstance({
   budgetGuard: { maxCostPerSession: 1.0, maxThinkingTokens: 4096, onBudgetExceeded: "throw" },
   enableLoopGuard: true,
 });
-auditor.patchAll();
+await auditor.patchAll();
+auditor.instrument(OpenAI); // Bundler-safe hook for Next.js / Vite
 
 const client = new OpenAI();
 const resp = await client.chat.completions.create({
   model: "gpt-4o",
   messages: [{ role: "user", content: "Summarize this ticket." }],
-  metadata: { workflow_id: "ticket-42" },
-});
+  workflowId: "ticket-42", // Auto-stripped before hitting the wire
+} as any);
 auditor.markSuccess("ticket-42");
-auditor.flush();`}
+await auditor.flushAndWait();`}
         />
       </section>
 

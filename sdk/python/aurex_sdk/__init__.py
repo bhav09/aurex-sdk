@@ -16,6 +16,8 @@ from .exceptions import (
 )
 from .resilience import ResiliencePolicy
 
+__version__ = "0.5.0"
+
 
 def patch_all(client=None):
     """Auto-detect and patch all installed LLM provider libraries."""
@@ -31,6 +33,7 @@ AurexClient = AurexAuditor
 
 
 __all__ = [
+    "__version__",
     "AurexAuditor",
     "AurexClient",
     "AurexConfig",

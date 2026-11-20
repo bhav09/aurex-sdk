@@ -1,20 +1,20 @@
 # Aurex Documentation Map (/llms.txt)
 
-> Aurex is an in-process Python (`aurex-sdk`) and Node.js (`aurex-sdk`) FinOps SDK that stops LLM token waste across one continuous 3-stage pipeline: **Before the Call (Prefix & 200k Cliff Shield)** -> **During the Call (Session, Thinking & Stream Circuit Breaker)** -> **After the Call + CI (Outcome Cost & Soft-Failure Gate)**. Zero proxy latency, zero raw prompt PII transmitted by default.
+> Aurex (`aurex-sdk` on PyPI and npm) is an open-source, in-process Python and Node.js/TypeScript FinOps SDK that stops LLM token waste across one continuous 3-stage pipeline: **Before the Call (Prefix & 200k Cliff Shield)** -> **During the Call (Session, Thinking & Stream Circuit Breaker)** -> **After the Call + CI (Outcome Cost & Soft-Failure Gate)**. `<0.1 ms` overhead, zero proxy network hops, and zero raw prompt PII transmitted by default.
 
 ## Core Documentation Routes
 
 - `/docs` — Overview: 3-stage call lifecycle, 60-second Python/Node quickstart, and architecture summary.
-- `/docs/installation` — Quickstart & Installation: `pip install aurex-sdk` / `npm install aurex-sdk`, `patch_all()` / `patchAll()`, zero-code `aurex install-hook`, and cloud sync setup.
-- `/docs/stage-1-shield` — Stage 1 (Before the Call): Prefix Cache-Shield, deterministic JSON canonicalization, `>5m` Anthropic cache-TTL gap warnings, and `>200k` 2x context cliff protection.
-- `/docs/stage-2-breaker` — Stage 2 (During the Call): Session isolation (`workflow_id` / OpenTelemetry `trace_id`), Redis multi-worker budgets, `max_thinking_tokens` clamping, aborted-stream accounting, and `AurexBlocked` loop circuit breaking.
+- `/docs/installation` — Quickstart & Installation: `pip install aurex-sdk` / `npm install aurex-sdk`, `patch_all()` / `await auditor.patchAll()`, bundler-safe `auditor.instrument(...)`, zero-code `aurex install-hook`, and serverless `flush()`.
+- `/docs/stage-1-shield` — Stage 1 (Before the Call): Prefix Cache-Shield (`system`, `developer`, and Anthropic `cache_control` blocks), deterministic JSON key canonicalization, `>5m` Anthropic cache-TTL gap warnings, and `>200k` 2x context cliff protection on Claude 4+ and Gemini 2.5+.
+- `/docs/stage-2-breaker` — Stage 2 (During the Call): Session isolation (`workflow_id` / `AsyncLocalStorage` / OpenTelemetry `trace_id`), Redis multi-worker budgets, `max_thinking_tokens` clamping, `.parse()` / `.stream()` & aborted-stream accounting, and `AurexBlocked` loop circuit breaking.
 - `/docs/stage-3-outcomes` — Stage 3 (After the Call + CI): `mark_success()` / `mark_failure()`, HTTP-200 soft-failure detection (`grammar_loop`, `thinking_exhausted` -> `unfulfilled_spend`), tenant margin guardrails (`/api/v1/policies`), and `aurex ci --baseline` PR diffs.
-- `/docs/reference` — Config & Provider Reference: `AurexConfig`, `BudgetGuard`, environment variables, and supported providers (OpenAI Chat + `responses.create`, Groq/Together/Fireworks/OpenRouter, Anthropic, Google Gemini, LiteLLM, local Ollama).
+- `/docs/reference` — Config & Provider Reference: `AurexConfig`, `BudgetGuard`, `AurexProviderDriftError` (`AUREX_STRICT_DRIFT=1`), environment variables, and supported providers (OpenAI Chat/Parse/Stream + `responses.create`, Groq/Together/Fireworks/OpenRouter, Anthropic, Google GenAI, LiteLLM, Hugging Face, local Ollama).
 
-## Canonical Quickstart (Python)
+## Canonical Drop-In Quickstart (Python)
 
 ```python
-from aurex_sdk import AurexAuditor, AurexConfig, patch_all
+from aurex_sdk import AurexAuditor, AurexBlocked, AurexConfig, patch_all
 
 auditor = AurexAuditor(
     AurexConfig(
@@ -23,22 +23,24 @@ auditor = AurexAuditor(
     )
 )
 patch_all(auditor)
-# Make standard OpenAI / Anthropic / Gemini / LiteLLM calls...
+# Pass workflow_id="workflow-123" directly to OpenAI / Anthropic / Gemini / LiteLLM calls (auto-stripped before wire)
 auditor.mark_success("workflow-123")
 auditor.flush()
 ```
 
-## Canonical Quickstart (Node.js / TypeScript)
+## Canonical Drop-In Quickstart (Node.js / TypeScript)
 
 ```typescript
 import { AurexAuditor } from "aurex-sdk";
+import OpenAI from "openai";
 
 const auditor = AurexAuditor.getInstance({
   budgetGuard: { maxCostPerSession: 1.0, maxThinkingTokens: 4096, onBudgetExceeded: "throw" },
   enableLoopGuard: true,
 });
-auditor.patchAll();
-// Make standard OpenAI / Anthropic / Gemini / LiteLLM calls...
+await auditor.patchAll();
+auditor.instrument(OpenAI); // Recommended for Next.js Turbopack / Vite / ESM bundlers
+// Pass workflowId: "workflow-123" directly on calls (auto-stripped before wire)
 auditor.markSuccess("workflow-123");
-auditor.flush();
+await auditor.flushAndWait();
 ```

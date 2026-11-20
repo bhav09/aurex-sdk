@@ -1,0 +1,92 @@
+# Aurex SDK — LLM & AI Coding Agent Integration Guide (/llms.txt)
+
+> Aurex (`aurex-sdk` on PyPI and npm) is an open-source, in-process Python & TypeScript LLM FinOps and runtime guardrail SDK. It wraps existing OpenAI, Anthropic, Google GenAI, LiteLLM, Ollama, Hugging Face, and OpenAI-compatible (Groq, Together, Fireworks, OpenRouter) clients with `<0.1 ms` overhead, zero proxy hops, and Zero-PII local SHA-256 hashing.
+
+## 1. Golden Rules for Integrating Aurex into an Existing Codebase
+
+1. **Initialize once per process:** Create `AurexAuditor` once at startup (e.g., FastAPI `lifespan`, Django `AppConfig.ready()`, Express bootstrap, or Next.js `instrumentation.ts`) and call `patch_all(auditor)` (Python) or `await auditor.patchAll()` (Node.js).
+2. **Bundled TypeScript apps (Next.js Turbopack / Webpack / Vite / Vitest):** Also call `auditor.instrument(OpenAI, Anthropic, GoogleGenAI, Ollama)` (passing imported SDK constructors or client instances) so bundler-isolated prototypes are instrumented deterministically.
+3. **Pass `workflow_id` / `workflowId` directly on LLM calls:** Aurex automatically strips `workflow_id`, `workflowId`, `tags`, `tenant_id`, `tenantId`, `quality_score`, and `qualityScore` before requests hit provider HTTP endpoints (preventing `HTTP 400` errors) and sanitizes Anthropic `metadata` to `{ user_id }`. If omitted, Aurex falls back to `aurex_context` / `aurexContext` -> active OpenTelemetry `trace_id` -> `AUREX_WORKFLOW_ID`.
+4. **Record real task completion:** Call `auditor.mark_success(workflow_id)` / `auditor.markSuccess(workflowId)` (or `mark_failure` / `markFailure`) when the business workflow completes so Stage 3 computes true `cost_per_success` rather than cost per LLM turn.
+5. **Flush in short-lived scripts & serverless functions:** Call `auditor.flush()` / `auditor.flush_async()` (Python) or `auditor.flush()` / `await auditor.flushAndWait()` (Node.js) before Lambda/CLI exit. Use `storage_mode="memory"` / `storageMode: "memory"` on read-only container filesystems.
+6. **Naming convention:** Python uses `snake_case` (`max_cost_per_session`, `enable_loop_guard`, `strict_provider_drift`). Node.js uses `camelCase` (`maxCostPerSession`, `enableLoopGuard`, `strictProviderDrift`).
+
+## 2. Drop-In Python Integration (FastAPI / Async / Sync / `.parse()` / `.stream()` / `Responses`)
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from aurex_sdk import AurexAuditor, AurexBlocked, AurexBudgetExceeded, AurexConfig, patch_all
+
+auditor = AurexAuditor(
+    AurexConfig(
+        redis_url=None,  # Or "redis://localhost:6379/0" (also reads env AUREX_REDIS_URL)
+        enable_loop_guard=True,
+        budget_guard={
+            "max_cost_per_session": 1.50,
+            "max_cost_per_minute": 15.00,
+            "max_context_tokens": 195000,
+            "max_thinking_tokens": 4096,
+            "on_budget_exceeded": "throw",  # "warn" | "throw" | "webhook"
+        },
+        resilience={"enabled": True, "mode": "enforce", "max_attempts": 2},
+    )
+)
+patch_all(auditor)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    auditor.flush()
+
+app = FastAPI(lifespan=lifespan)
+```
+
+## 3. Drop-In TypeScript / Node.js Integration (Next.js / Express / Fastify)
+
+```typescript
+import { AurexAuditor, AurexBlocked } from "aurex-sdk";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
+
+export const auditor = AurexAuditor.getInstance({
+  redisUrl: process.env.AUREX_REDIS_URL,
+  enableLoopGuard: true,
+  budgetGuard: {
+    maxCostPerSession: 1.5,
+    maxCostPerMinute: 15.0,
+    maxContextTokens: 195000,
+    maxThinkingTokens: 4096,
+    onBudgetExceeded: "throw",
+  },
+  resilience: { enabled: true, mode: "enforce", maxAttempts: 2 },
+});
+
+await auditor.patchAll();
+auditor.instrument(OpenAI, Anthropic);
+```
+
+## 4. Supported SDK Methods & Provider Nuances
+
+- **OpenAI (`openai`):** Sync & Async `chat.completions.create`, `chat.completions.parse` (Pydantic/Zod), `chat.completions.stream`, `responses.create`, `responses.parse`, `responses.stream`. Auto-injects `stream_options={"include_usage": True}`. Automatically detects `base_url` / `baseURL` for **Groq**, **Together AI**, **Fireworks**, **OpenRouter**, **Bedrock**, and **Ollama** (`localhost` = `$0.00`, hosted cloud = real token rates).
+- **Anthropic (`anthropic` / `@anthropic-ai/sdk`):** Sync & Async `messages.create`, `messages.parse`, `messages.stream`. Inspects `cache_control` block arrays, tracks mixed `5m` (`1.25x`) and `1h` (`2.0x`) cache writes, separates `ThinkingBlock` from `TextBlock`, and enforces the `>200k` 2x cliff on Claude 4+ models.
+- **Google Gemini (`google-genai` / `@google/genai`):** `models.generate_content` & `models.generate_content_stream` (sync & `.aio` async), `thoughts_token_count`, `cached_content_token_count`, and `>200k` 2x cliff on Gemini 2.5+ models.
+- **LiteLLM, Ollama & Hugging Face:** `litellm.completion` / `acompletion`, `ollama.Client` / `AsyncClient`, `huggingface_hub.InferenceClient`.
+
+## 5. Exceptions, Health & CI Commands
+
+- **Exceptions:** `AurexBlocked` (pre-call budget/loop/policy block), `AurexBudgetExceeded` (post-call budget breach), `AurexResilienceExhausted` (all retries/fallbacks failed), `AurexProviderDriftError` (raised when `strict_provider_drift=True` or `AUREX_STRICT_DRIFT=1` detects an incompatible upstream SDK layout change).
+- **Health check:** `auditor.get_health()` (Python) / `auditor.getHealth()` (Node.js) returns `status`, `events_logged`/`eventsLogged`, `patch_status`/`patchStatus`, and `drift_warnings`/`driftWarnings`.
+- **CLI & CI:**
+  - `aurex audit`
+  - `aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comment --fail-on-regression`
+  - `aurex install-hook` (zero-code Python `.pth` / Node `--import` hook; activate with `AUREX_ENABLED=1`)
+
+## 6. Documentation Routes
+
+- `/docs` — 3-stage pipeline overview & 60-second quickstart
+- `/docs/installation` — Python & Node installation, serverless flush, and zero-code hook
+- `/docs/stage-1-shield` — Prefix Cache-Shield & `200k` 2x cliff guard
+- `/docs/stage-2-breaker` — Session-isolated spend, thinking caps, Redis state, and stream breaker
+- `/docs/stage-3-outcomes` — `mark_success()`, HTTP-200 soft-failure gate, tenant policies, and `aurex ci`
+- `/docs/reference` — Complete `AurexConfig`, `BudgetGuard`, provider coverage, and env vars

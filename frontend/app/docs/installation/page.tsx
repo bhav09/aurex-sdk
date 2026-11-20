@@ -59,12 +59,14 @@ auditor = AurexAuditor(AurexConfig(
 ))
 patch_all(auditor)`}
           nodeCode={`import { AurexAuditor } from "aurex-sdk";
+import OpenAI from "openai";
 
 const auditor = AurexAuditor.getInstance({
   apiKey: process.env.AUREX_API_KEY, // Omit for 100% local-only mode
   budgetGuard: { maxCostPerSession: 2.0, onBudgetExceeded: "throw" },
 });
-auditor.patchAll();`}
+await auditor.patchAll();
+auditor.instrument(OpenAI); // Explicit hook for Next.js Turbopack / Vite bundlers`}
         />
 
         <p className="text-sm font-medium text-teal-400">Step 3: Or enable Zero-Code Auto-Hook (no code edits)</p>

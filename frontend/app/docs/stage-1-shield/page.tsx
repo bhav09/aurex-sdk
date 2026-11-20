@@ -19,7 +19,7 @@ export default function Stage1ShieldPage() {
         <ul className="list-disc list-inside text-sm text-white/65 space-y-1.5">
           <li><strong>Silent prefix-cache breakers:</strong> OpenAI, Claude, and Gemini give 50%–90% discounts on repeated prompt prefixes, but changing a single timestamp at character 20 or shuffling JSON dictionary keys resets cache hits to <code>0</code>.</li>
           <li><strong>Anthropic 5-minute TTL trap:</strong> Waiting just over 5 minutes between turns expires the default cache and charges a <code>1.25x</code> cache-rewrite penalty.</li>
-          <li><strong>The 200k 2x pricing cliff:</strong> Sending <code>200,001</code> input tokens to Claude or Gemini doubles the rate on <em>all</em> 200,001 tokens—not just the extra token.</li>
+          <li><strong>The 200k 2x pricing cliff:</strong> Sending <code>200,001</code> input tokens to 1M-context Claude 4+ or Gemini 2.5+ models doubles the rate on <em>all</em> 200,001 tokens—not just the extra token.</li>
         </ul>
       </section>
 

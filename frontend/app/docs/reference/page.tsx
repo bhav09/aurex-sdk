@@ -34,6 +34,7 @@ export default function ReferencePage() {
               <tr><td className="p-3 font-mono">cache_ttl / cacheTtl</td><td className="p-3"><code>&quot;5m&quot;</code></td><td className="p-3">Anthropic cache write multiplier (<code>&quot;5m&quot;</code> = 1.25x, <code>&quot;1h&quot;</code> = 2.0x).</td></tr>
               <tr><td className="p-3 font-mono">enable_loop_guard / enableLoopGuard</td><td className="p-3"><code>false</code></td><td className="p-3">Blocks repeated tool/prompt loops cleanly with <code>AurexBlocked</code>.</td></tr>
               <tr><td className="p-3 font-mono">auto_downgrade_simple_prompts</td><td className="p-3"><code>false</code></td><td className="p-3">Routes short non-code prompts on frontier models to mini/flash/haiku tiers.</td></tr>
+              <tr><td className="p-3 font-mono">strict_provider_drift / strictProviderDrift</td><td className="p-3">env <code>AUREX_STRICT_DRIFT=1</code></td><td className="p-3">Raises <code>AurexProviderDriftError</code> in CI if an upstream SDK upgrade changes internal layouts (production fails open).</td></tr>
               <tr><td className="p-3 font-mono">resilience</td><td className="p-3">disabled</td><td className="p-3"><code>{`{ enabled: true, mode: "observe" | "enforce", max_attempts: 2 }`}</code>.</td></tr>
             </tbody>
           </table>
@@ -65,17 +66,17 @@ export default function ReferencePage() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">3. Supported Providers &amp; Endpoints</h2>
         <ul className="list-disc list-inside text-sm text-white/65 space-y-1.5">
-          <li><strong>OpenAI &amp; OpenAI-Compatible Standard (<code>patch_openai</code> / <code>patchOpenAI</code>):</strong> Covers <code>chat.completions.create</code>, <code>responses.create</code>, streaming usage injection, and automatic <code>base_url</code> pricing detection for <strong>Groq</strong>, <strong>Together AI</strong>, <strong>Fireworks</strong>, <strong>OpenRouter</strong>, <strong>Azure</strong>, and local <strong>Ollama</strong> (<code>localhost:11434</code> = <code>$0.00</code>).</li>
-          <li><strong>Anthropic (<code>patch_anthropic</code> / <code>patchAnthropic</code>):</strong> Tracks <code>cache_read_input_tokens</code>, <code>cache_creation_input_tokens</code> (<code>5m</code> vs <code>1h</code>), extended thinking caps, and <code>&gt;200k</code> 2x tiered pricing.</li>
-          <li><strong>Google Gemini (<code>patch_google</code> / <code>patchGoogle</code>):</strong> Tracks <code>cached_content_token_count</code>, <code>thoughts_token_count</code> thinking tokens, and <code>&gt;200k</code> 2x tiered pricing.</li>
-          <li><strong>LiteLLM &amp; Native Ollama / Hugging Face:</strong> Supported via <code>patch_litellm</code>, <code>patch_ollama</code>, and <code>patch_huggingface</code> (all included in <code>patch_all()</code>).</li>
+          <li><strong>OpenAI &amp; OpenAI-Compatible Standard (<code>patch_openai</code> / <code>patchOpenAI</code>):</strong> Covers <code>chat.completions.create</code>, <code>.parse()</code> (Pydantic/Zod), <code>.stream()</code>, <code>responses.create</code>, streaming usage injection, and automatic <code>base_url</code> pricing detection for <strong>Groq</strong>, <strong>Together AI</strong>, <strong>Fireworks</strong>, <strong>OpenRouter</strong>, <strong>Azure</strong>, and local <strong>Ollama</strong> (<code>localhost:11434</code> = <code>$0.00</code>).</li>
+          <li><strong>Anthropic (<code>patch_anthropic</code> / <code>patchAnthropic</code>):</strong> Covers <code>messages.create</code>, <code>.parse()</code>, <code>.stream()</code>, mixed <code>5m</code> (<code>1.25x</code>) &amp; <code>1h</code> (<code>2.0x</code>) cache creation billing, <code>ThinkingBlock</code> separation, and Claude 4+ <code>&gt;200k</code> 2x tiered pricing.</li>
+          <li><strong>Google Gemini (<code>patch_google</code> / <code>patchGoogle</code>):</strong> Covers sync &amp; <code>.aio</code> async <code>generate_content</code> / <code>generate_content_stream</code>, <code>cached_content_token_count</code>, <code>thoughts_token_count</code>, and Gemini 2.5+ <code>&gt;200k</code> 2x tiered pricing.</li>
+          <li><strong>LiteLLM, Ollama, Hugging Face &amp; Bundlers:</strong> Supported via <code>patch_all()</code> / <code>await auditor.patchAll()</code> plus explicit <code>auditor.instrument(OpenAI, Anthropic, GoogleGenAI, Ollama)</code> for Next.js Turbopack / Vite / ESM bundlers.</li>
         </ul>
       </section>
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold text-white">4. Environment Variables</h2>
         <p className="text-xs font-mono text-white/65 leading-relaxed">
-          AUREX_API_KEY • AUREX_BASE_URL • AUREX_REDIS_URL • AUREX_LEDGER_PATH • AUREX_WORKFLOW_ID • AUREX_CACHE_TTL • AUREX_ENABLED=1 • AUREX_BLOCK_ON_WASTE=1 • AUREX_DEBUG=1
+          AUREX_API_KEY • AUREX_BASE_URL • AUREX_REDIS_URL • AUREX_LEDGER_PATH • AUREX_WORKFLOW_ID • AUREX_CACHE_TTL • AUREX_STRICT_DRIFT=1 • AUREX_ENABLED=1 • AUREX_BLOCK_ON_WASTE=1 • AUREX_DEBUG=1
         </p>
       </section>
 

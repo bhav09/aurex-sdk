@@ -60,7 +60,7 @@ except AurexBlocked as err:
 const auditor = AurexAuditor.getInstance({
   redisUrl: process.env.AUREX_REDIS_URL, // Optional shared multi-pod state
   enableLoopGuard: true,
-  resilience: { enabled: true, mode: "enforce", max_attempts: 2 },
+  resilience: { enabled: true, mode: "enforce", maxAttempts: 2 },
   budgetGuard: {
     maxCostPerSession: 1.5,
     maxCostPerMinute: 10.0,
@@ -68,7 +68,7 @@ const auditor = AurexAuditor.getInstance({
     onBudgetExceeded: "throw",
   },
 });
-auditor.patchAll();
+await auditor.patchAll();
 
 try {
   // Works across OpenAI Chat, client.responses.create, Anthropic, Gemini & Groq
