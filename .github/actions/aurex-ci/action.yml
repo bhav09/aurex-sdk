@@ -18,12 +18,16 @@ runs:
   steps:
     - name: Run Aurex CI
       shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_FAIL_ON_REGRESSION: ${{ inputs.fail_on_regression }}
       run: |
-        EXTRA_ARGS=""
-        if [ -n "${{ inputs.baseline }}" ]; then
-          EXTRA_ARGS="$EXTRA_ARGS --baseline=${{ inputs.baseline }}"
+        ARGS=("--mode=${INPUT_MODE}" "--github-comment")
+        if [ -n "${INPUT_BASELINE}" ]; then
+          ARGS+=("--baseline=${INPUT_BASELINE}")
         fi
-        if [ "${{ inputs.fail_on_regression }}" = "true" ]; then
-          EXTRA_ARGS="$EXTRA_ARGS --fail-on-regression"
+        if [ "${INPUT_FAIL_ON_REGRESSION}" = "true" ]; then
+          ARGS+=("--fail-on-regression")
         fi
-        npx aurex ci --mode=${{ inputs.mode }} --github-comment $EXTRA_ARGS
+        npx aurex ci "${ARGS[@]}"
