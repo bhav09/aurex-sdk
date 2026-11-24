@@ -1,6 +1,11 @@
 {
   "name": "aurex-sdk",
-  "version": "0.5.3",
+  "version": "0.5.4",
+  "author": "Bhavishya Pandit & Aakriti Aggarwal",
+  "contributors": [
+    { "name": "Bhavishya Pandit", "url": "https://github.com/bhav09" },
+    { "name": "Aakriti Aggarwal", "url": "https://github.com/aakriti1318" }
+  ],
   "description": "Aurex AI FinOps SDK — local-first LLM cost shield, circuit breaker, and outcome gate.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

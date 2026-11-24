@@ -79,3 +79,7 @@ Verified across **SWE-agent** autonomous coding runs and **LangGraph** multi-age
 - **Propagate `workflow_id` in LangGraph / sub-agents:** Use `aurex_context.set({"workflow_id": run_id})` so multi-agent nodes share one isolated session budget.
 - **Do not retry `AurexBlocked`:** In `tenacity`, pass `retry=retry_if_not_exception_type(AurexBlocked)` so intentional circuit-breaker stops are not retried.
 - **Interactive Docs & AI-agent guide:** https://bhav09.github.io/aurex-sdk/ and https://github.com/bhav09/aurex-sdk (see `llms.txt` and `AGENTS.md`).
+
+## Credits
+
+**Author:** [Bhavishya Pandit](https://github.com/bhav09) and [Aakriti Aggarwal](https://github.com/aakriti1318)

@@ -167,3 +167,7 @@ Contributions, bug reports, and provider adapter PRs are welcome!
 1. Fork [bhav09/aurex-sdk](https://github.com/bhav09/aurex-sdk), create a feature branch, and keep Python (`sdk/python`) and Node.js (`sdk/node`) changes in lockstep.
 2. Run `AUREX_STRICT_DRIFT=1 bash .agent/skills/aurex-smoke-test/scripts/run_smoke.sh` from the repo root to verify all Python, Node.js, and Backend checks pass.
 3. Open a Pull Request describing the problem solved and test coverage added.
+
+## Credits
+
+**Author:** [Bhavishya Pandit](https://github.com/bhav09) and [Aakriti Aggarwal](https://github.com/aakriti1318)

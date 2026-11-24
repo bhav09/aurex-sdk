@@ -76,3 +76,7 @@ npx aurex ci --ledger=.aurex/ledger.jsonl --baseline=main_ledger.jsonl --github-
 - **Scope concurrent & multi-agent runs:** Wrap requests with `aurexContext.run({ workflowId, tenantId }, async () => { ... })` so sub-agents share one isolated session budget.
 - **Do not retry `AurexBlocked`:** Skip retrying `err instanceof AurexBlocked` in custom retry wrappers so intentional circuit-breaker stops halt immediately.
 - **Docs & AI-agent guide:** https://github.com/bhav09/aurex-sdk (see `llms.txt` and `AGENTS.md`).
+
+## Credits
+
+**Author:** [Bhavishya Pandit](https://github.com/bhav09) and [Aakriti Aggarwal](https://github.com/aakriti1318)
