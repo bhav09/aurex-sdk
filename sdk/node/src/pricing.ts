@@ -113,21 +113,32 @@ export function countTextTokens(text?: string): number {
   return Math.max(1, pieces ? pieces.length : 0, Math.floor(text.length / 4));
 }
 
+function safeStringify(val: any): string {
+  const seen = new WeakSet();
+  return JSON.stringify(val, (_k, v) => {
+    if (typeof v === "object" && v !== null) {
+      if (seen.has(v)) return undefined;
+      seen.add(v);
+    }
+    return typeof v === "bigint" ? v.toString() : v;
+  });
+}
+
 function serializeSchema(schemaObj: any): string {
   if (!schemaObj) return "";
   if (typeof schemaObj === "object") {
     if (typeof schemaObj.toJSONSchema === "function") {
       try {
-        return JSON.stringify(schemaObj.toJSONSchema());
+        return safeStringify(schemaObj.toJSONSchema());
       } catch {}
     }
     if (schemaObj._zod || schemaObj._def) {
       try {
-        return JSON.stringify(schemaObj._zod?.def || schemaObj._def);
+        return safeStringify(schemaObj._zod?.def || schemaObj._def);
       } catch {}
     }
     try {
-      return JSON.stringify(schemaObj);
+      return safeStringify(schemaObj);
     } catch {}
   }
   return "";

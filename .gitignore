@@ -22,7 +22,9 @@ aurex-*.json
 .coverage
 .pytest_cache/
 **/.pytest_cache/
-backend/data/
+backend/data/*
+!backend/data/pricing/
+!backend/data/pricing/*.json
 backend/.venv/
 
 # CSV and database files
@@ -54,4 +56,7 @@ Features Aurex.pdf
 session.json
 summary.json
 upload_res.json
+
+# Internal MD files
+aurex_feature.md
 

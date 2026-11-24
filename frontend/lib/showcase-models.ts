@@ -1,4 +1,4 @@
-import { MODEL_PRICING } from "../../sdk/node/src/index";
+import { MODEL_PRICING } from "../../sdk/node/src/pricing";
 import { FALLBACK_SHOWCASE_MODELS } from "./showcase-models-fallback";
 
 const LITELLM_PRICING_URL =

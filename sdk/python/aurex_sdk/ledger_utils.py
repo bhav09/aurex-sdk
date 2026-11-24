@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from typing import Optional, Tuple
 
 
@@ -57,8 +58,12 @@ def prepare_ledger_storage(
     if _probe_writable_directory(ledger_dir):
         return resolved, "file", None
 
-    tmp_path = os.path.join("/tmp", ".aurex", os.path.basename(resolved))
-    tmp_dir = os.path.dirname(tmp_path)
+    tmp_dir = os.path.join(tempfile.gettempdir(), ".aurex")
+    tmp_path = os.path.join(tmp_dir, os.path.basename(resolved))
+    try:
+        os.makedirs(tmp_dir, mode=0o700, exist_ok=True)
+    except OSError:
+        pass
     if _probe_writable_directory(tmp_dir):
         warning = (
             f"[Aurex Warning] Ledger directory not writable ({ledger_dir}); "

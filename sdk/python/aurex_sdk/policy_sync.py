@@ -5,6 +5,7 @@ import urllib.request
 import urllib.error
 import sys
 from typing import Optional, Any
+from aurex_sdk.cloud_sync import safe_urlopen
 
 class PolicySyncThread:
     """
@@ -47,7 +48,7 @@ class PolicySyncThread:
                     "Accept": "application/json"
                 }
             )
-            with urllib.request.urlopen(req, timeout=10.0) as response:
+            with safe_urlopen(req, timeout=10.0) as response:
                 data = json.loads(response.read().decode('utf-8'))
                 
                 # Apply rules to auditor

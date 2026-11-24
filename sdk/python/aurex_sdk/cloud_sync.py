@@ -6,8 +6,17 @@ import json
 import random
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional, Tuple
+
+
+def safe_urlopen(req: urllib.request.Request, timeout: float = 10.0):
+    """Validate http/https URL scheme before opening (prevents file:/ / custom-scheme SSRF)."""
+    parsed = urllib.parse.urlparse(req.full_url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme '{parsed.scheme}'; only http/https allowed.")
+    return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
 
 
 def sync_batch_with_retry(
@@ -33,7 +42,7 @@ def sync_batch_with_retry(
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+            with safe_urlopen(req, timeout=timeout_seconds) as response:
                 response.read()
             return True, None
         except urllib.error.HTTPError as exc:

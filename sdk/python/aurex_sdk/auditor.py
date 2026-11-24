@@ -11,7 +11,7 @@ import urllib.request
 import urllib.error
 from aurex_sdk.decisions import AurexDecision, AurexAction, suggest_cheaper_model, is_expensive_model, compress_messages, apply_decision_to_call_params
 from aurex_sdk.semantic import jaccard_ngram_similarity
-from aurex_sdk.cloud_sync import sync_batch_with_retry
+from aurex_sdk.cloud_sync import safe_urlopen, sync_batch_with_retry
 from aurex_sdk.exceptions import AurexBlocked, AurexBudgetExceeded, AurexProviderDriftError, AurexResilienceExhausted
 from aurex_sdk.ledger_utils import emit_warning_once, prepare_ledger_storage
 from aurex_sdk.resilience import (
@@ -796,7 +796,7 @@ class AurexAuditor:
                     },
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                with safe_urlopen(req, timeout=3.0) as resp:
                     resp.read()
             except Exception as e:
                 self._debug_log(f"Escalation request failed: {e}")
@@ -1600,7 +1600,7 @@ class AurexAuditor:
                                 headers={"Content-Type": "application/json"},
                                 method="POST"
                             )
-                            with urllib.request.urlopen(req, timeout=3.0) as response:
+                            with safe_urlopen(req, timeout=3.0) as response:
                                 response.read()
                         except Exception as ex:
                             print(f"[Aurex SDK Budget Guard] Webhook failed: {ex}", file=sys.stderr)

@@ -1,3 +1,5 @@
+import path from "node:path";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
@@ -23,7 +25,9 @@ const nextConfig = {
     ];
   },
   serverExternalPackages: ["@mlc-ai/web-llm"],
-  turbopack: {},
+  turbopack: {
+    root: path.resolve(import.meta.dirname, ".."),
+  },
   webpack: (config) => {
     return config;
   },

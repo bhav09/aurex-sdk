@@ -217,7 +217,7 @@ describe("Aurex Node.js Real-Usage & Latest-Package Functionality Suite", () => 
     expect(oaText).toBe("Hello OpenAI SSE");
     expect(wire.requests[wire.requests.length - 1].body.stream_options).toEqual({ include_usage: true });
 
-    // 3. OpenAI beta.chat.completions.parse() (verifies _thenUnwrap on lazy APIPromise!)
+    // 3. OpenAI chat.completions.parse() (verifies _thenUnwrap on lazy APIPromise in openai v7!)
     wire.enqueue({
       json: {
         id: "cmpl_p1",
@@ -228,7 +228,10 @@ describe("Aurex Node.js Real-Usage & Latest-Package Functionality Suite", () => 
         usage: { prompt_tokens: 220, completion_tokens: 40, total_tokens: 260 },
       },
     });
-    const parsed = await oa.beta.chat.completions.parse({
+    const parseFn = oa.chat.completions.parse
+      ? oa.chat.completions.parse.bind(oa.chat.completions)
+      : oa.beta.chat.completions.parse.bind(oa.beta.chat.completions);
+    const parsed = await parseFn({
       model: "gpt-4o-2024-08-06",
       messages: [{ role: "user", content: "Parse invoice" }],
       response_format: { type: "json_object" },

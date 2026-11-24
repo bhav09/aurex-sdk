@@ -45,15 +45,18 @@ PRICING_DIR = os.path.join(
 # ─── Light-weight HTTP fetch (uses urllib so the script has no heavy deps) ──
 
 def _fetch(url: str, timeout: float = 30.0) -> str:
+    import urllib.parse
     import urllib.request
+    if urllib.parse.urlparse(url).scheme != "https":
+        raise ValueError(f"Only https:// pricing URLs allowed: {url}")
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "Aurex-Pricing-Scraper/1.0 (https://github.com/bhav09/tbank)",
+            "User-Agent": "Aurex-Pricing-Scraper/1.0 (https://github.com/bhav09/aurex-sdk)",
             "Accept": "text/html,application/xhtml+xml",
         },
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
         if resp.status != 200:
             raise RuntimeError(f"GET {url} → HTTP {resp.status}")
         return resp.read().decode("utf-8", errors="replace")
@@ -241,9 +244,13 @@ def merge_partial_into_catalog(catalog: dict, partials: list[PartialModel]) -> t
 
 def refresh_provider(name: str) -> dict:
     cfg = PROVIDERS[name]
+    os.makedirs(PRICING_DIR, exist_ok=True)
     path = os.path.join(PRICING_DIR, f"{name}.json")
-    with open(path, "r") as f:
-        catalog = json.load(f)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            catalog = json.load(f)
+    else:
+        catalog = {"provider": name, "models": {}}
 
     print(f"[{name}] GET {cfg['url']}")
     try:

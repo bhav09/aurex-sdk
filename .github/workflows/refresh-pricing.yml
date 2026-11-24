@@ -22,10 +22,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Run scraper
         run: |
           python -m scripts.scrape_pricing
@@ -40,7 +40,7 @@ jobs:
           fi
       - name: Open PR
         if: steps.diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           branch: pricing/refresh-${{ github.run_id }}
           title: "Pricing refresh — $(date -u +%Y-%m-%d)"

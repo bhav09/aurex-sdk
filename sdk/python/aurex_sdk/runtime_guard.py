@@ -165,7 +165,8 @@ def resolve_endpoint_provider(model: str, base_url: Optional[str] = None) -> str
                 return prov
         if ":11434" in b or ("ollama" in b):
             return "ollama"
-        if any(h in b for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+        # URL hostname check (not a socket bind)
+        if any(h in b for h in ("localhost", "127.0.0.1", "0.0.0.0")):  # nosec B104
             inferred = extract_provider(model)
             return "ollama" if inferred in ("ollama", "unknown") else inferred
     return extract_provider(model)
