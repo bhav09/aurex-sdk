@@ -10,6 +10,7 @@
 4. **Record real task completion:** Call `auditor.mark_success(workflow_id)` / `auditor.markSuccess(workflowId)` (or `mark_failure` / `markFailure`) when the business workflow completes so Stage 3 computes true `cost_per_success` rather than cost per LLM turn.
 5. **Flush in short-lived scripts & serverless functions:** Call `auditor.flush()` / `auditor.flush_async()` (Python) or `auditor.flush()` / `await auditor.flushAndWait()` (Node.js) before Lambda/CLI exit. Use `storage_mode="memory"` / `storageMode: "memory"` on read-only container filesystems.
 6. **Naming convention:** Python uses `snake_case` (`max_cost_per_session`, `enable_loop_guard`, `strict_provider_drift`). Node.js uses `camelCase` (`maxCostPerSession`, `enableLoopGuard`, `strictProviderDrift`).
+7. **Multi-agent context & retry libraries (`tenacity` / LangGraph / SWE-agent):** Wrap multi-agent graph runs with `aurex_context.set({"workflow_id": run_id})` (Python) or `aurexContext.run({ workflowId }, ...)` (Node.js) so sub-agents do not fall back to `default_workflow`. Never retry `AurexBlocked` in external retry decorators (e.g., use `retry=retry_if_not_exception_type(AurexBlocked)` in `tenacity`).
 
 ## 2. Drop-In Python Integration (FastAPI / Async / Sync / `.parse()` / `.stream()` / `Responses`)
 

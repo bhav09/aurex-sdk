@@ -31,7 +31,7 @@ def report_provider_drift(
     missing_symbol: str,
     message: str,
     provider_version: Optional[str] = None,
-    strict: bool = False,
+    strict: Optional[bool] = None,
     drift_log: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     """Emit AurexProviderWarning in prod (fail-open) or raise AurexProviderDriftError in strict/CI mode."""
@@ -43,7 +43,8 @@ def report_provider_drift(
     }
     if drift_log is not None:
         drift_log.append(entry)
-    if strict or os.getenv("AUREX_STRICT_DRIFT") == "1":
+    is_strict = (os.getenv("AUREX_STRICT_DRIFT", "0") in ("1", "true", "True")) if strict is None else bool(strict)
+    if is_strict:
         raise AurexProviderDriftError(
             message,
             provider=provider,

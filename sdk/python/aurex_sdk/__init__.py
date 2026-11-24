@@ -16,7 +16,7 @@ from .exceptions import (
 )
 from .resilience import ResiliencePolicy
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 
 def patch_all(client=None):

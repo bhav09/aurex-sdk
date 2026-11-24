@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 360" role="img" aria-label="Aurex SDK in-process architecture: Your Application calls Provider SDKs patched in-process by Aurex SDK (Prefix and 200k Shield, Budget and LoopGuard, Outcome and CI Gate) before reaching LLM Providers">
+  <rect x="4" y="4" width="992" height="352" rx="18" fill="#0f141d" stroke="#242e42" stroke-width="1.5"/>
+
+  <!-- Connectors -->
+  <g stroke="#33415c" stroke-width="1.5" stroke-dasharray="4 4" fill="none">
+    <line x1="216" y1="145" x2="256" y2="176"/>
+    <line x1="216" y1="215" x2="256" y2="184"/>
+    <line x1="454" y1="180" x2="494" y2="180"/>
+    <line x1="748" y1="150" x2="788" y2="118"/>
+    <line x1="748" y1="180" x2="788" y2="180"/>
+    <line x1="748" y1="210" x2="788" y2="242"/>
+  </g>
+
+  <!-- Column 1: YOUR APPLICATION -->
+  <text x="125" y="92" text-anchor="middle" fill="#93a0b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="600" letter-spacing="1.2">YOUR APPLICATION</text>
+
+  <rect x="34" y="114" width="182" height="54" rx="10" fill="#171e2b" stroke="#28344b" stroke-width="1.2"/>
+  <circle cx="60" cy="141" r="10" fill="none" stroke="#2dd4bf" stroke-width="1.5"/>
+  <path d="M50 141h20M60 131a14 14 0 0 1 0 20M60 131a14 14 0 0 0 0 20" fill="none" stroke="#2dd4bf" stroke-width="1.3"/>
+  <text x="80" y="146" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">Web App / API</text>
+
+  <rect x="34" y="184" width="182" height="54" rx="10" fill="#171e2b" stroke="#28344b" stroke-width="1.2"/>
+  <ellipse cx="60" cy="205" rx="9" ry="4" fill="none" stroke="#2dd4bf" stroke-width="1.5"/>
+  <path d="M51 205v12c0 2.2 4 4 9 4s9-1.8 9-4v-12" fill="none" stroke="#2dd4bf" stroke-width="1.5"/>
+  <text x="80" y="216" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">Async Workers</text>
+
+  <text x="125" y="270" text-anchor="middle" fill="#93a0b8" font-family="system-ui, -apple-system, sans-serif" font-size="12">Inside your VPC</text>
+
+  <!-- Column 2: PROVIDER SDKS -->
+  <text x="355" y="118" text-anchor="middle" fill="#93a0b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="600" letter-spacing="1.2">PROVIDER SDKS</text>
+
+  <rect x="256" y="142" width="198" height="76" rx="10" fill="#171e2b" stroke="#28344b" stroke-width="1.2"/>
+  <path d="M279 175l-6 5 6 5M291 175l6 5-6 5M287 172l-4 16" fill="none" stroke="#93a0b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="307" y="175" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="13.5" font-weight="600">Standard SDKs</text>
+  <text x="307" y="195" fill="#93a0b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5">patch_all() · 0 edits</text>
+
+  <text x="355" y="248" text-anchor="middle" fill="#93a0b8" font-family="system-ui, -apple-system, sans-serif" font-size="12">Direct client calls</text>
+
+  <!-- Column 3: AUREX SDK -->
+  <text x="621" y="54" text-anchor="middle" fill="#2dd4bf" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="600" letter-spacing="1.3">IN-PROCESS GUARDRAIL LAYER</text>
+
+  <rect x="494" y="74" width="254" height="214" rx="12" fill="#131a26" stroke="#2dd4bf" stroke-width="1.6"/>
+  <circle cx="728" cy="94" r="5" fill="#2dd4bf"/>
+
+  <rect x="512" y="90" width="38" height="38" rx="9" fill="rgba(45,212,191,0.14)"/>
+  <image href="data:image/png;base64,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" x="517" y="95" width="28" height="28"/>
+  <text x="562" y="115" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" letter-spacing="0.3">AUREX SDK</text>
+
+  <line x1="512" y1="142" x2="730" y2="142" stroke="#28344b" stroke-width="1"/>
+
+  <rect x="512" y="154" width="218" height="34" rx="6" fill="#1c2536"/>
+  <text x="524" y="175" fill="#f1f0ea" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">Prefix &amp; 200k Shield</text>
+  <text x="718" y="175" text-anchor="end" fill="#2dd4bf" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700">ACTIVE</text>
+
+  <rect x="512" y="196" width="218" height="34" rx="6" fill="#1c2536"/>
+  <text x="524" y="217" fill="#f1f0ea" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">Budget &amp; LoopGuard</text>
+  <text x="718" y="217" text-anchor="end" fill="#2dd4bf" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700">ACTIVE</text>
+
+  <rect x="512" y="238" width="218" height="34" rx="6" fill="#1c2536"/>
+  <text x="524" y="259" fill="#f1f0ea" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">Outcome &amp; CI Gate</text>
+  <text x="718" y="259" text-anchor="end" fill="#2dd4bf" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="700">ACTIVE</text>
+
+  <text x="621" y="314" text-anchor="middle" fill="#93a0b8" font-family="system-ui, -apple-system, sans-serif" font-size="12">Runs in-process · &lt;0.1 ms · Zero PII</text>
+
+  <!-- Column 4: LLM PROVIDERS -->
+  <text x="877" y="72" text-anchor="middle" fill="#93a0b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="600" letter-spacing="1.2">LLM PROVIDERS</text>
+
+  <rect x="788" y="92" width="178" height="50" rx="10" fill="#171e2b" stroke="#28344b" stroke-width="1.2"/>
+  <circle cx="813" cy="117" r="7" fill="none" stroke="#93a0b8" stroke-width="1.4"/>
+  <text x="832" y="122" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="13.5" font-weight="600">OpenAI / Groq</text>
+
+  <rect x="788" y="155" width="178" height="50" rx="10" fill="#171e2b" stroke="#28344b" stroke-width="1.2"/>
+  <rect x="806" y="173" width="14" height="14" rx="3" fill="none" stroke="#93a0b8" stroke-width="1.4"/>
+  <text x="832" y="185" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="13.5" font-weight="600">Anthropic Claude</text>
+
+  <rect x="788" y="218" width="178" height="50" rx="10" fill="#171e2b" stroke="#28344b" stroke-width="1.2"/>
+  <polygon points="813,235 820,243 813,251 806,243" fill="none" stroke="#93a0b8" stroke-width="1.4"/>
+  <text x="832" y="248" fill="#f1f0ea" font-family="system-ui, -apple-system, sans-serif" font-size="13.5" font-weight="600">Gemini / Ollama</text>
+
+  <text x="877" y="294" text-anchor="middle" fill="#93a0b8" font-family="system-ui, -apple-system, sans-serif" font-size="12">Zero proxy hop</text>
+</svg>

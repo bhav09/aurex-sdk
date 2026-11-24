@@ -83,6 +83,7 @@ try {
         <ul className="list-disc list-inside text-sm text-white/65 space-y-1.5">
           <li><strong>Cap thinking tokens early:</strong> Set <code>max_thinking_tokens: 4096</code> so reasoning models cannot burn 32k output tokens on routine requests.</li>
           <li><strong>Enable Redis in production:</strong> Point <code>AUREX_REDIS_URL</code> at your existing Redis/Valkey instance so all Kubernetes pods enforce one shared session cap.</li>
+          <li><strong>Scope multi-agent runs &amp; skip retrying blocks:</strong> Wrap LangGraph or SWE-agent runs with <code>aurex_context.set({`{"workflow_id": run_id}`})</code> / <code>aurexContext.run(...)</code>, and exclude <code>AurexBlocked</code> from external retry libraries like <code>tenacity</code> (<code>retry_if_not_exception_type(AurexBlocked)</code>).</li>
           <li><strong>Start in warn/dry-run mode:</strong> Set <code>dry_run: True</code> / <code>dryRun: true</code> on day one to observe limits in logs before switching to <code>&quot;throw&quot;</code>.</li>
         </ul>
       </section>

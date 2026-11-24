@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aurex SDK — In-Process LLM FinOps Shield, Circuit Breaker &amp; CI Outcome Gate</title>
+  <meta name="description" content="Plain-English documentation for aurex-sdk (Python &amp; Node.js): stop LLM token waste before, during, and after every call, backed by 23 real-world GitHub &amp; Reddit engineering reports." />
+  <link rel="icon" type="image/png" href="./assets/logo-dark.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root,
+    [data-theme="dark"] {
+      --bg: #0c0f15;
+      --surface: #131822;
+      --surface-raised: #19202e;
+      --surface-code: #0f131c;
+      --fg: #f1f0ea;
+      --fg-secondary: #b1b8c9;
+      --fg-muted: #8590a6;
+      --border: #252e40;
+      --border-strong: #334059;
+      --accent: #2dd4bf;
+      --accent-strong: #14b8a6;
+      --accent-tint: rgba(45, 212, 191, 0.11);
+      --amber: #f59e0b;
+      --amber-tint: rgba(245, 158, 11, 0.12);
+      --coral: #fb7185;
+      --coral-tint: rgba(251, 113, 133, 0.12);
+      --sky: #38bdf8;
+      --sky-tint: rgba(56, 189, 248, 0.12);
+      --shadow: 0 12px 28px -8px rgba(4, 7, 13, 0.55);
+      --selection-bg: rgba(45, 212, 191, 0.26);
+      --scrollbar-thumb: #2b354a;
+      --scrollbar-track: #0c0f15;
+    }
+
+    [data-theme="light"] {
+      --bg: #faf9f6;
+      --surface: #ffffff;
+      --surface-raised: #f2f4f8;
+      --surface-code: #f3f5f9;
+      --fg: #121621;
+      --fg-secondary: #394256;
+      --fg-muted: #58647c;
+      --border: #dce1eb;
+      --border-strong: #c4cddc;
+      --accent: #0f766e;
+      --accent-strong: #0d9488;
+      --accent-tint: rgba(15, 118, 110, 0.09);
+      --amber: #b45309;
+      --amber-tint: rgba(180, 83, 9, 0.1);
+      --coral: #be123c;
+      --coral-tint: rgba(190, 18, 60, 0.09);
+      --sky: #0369a1;
+      --sky-tint: rgba(3, 105, 161, 0.09);
+      --shadow: 0 10px 24px -8px rgba(18, 22, 33, 0.09);
+      --selection-bg: rgba(15, 118, 110, 0.18);
+      --scrollbar-thumb: #c4cddc;
+      --scrollbar-track: #faf9f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    ::selection {
+      background: var(--selection-bg);
+      color: var(--fg);
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      scrollbar-width: thin;
+    }
+
+    ::-webkit-scrollbar {
+      width: 9px;
+      height: 9px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 5px;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.68;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      caret-color: var(--accent);
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-thickness: 1px;
+      transition: color 0.16s ease;
+    }
+
+    a:hover {
+      color: var(--fg);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    code,
+    pre,
+    .mono {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    p code,
+    li code,
+    td code {
+      font-size: 0.86em;
+      padding: 0.14em 0.42em;
+      border-radius: 4px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--fg);
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Top Header */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0.8rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-decoration: none;
+      color: var(--fg);
+      font-family: "Outfit", sans-serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-version {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: var(--accent-tint);
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--fg-secondary);
+      text-decoration: none;
+      padding: 0.38rem 0.72rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .nav-pill:hover {
+      color: var(--fg);
+      border-color: var(--border-strong);
+    }
+
+    .theme-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.38rem 0.72rem;
+      font-size: 0.82rem;
+      font-weight: 500;
+      font-family: inherit;
+      color: var(--fg-secondary);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .theme-btn:hover {
+      color: var(--fg);
+      border-color: var(--border-strong);
+    }
+
+    /* Two-column Reading Shell */
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 5rem;
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+      gap: 3.25rem;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 4.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding-right: 0.75rem;
+      border-right: 1px solid var(--border);
+    }
+
+    .toc-heading {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0 0 0.5rem;
+      padding-left: 0.6rem;
+    }
+
+    .toc a {
+      text-decoration: none;
+      font-size: 0.86rem;
+      line-height: 1.4;
+      color: var(--fg-muted);
+      padding: 0.38rem 0.6rem;
+      border-radius: 5px;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .toc a:hover,
+    .toc a.active {
+      color: var(--fg);
+      background: var(--surface);
+    }
+
+    .toc-install {
+      margin-top: 1.25rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .toc-install-cmd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--fg);
+    }
+
+    /* Main Content Typography & Rhythm */
+    main {
+      min-width: 0;
+      max-width: 850px;
+    }
+
+    .prose-measure {
+      max-width: 69ch;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: "Outfit", system-ui, sans-serif;
+      color: var(--fg);
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 3.6vw, 2.75rem);
+      line-height: 1.15;
+      margin: 0 0 1rem;
+    }
+
+    h2 {
+      font-size: clamp(1.4rem, 2.3vw, 1.75rem);
+      line-height: 1.25;
+      margin: 3.5rem 0 0.85rem;
+      padding-top: 2.25rem;
+      border-top: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.14rem;
+      line-height: 1.35;
+      margin: 2rem 0 0.55rem;
+    }
+
+    p {
+      margin: 0 0 1.05rem;
+      color: var(--fg-secondary);
+    }
+
+    ul,
+    ol {
+      margin: 0 0 1.25rem;
+      padding-left: 1.35rem;
+      color: var(--fg-secondary);
+    }
+
+    li {
+      margin-bottom: 0.55rem;
+    }
+
+    li strong,
+    p strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    .lead {
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: var(--fg-secondary);
+      max-width: 66ch;
+      margin-bottom: 1.4rem;
+    }
+
+    .install-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin: 1.25rem 0 0.5rem;
+    }
+
+    .cmd-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 0.86rem;
+      color: var(--fg);
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.28rem 0.58rem;
+      font-size: 0.75rem;
+      font-family: "IBM Plex Sans", sans-serif;
+      font-weight: 500;
+      color: var(--fg-secondary);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      color: var(--fg);
+      border-color: var(--border-strong);
+    }
+
+    /* Pipeline Diagram */
+    .pipeline-frame {
+      margin: 1.5rem 0 2rem;
+      padding: 1.35rem 1.5rem;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .stage-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.1rem;
+      padding-top: 1.1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .stage-col h3 {
+      margin: 0 0 0.45rem;
+      font-size: 1rem;
+    }
+
+    .stage-col p {
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    /* Interactive Chart Panel */
+    .chart-panel {
+      margin: 1.5rem 0 1.75rem;
+      padding: 1.35rem 1.5rem;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .chart-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.15rem;
+    }
+
+    .chart-title {
+      margin: 0;
+      font-family: "Outfit", sans-serif;
+      font-size: 1.12rem;
+      font-weight: 600;
+      color: var(--fg);
+    }
+
+    .chart-subtitle {
+      margin: 0.2rem 0 0;
+      font-size: 0.86rem;
+      color: var(--fg-muted);
+    }
+
+    .segmented {
+      display: inline-flex;
+      padding: 0.2rem;
+      border-radius: 7px;
+      background: var(--surface-code);
+      border: 1px solid var(--border);
+    }
+
+    .segmented button {
+      border: 0;
+      background: transparent;
+      color: var(--fg-muted);
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 0.36rem 0.72rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .segmented button[aria-selected="true"] {
+      background: var(--surface-raised);
+      color: var(--fg);
+    }
+
+    .bar-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.62rem;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 225px minmax(0, 1fr) 72px;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.36rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .bar-row:hover {
+      background: var(--surface-raised);
+    }
+
+    .bar-row.is-selected {
+      background: var(--accent-tint);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+
+    .bar-label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.8rem;
+      color: var(--fg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bar-track {
+      height: 12px;
+      border-radius: 999px;
+      background: var(--surface-code);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+      transform-origin: left center;
+      transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .bar-fill[data-tone="amber"] { background: var(--amber); }
+    .bar-fill[data-tone="coral"] { background: var(--coral); }
+    .bar-fill[data-tone="sky"] { background: var(--sky); }
+
+    .bar-count {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.8rem;
+      color: var(--fg-secondary);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chart-footnote {
+      margin-top: 0.9rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--fg-muted);
+    }
+
+    .reset-filter-btn {
+      font-family: inherit;
+      font-size: 0.78rem;
+      padding: 0.24rem 0.6rem;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface-raised);
+      color: var(--fg);
+      cursor: pointer;
+    }
+
+    .reset-filter-btn[hidden] {
+      display: none;
+    }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
+      padding: 0.85rem 1rem;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin: 1.15rem 0 1.75rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      text-align: left;
+      padding: 0.7rem 0.9rem;
+      font-weight: 600;
+      font-size: 0.79rem;
+      color: var(--fg);
+      background: var(--surface-raised);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.72rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--fg-secondary);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-code);
+      color: var(--fg-secondary);
+      margin: 0.1rem 0.22rem 0.1rem 0;
+      white-space: nowrap;
+    }
+
+    .tag-stage {
+      background: var(--accent-tint);
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+    }
+
+    /* Tabbed Code Blocks */
+    .code-panel {
+      margin: 1.1rem 0 1.65rem;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface-code);
+      overflow: hidden;
+    }
+
+    .code-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.45rem 0.75rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lang-tabs {
+      display: inline-flex;
+      gap: 0.3rem;
+    }
+
+    .lang-tab {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--fg-muted);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      padding: 0.28rem 0.62rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .lang-tab[aria-selected="true"] {
+      background: var(--surface-raised);
+      color: var(--fg);
+      border-color: var(--border);
+    }
+
+    pre {
+      margin: 0;
+      padding: 1rem 1.15rem;
+      overflow-x: auto;
+      font-size: 0.83rem;
+      line-height: 1.6;
+      color: var(--fg);
+    }
+
+    .callout {
+      margin: 1.35rem 0;
+      padding: 0.95rem 1.15rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      max-width: 69ch;
+    }
+
+    .callout p {
+      margin: 0;
+      font-size: 0.92rem;
+    }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 1.75rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+    }
+
+    @media (max-width: 940px) {
+      .shell {
+        grid-template-columns: 1fr;
+        gap: 1.75rem;
+        padding-top: 1.5rem;
+      }
+
+      .toc {
+        position: static;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 0 0 1rem;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .toc-heading,
+      .toc-install {
+        display: none;
+      }
+
+      .stage-list {
+        grid-template-columns: 1fr;
+      }
+
+      .bar-row {
+        grid-template-columns: 155px minmax(0, 1fr) 58px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#overview">
+        <img id="brandLogo" src="./assets/logo-white.png" width="26" height="26" alt="Aurex logo" style="display:block;object-fit:contain;" />
+        <span>Aurex SDK</span>
+        <span class="brand-version">v0.5.2 · MIT</span>
+      </a>
+      <div class="topbar-actions">
+        <a class="nav-pill" href="https://pypi.org/project/aurex-sdk/" target="_blank" rel="noopener noreferrer">PyPI</a>
+        <a class="nav-pill" href="https://github.com/bhav09/aurex-sdk" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+        <a class="nav-pill" href="https://github.com/bhav09/aurex-sdk/blob/main/llms.txt" target="_blank" rel="noopener noreferrer">llms.txt</a>
+        <button class="theme-btn" id="themeToggle" type="button" aria-label="Switch color theme">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+          </svg>
+          <span id="themeLabel">Light mode</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="toc" aria-label="Table of contents">
+      <p class="toc-heading">On this page</p>
+      <a href="#overview" class="active">Overview</a>
+      <a href="#problem-evidence">Problem &amp; Issue Graph</a>
+      <a href="#how-it-works">3-Stage Call Lifecycle</a>
+      <a href="#quickstart">How to Use It</a>
+      <a href="#benchmarks">SWE-agent &amp; Benchmarks</a>
+      <a href="#configuration">Config &amp; Providers</a>
+      <a href="#privacy">Data &amp; Zero-PII Model</a>
+      <a href="#production-tips">Playbook &amp; Contributing</a>
+      <div class="toc-install">
+        <div class="toc-install-cmd mono">
+          <span>pip install aurex-sdk</span>
+          <button class="copy-btn" data-copy="pip install aurex-sdk" type="button">Copy</button>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <section id="overview">
+        <h1>Stop AI Token Waste Before, During, and After Every LLM Call</h1>
+        <p class="lead">
+          <code>aurex-sdk</code> is an open-source, in-process Python and Node.js SDK that shields prompt caches, circuit-breaks runaway agent spend in real time, and gates Pull Requests on verified cost per completed task—with <strong>0 ms proxy latency</strong> and <strong>zero raw prompts leaving your servers</strong>.
+        </p>
+
+        <div class="install-strip">
+          <div class="cmd-chip mono">
+            <span>pip install aurex-sdk</span>
+            <button class="copy-btn" data-copy="pip install aurex-sdk" type="button">Copy</button>
+          </div>
+          <div class="cmd-chip mono">
+            <span>npm install aurex-sdk</span>
+            <button class="copy-btn" data-copy="npm install aurex-sdk" type="button">Copy</button>
+          </div>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>Using an AI coding agent (Claude Code, Cursor, Antigravity, Codex, Copilot)?</strong> Point it directly at <a href="https://github.com/bhav09/aurex-sdk/blob/main/llms.txt"><code>llms.txt</code></a> or <a href="https://github.com/bhav09/aurex-sdk/blob/main/AGENTS.md"><code>AGENTS.md</code></a> for drop-in setup without rewriting existing OpenAI, Anthropic, Gemini, LiteLLM, or Ollama calls.
+          </p>
+        </div>
+      </section>
+
+      <section id="problem-evidence">
+        <h2>Why Aurex Exists: 23 Real-World GitHub Issues &amp; Reddit Reports</h2>
+        <div class="prose-measure">
+          <p>
+            Passive observability dashboards show yesterday&apos;s token bill after the money is gone, while proxy gateways add network hops and require routing sensitive prompts outside your VPC. Across frontier-lab SDK trackers and engineering forums, production teams hit six recurring cost traps:
+          </p>
+          <ul>
+            <li><strong>Silent cache invalidation &amp; TTL rewrites:</strong> Changing a timestamp at character 20 or shuffling JSON tool keys wipes out 50%–90% prefix-cache discounts, while resuming an Anthropic session past 5 minutes triggers a <code>1.25x</code> cache-write surcharge.</li>
+            <li><strong>The 200k 2x pricing cliff &amp; missing cloud spend caps:</strong> Sending <code>200,001</code> input tokens to Claude 4+ or Gemini 2.5+ doubles the price of the <em>entire</em> request, and cloud budget alerts arrive hours after runaway spend.</li>
+            <li><strong>Hidden reasoning tokens, agent loops &amp; HTTP-200 soft failures:</strong> Reasoning models burn thousands of internal thinking tokens billed at output rates, nested retries multiply <code>429</code> storms <code>6x</code>, and empty or whitespace-looped HTTP <code>200 OK</code> responses still bill full price.</li>
+          </ul>
+        </div>
+
+        <div class="chart-panel" aria-labelledby="chartHeading">
+          <div class="chart-header">
+            <div>
+              <h3 class="chart-title" id="chartHeading">Number of Tracked Issues per Issue Label</h3>
+              <p class="chart-subtitle" id="chartSubtitle">Click any bar to filter the 23 linked GitHub issues and Reddit engineering threads below.</p>
+            </div>
+            <div class="segmented" role="tablist" aria-label="Issue label grouping">
+              <button type="button" role="tab" id="tabProblemLabels" aria-selected="true">Problem Labels (23)</button>
+              <button type="button" role="tab" id="tabGithubLabels" aria-selected="false">Upstream GitHub Labels (13)</button>
+            </div>
+          </div>
+
+          <div class="bar-rows" id="barContainer"></div>
+
+          <div class="chart-footnote">
+            <span id="filterStatus">Showing all 23 verified problem reports (13 GitHub issues + 10 Reddit threads).</span>
+            <button type="button" class="reset-filter-btn" id="resetFilterBtn" hidden>Show all 23 reports</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-label="Frontier-lab GitHub issues and Reddit engineering threads">
+            <thead>
+              <tr>
+                <th>Source &amp; Link</th>
+                <th>Reported Problem</th>
+                <th>Labels</th>
+                <th>Aurex Fix</th>
+              </tr>
+            </thead>
+            <tbody id="issuesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="how-it-works">
+        <h2>What Aurex Does: One 3-Stage Pipeline Around Every Call</h2>
+        <div class="prose-measure">
+          <p>
+            Instead of acting as a remote proxy, Aurex patches your installed provider SDKs directly in memory (<code>&lt;0.1 ms</code> overhead) and connects three stages around every request:
+          </p>
+        </div>
+
+        <div class="pipeline-frame">
+          <img id="archDiagram" src="./assets/architecture-dark.svg" alt="Aurex SDK in-process architecture diagram" style="display:block;width:100%;height:auto;border-radius:8px;" />
+
+          <div class="stage-list">
+            <div class="stage-col">
+              <h3>Before the Call (Stage 1)</h3>
+              <p>Deterministically sorts JSON keys in <code>tools</code> and schemas, hashes prompt layers to pinpoint the exact character index breaking your prefix cache, flags <code>&gt;5m</code> Anthropic TTL gaps, and warns before crossing the <code>200,000</code>-token 2x cliff. Any runtime hint appends at the tail so index <code>0</code> caches stay warm.</p>
+            </div>
+            <div class="stage-col">
+              <h3>During the Call (Stage 2)</h3>
+              <p>Isolates sessions via <code>workflow_id</code>, async context, or active OpenTelemetry <code>trace_id</code>; shares live session/minute dollar caps across workers via optional Redis; clamps hidden thinking budgets; injects <code>stream_options.include_usage</code>; logs aborted streams in <code>try...finally</code>; and raises <code>AurexBlocked</code> on loops.</p>
+            </div>
+            <div class="stage-col">
+              <h3>After the Call + CI (Stage 3)</h3>
+              <p>Classifies empty thinking-exhausted outputs and <code>\n\n\n</code> JSON grammar loops as <code>unfulfilled_spend</code>, joins spend with <code>mark_success()</code> to compute true <strong>cost per completed task</strong>, enforces per-tenant margin downgrades, and posts cost regression diffs on Pull Requests.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="quickstart">
+        <h2>How to Use It (Step-by-Step)</h2>
+
+        <h3>Step 1: Install the SDK</h3>
+        <div class="code-panel" data-codegroup="install">
+          <div class="code-bar">
+            <div class="lang-tabs" role="tablist" aria-label="Install commands">
+              <button class="lang-tab" role="tab" aria-selected="true" data-lang="py" type="button">Python</button>
+              <button class="lang-tab" role="tab" aria-selected="false" data-lang="ts" type="button">Node.js / TypeScript</button>
+            </div>
+            <button class="copy-btn" data-copy-group="install" type="button">Copy snippet</button>
+          </div>
+          <pre data-pane="py"><code>pip install aurex-sdk
+
+# Optional multi-worker Redis &amp; OpenTelemetry extras:
+pip install "aurex-sdk[redis,otel]"</code></pre>
+          <pre data-pane="ts" hidden><code>npm install aurex-sdk
+
+# Optional multi-worker Redis &amp; OpenTelemetry peers:
+npm install ioredis @opentelemetry/api</code></pre>
+        </div>
+
+        <h3>Step 2: Initialize Once at Startup &amp; Mark Task Outcomes</h3>
+        <div class="prose-measure">
+          <p>
+            Keep your existing provider client calls unchanged. Aurex automatically strips <code>workflow_id</code> / <code>workflowId</code> and <code>tags</code> before requests hit the network wire so upstream APIs never return <code>HTTP 400</code> validation errors.
+          </p>
+        </div>
+        <div class="code-panel" data-codegroup="init">
+          <div class="code-bar">
+            <div class="lang-tabs" role="tablist" aria-label="Initialization snippets">
+              <button class="lang-tab" role="tab" aria-selected="true" data-lang="py" type="button">Python</button>
+              <button class="lang-tab" role="tab" aria-selected="false" data-lang="ts" type="button">Node.js / TypeScript</button>
+            </div>
+            <button class="copy-btn" data-copy-group="init" type="button">Copy snippet</button>
+          </div>
+          <pre data-pane="py"><code>from aurex_sdk import AurexAuditor, AurexBlocked, AurexConfig, patch_all
+import openai
+
+auditor = AurexAuditor(
+    AurexConfig(
+        redis_url=None,  # Or "redis://localhost:6379/0" (also reads AUREX_REDIS_URL)
+        enable_loop_guard=True,
+        budget_guard={
+            "max_cost_per_session": 1.50,
+            "max_cost_per_minute": 15.00,
+            "max_context_tokens": 195000,
+            "max_thinking_tokens": 4096,
+            "on_budget_exceeded": "throw",
+        },
+        resilience={"enabled": True, "mode": "enforce", "max_attempts": 2},
+    )
+)
+patch_all(auditor)
+
+client = openai.OpenAI()
+try:
+    resp = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Summarize support ticket #42."}],
+        workflow_id="ticket-42",
+        tags={"tenant_id": "acme-corp"},
+    )
+    auditor.mark_success("ticket-42")
+except AurexBlocked as err:
+    print("Circuit breaker tripped:", err.reason)
+finally:
+    auditor.flush()</code></pre>
+          <pre data-pane="ts" hidden><code>import { AurexAuditor, AurexBlocked } from "aurex-sdk";
+import OpenAI from "openai";
+
+const auditor = AurexAuditor.getInstance({
+  redisUrl: process.env.AUREX_REDIS_URL,
+  enableLoopGuard: true,
+  budgetGuard: {
+    maxCostPerSession: 1.5,
+    maxCostPerMinute: 15.0,
+    maxContextTokens: 195000,
+    maxThinkingTokens: 4096,
+    onBudgetExceeded: "throw",
+  },
+  resilience: { enabled: true, mode: "enforce", maxAttempts: 2 },
+});
+
+await auditor.patchAll();
+auditor.instrument(OpenAI); // Bundler-safe hook for Next.js / Vite / Vitest
+
+const client = new OpenAI();
+try {
+  const resp = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: "Summarize support ticket #42." }],
+    workflowId: "ticket-42",
+    tags: { tenant_id: "acme-corp" },
+  } as any);
+  auditor.markSuccess("ticket-42");
+} catch (err) {
+  if (err instanceof AurexBlocked) console.error("Circuit breaker tripped:", err.reason);
+} finally {
+  await auditor.flushAndWait();
+}</code></pre>
+        </div>
+
+        <h3>Step 3: Audit Locally, Gate Pull Requests in CI, or Use Zero-Code Hook</h3>
+        <div class="code-panel" data-codegroup="cli">
+          <div class="code-bar">
+            <div class="lang-tabs" role="tablist" aria-label="CLI and CI commands">
+              <button class="lang-tab" role="tab" aria-selected="true" data-lang="py" type="button">Python CLI &amp; CI</button>
+              <button class="lang-tab" role="tab" aria-selected="false" data-lang="ts" type="button">Node.js CLI &amp; CI</button>
+            </div>
+            <button class="copy-btn" data-copy-group="cli" type="button">Copy snippet</button>
+          </div>
+          <pre data-pane="py"><code># Inspect local ledger waste, cache breaks &amp; cost_per_success
+aurex audit
+
+# Diff PR branch ledger against main baseline in GitHub Actions
+aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comment --fail-on-regression
+
+# Optional zero-code startup hook (no application imports required)
+aurex install-hook &amp;&amp; AUREX_ENABLED=1 python app.py</code></pre>
+          <pre data-pane="ts" hidden><code># Inspect local ledger waste, cache breaks &amp; costPerSuccess
+npx aurex audit
+
+# Diff PR branch ledger against main baseline in GitHub Actions
+npx aurex ci --ledger=.aurex/ledger.jsonl --baseline=main_ledger.jsonl --github-comment --fail-on-regression
+
+# Optional zero-code startup hook
+npx aurex install-hook &amp;&amp; source .env.aurex &amp;&amp; AUREX_ENABLED=1 node server.js</code></pre>
+        </div>
+      </section>
+
+      <section id="benchmarks">
+        <h2>Real-World Testing: SWE-agent, LangGraph, Ollama &amp; Gemini (8.6 / 10)</h2>
+        <div class="prose-measure">
+          <p>
+            Aurex was evaluated end-to-end on <strong>SWE-agent</strong> autonomous coding trajectories using Google Gemini reasoning models (<code>gemini-2.5-flash</code>) and <strong>LangGraph</strong> multi-agent loops running local <strong>Ollama</strong> models (<code>granite4.2:3b</code>, <code>llama3.1</code>). Instead of tripping on the first failed file lookup, Aurex gave SWE-agent <strong>3 exploration steps</strong> before blocking non-progressive repetition on Step 4—while recording streamed thought tokens and Zero-PII SHA-256 hashes. On real multi-file repository tasks (<code>40k–120k</code> context + <code>4k–16k</code> reasoning tokens per turn), halting a stuck <code>30–50</code> step loop at Step 4 prevents <strong>1.5M–5M+ wasted tokens</strong> per runaway run.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-label="SWE-agent trajectory step-by-step verification">
+            <thead>
+              <tr>
+                <th>Step</th>
+                <th>SWE-agent Action</th>
+                <th>Observation</th>
+                <th>Aurex Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Step 1</strong></td>
+                <td><code>str_replace_editor view .../missing_colon.py</code></td>
+                <td>File not found (wrong directory path)</td>
+                <td><span class="tag">Allowed</span></td>
+              </tr>
+              <tr>
+                <td><strong>Step 2</strong></td>
+                <td><code>str_replace_editor view .../test-repo</code></td>
+                <td>Listed folder structure to locate target file</td>
+                <td><span class="tag">Allowed</span></td>
+              </tr>
+              <tr>
+                <td><strong>Step 3</strong></td>
+                <td><code>str_replace_editor view .../tests/missing_colon.py</code></td>
+                <td>Read and displayed target source file</td>
+                <td><span class="tag">Allowed</span></td>
+              </tr>
+              <tr>
+                <td><strong>Step 4</strong></td>
+                <td>4th consecutive <code>str_replace_editor</code> without code diff</td>
+                <td>Pattern <code>[&apos;str_replace_editor&apos;, &apos;str_replace_editor&apos;, &apos;str_replace_editor&apos;]</code></td>
+                <td><span class="tag tag-stage">Blocked (AurexBlocked)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-label="Aurex SDK end-to-end evaluation scorecard">
+            <thead>
+              <tr>
+                <th>Evaluation Category</th>
+                <th>Score</th>
+                <th>Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1. Code Implementation (DX)</strong></td>
+                <td class="mono">9.0 / 10</td>
+                <td>One-line <code>patch_all(auditor)</code> setup across LiteLLM, OpenAI, Gemini, and Ollama.</td>
+              </tr>
+              <tr>
+                <td><strong>2. Guardrails &amp; Governance Features</strong></td>
+                <td class="mono">8.8 / 10</td>
+                <td>Accurate streamed thought-token capture, 3-step exploration headroom, and hard USD caps.</td>
+              </tr>
+              <tr>
+                <td><strong>3. Log &amp; Telemetry Clarity</strong></td>
+                <td class="mono">8.5 / 10</td>
+                <td>Readable <code>AurexBlocked</code> reasons and structured Zero-PII <code>.aurex/ledger.*.jsonl</code> rows.</td>
+              </tr>
+              <tr>
+                <td><strong>4. Framework Resilience &amp; Compatibility</strong></td>
+                <td class="mono">8.0 / 10</td>
+                <td><code>&lt;0.1 ms</code> overhead across local Ollama (<code>$0.00</code>) and cloud APIs.</td>
+              </tr>
+              <tr>
+                <td><strong>Composite Final Score</strong></td>
+                <td class="mono"><strong>8.6 / 10</strong></td>
+                <td><strong>Production-ready &amp; verified on real multi-agent workflows.</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="configuration">
+        <h2>Configuration, Providers &amp; Typed Exceptions</h2>
+        <div class="prose-measure">
+          <p>
+            Python uses <code>snake_case</code> keys while Node.js uses <code>camelCase</code> keys with identical behavior across both runtimes.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-label="AurexConfig and BudgetGuard options">
+            <thead>
+              <tr>
+                <th>Python / Node.js Key</th>
+                <th>Default</th>
+                <th>What It Controls</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>max_cost_per_session</code> / <code>maxCostPerSession</code></td>
+                <td><code>None</code></td>
+                <td>Hard USD cap per <code>workflow_id</code> (downgrades at 80%, blocks with <code>AurexBlocked</code> at 100%).</td>
+              </tr>
+              <tr>
+                <td><code>max_cost_per_minute</code> / <code>maxCostPerMinute</code></td>
+                <td><code>None</code></td>
+                <td>Sliding 60-second USD cap across calls (shared across pods when Redis is configured).</td>
+              </tr>
+              <tr>
+                <td><code>max_context_tokens</code> / <code>maxContextTokens</code></td>
+                <td><code>None</code></td>
+                <td>Pre-call input cap; set to <code>195000</code> to stop requests before <code>200k</code> 2x pricing cliffs.</td>
+              </tr>
+              <tr>
+                <td><code>max_thinking_tokens</code> / <code>maxThinkingTokens</code></td>
+                <td><code>None</code></td>
+                <td>Clamps <code>thinking.budget_tokens</code> / Gemini thinking budgets and lowers <code>reasoning_effort</code>.</td>
+              </tr>
+              <tr>
+                <td><code>on_budget_exceeded</code> / <code>onBudgetExceeded</code></td>
+                <td><code>"warn"</code></td>
+                <td><code>"warn"</code> logs only; <code>"throw"</code> raises <code>AurexBlocked</code>; <code>"webhook"</code> posts an alert.</td>
+              </tr>
+              <tr>
+                <td><code>enable_loop_guard</code> / <code>enableLoopGuard</code></td>
+                <td><code>False</code></td>
+                <td>Stops structural and semantic agent retry loops cleanly with <code>AurexBlocked</code>.</td>
+              </tr>
+              <tr>
+                <td><code>cache_ttl</code> / <code>cacheTtl</code></td>
+                <td><code>"5m"</code></td>
+                <td>Anthropic cache-creation billing multiplier (<code>"5m"</code> = <code>1.25x</code>, <code>"1h"</code> = <code>2.0x</code>).</td>
+              </tr>
+              <tr>
+                <td><code>redis_url</code> / <code>redisUrl</code></td>
+                <td>env <code>AUREX_REDIS_URL</code></td>
+                <td>Enables <code>RedisStateStore</code> for multi-worker Gunicorn, Uvicorn, Celery, or Kubernetes pods.</td>
+              </tr>
+              <tr>
+                <td><code>storage_mode</code> / <code>storageMode</code></td>
+                <td><code>"file"</code></td>
+                <td><code>"file"</code> writes <code>.aurex/ledger.jsonl</code>; <code>"memory"</code> supports read-only containers.</td>
+              </tr>
+              <tr>
+                <td><code>strict_provider_drift</code> / <code>strictProviderDrift</code></td>
+                <td>env <code>AUREX_STRICT_DRIFT=1</code></td>
+                <td>Raises <code>AurexProviderDriftError</code> in CI if an upstream SDK breaks internal layouts; production fails open.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="prose-measure">
+          <ul>
+            <li><strong>Supported Providers:</strong> OpenAI (Chat, Structured <code>.parse()</code>, <code>.stream()</code>, and <code>responses</code> API, plus automatic <code>base_url</code> pricing for Groq, Together AI, Fireworks, OpenRouter, and <code>$0.00</code> local Ollama), Anthropic Claude (<code>5m</code>/<code>1h</code> prompt caching, <code>ThinkingBlock</code>, <code>&gt;200k</code> 2x tiers), Google Gemini (sync &amp; <code>.aio</code> async, <code>thoughts_token_count</code>, <code>&gt;200k</code> 2x tiers), LiteLLM, Ollama, and Hugging Face.</li>
+            <li><strong>Typed Exceptions &amp; Health:</strong> Catch <code>AurexBlocked</code>, <code>AurexBudgetExceeded</code>, <code>AurexResilienceExhausted</code>, and <code>AurexProviderDriftError</code>. Inspect live patch state anytime with <code>auditor.get_health()</code> / <code>auditor.getHealth()</code>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="privacy">
+        <h2>Data Storage &amp; Zero-PII Architecture</h2>
+        <div class="prose-measure">
+          <p>
+            <strong>Raw prompts and model responses are never transmitted to Aurex servers.</strong> By default, Aurex runs in 100% local mode with no API key required:
+          </p>
+          <ul>
+            <li><strong>Local-Only Mode (Default):</strong> Writes numeric token breakdowns, USD cost, <code>workflow_id</code>, <code>tenant_id</code>, latency, <code>outcome</code>, and local one-way SHA-256 hashes (<code>prompt_hash</code>, <code>system_prompt_hash</code>, <code>response_hash</code>) to <code>.aurex/ledger.jsonl</code> on your own disk.</li>
+            <li><strong>User-Owned Redis (Optional):</strong> When <code>AUREX_REDIS_URL</code> is set, temporary sliding-window counters (<code>aurex:session_cost:*</code>, <code>aurex:min_cost:*</code>, <code>aurex:prefix:*</code>) stay inside your own Redis instance and auto-expire in <code>120s</code>–<code>2h</code>.</li>
+            <li><strong>Opt-In Cloud Sync (When <code>AUREX_API_KEY</code> is set):</strong> Transmits only operational cost metadata; SHA-256 prompt hashes are stripped before leaving the SDK unless explicitly enabled, and backend ingestion enforces <code>prompt=None</code> and <code>response=None</code>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="production-tips">
+        <h2>Production Playbook &amp; Contributing</h2>
+        <div class="prose-measure">
+          <ol>
+            <li><strong>Move changing dates and IDs to the tail of prompts:</strong> Keep <code>messages[0]</code> / <code>system</code> static and set <code>max_context_tokens: 195000</code> on Claude 4+ and Gemini 2.5+ pipelines so 50%–90% cache discounts stay warm and requests stop before the 2x cliff.</li>
+            <li><strong>Scope LangGraph &amp; multi-agent workflows:</strong> Wrap agent runs with <code>aurex_context.set({"workflow_id": run_id})</code> (Python) or <code>aurexContext.run({ workflowId }, ...)</code> (Node.js) so sub-agents share one isolated session budget instead of falling back to <code>default_workflow</code>.</li>
+            <li><strong>Exclude <code>AurexBlocked</code> from retry decorators:</strong> Pass <code>retry=retry_if_not_exception_type(AurexBlocked)</code> in <code>tenacity</code> so intentional blocks are never re-fired, and raise <code>loop_similarity_threshold</code> (e.g. <code>0.90</code>–<code>0.95</code>) when coding agents need wider file-reading headroom on large repos.</li>
+            <li><strong>Share state with Redis &amp; gate PRs:</strong> Set <code>AUREX_REDIS_URL=redis://...</code> in multi-worker Kubernetes or Gunicorn deployments and run <code>aurex ci --fail-on-regression</code> in GitHub Actions.</li>
+          </ol>
+          <h3>Contributing</h3>
+          <p>
+            Contributions and provider adapter PRs are welcome! Fork <a href="https://github.com/bhav09/aurex-sdk">bhav09/aurex-sdk</a>, keep Python (<code>sdk/python</code>) and Node.js (<code>sdk/node</code>) changes in lockstep, verify with <code>AUREX_STRICT_DRIFT=1 bash .agent/skills/aurex-smoke-test/scripts/run_smoke.sh</code>, and open a Pull Request.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <span>Aurex SDK · MIT Licensed Open-Source LLM FinOps &amp; Runtime Control</span>
+        <span>
+          <a href="https://github.com/bhav09/aurex-sdk">GitHub</a> ·
+          <a href="https://pypi.org/project/aurex-sdk/">PyPI</a> ·
+          <a href="./README.md">Markdown Guide</a>
+        </span>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const REPORTS = [
+      {
+        source: "anthropics/claude-code #91151",
+        url: "https://github.com/anthropics/claude-code/issues/91151",
+        kind: "GitHub",
+        summary: "Prompt cache collapses to baseline on resumed long sessions (>80k–200k), triggering full cache_creation rewrite bills.",
+        problemLabel: "cache-invalidation",
+        githubLabels: ["bug / type: bug", "area:cost", "area/agent", "api:bedrock", "has repro", "stale"],
+        stage: "Stage 1"
+      },
+      {
+        source: "anthropics/claude-code #60830",
+        url: "https://github.com/anthropics/claude-code/issues/60830",
+        kind: "GitHub",
+        summary: "Bedrock writes <2% of prompt to cache above 150k context vs. 1P Anthropic API.",
+        problemLabel: "cache-invalidation",
+        githubLabels: ["bug / type: bug", "area:cost", "api:bedrock", "has repro", "stale"],
+        stage: "Stage 1"
+      },
+      {
+        source: "anthropics/claude-code #42796",
+        url: "https://github.com/anthropics/claude-code/issues/42796",
+        kind: "GitHub",
+        summary: "Extended thinking spikes and sub-agent fan-out rapidly exhaust session token budgets.",
+        problemLabel: "thinking-tokens",
+        githubLabels: ["bug / type: bug"],
+        stage: "Stage 2"
+      },
+      {
+        source: "googleapis/python-genai #782",
+        url: "https://github.com/googleapis/python-genai/issues/782",
+        kind: "GitHub",
+        summary: "thoughts_token_count consumes max_output_tokens and returns empty visible output while billing full output rates.",
+        problemLabel: "thinking-tokens",
+        githubLabels: ["bug / type: bug", "api: gemini-api / vertex-ai", "priority: p2"],
+        stage: "Stage 2 & 3"
+      },
+      {
+        source: "googleapis/python-genai #1795",
+        url: "https://github.com/googleapis/python-genai/issues/1795",
+        kind: "GitHub",
+        summary: "Gemini thought_token count exceeds configured thinking budget unexpectedly.",
+        problemLabel: "thinking-tokens",
+        githubLabels: ["bug / type: bug", "priority: p2", "stale"],
+        stage: "Stage 2"
+      },
+      {
+        source: "googleapis/python-genai #2062",
+        url: "https://github.com/googleapis/python-genai/issues/2062",
+        kind: "GitHub",
+        summary: "Combined thinking + output cap truncates responses into empty/hung paid HTTP-200 calls.",
+        problemLabel: "soft-failure-200",
+        githubLabels: ["bug / type: bug", "api: gemini-api / vertex-ai"],
+        stage: "Stage 3"
+      },
+      {
+        source: "google-gemini/gemini-cli #16448",
+        url: "https://github.com/google-gemini/gemini-cli/issues/16448",
+        kind: "GitHub",
+        summary: "Autonomous CLI agent enters an unbounded repetitive thinking loop.",
+        problemLabel: "agent-loop",
+        githubLabels: ["area/agent", "stale"],
+        stage: "Stage 2"
+      },
+      {
+        source: "google-gemini/gemini-cli #16160",
+        url: "https://github.com/google-gemini/gemini-cli/issues/16160",
+        kind: "GitHub",
+        summary: "Agent enters an infinite text generation loop during multi-step problem solving.",
+        problemLabel: "agent-loop",
+        githubLabels: ["area/agent"],
+        stage: "Stage 2"
+      },
+      {
+        source: "openai/codex #60294",
+        url: "https://github.com/openai/codex/issues/60294",
+        kind: "GitHub",
+        summary: "Agent hangs when an OpenAI-compatible model returns HTTP 200 with whitespace-only (\"\\n\") content.",
+        problemLabel: "soft-failure-200",
+        githubLabels: ["bug / type: bug"],
+        stage: "Stage 3"
+      },
+      {
+        source: "openai/openai-python #3480",
+        url: "https://github.com/openai/openai-python/issues/3480",
+        kind: "GitHub",
+        summary: "Upstream InputTokensDetails schema change (cache_write_tokens) breaks downstream agent SDKs.",
+        problemLabel: "streaming & sdk-drift",
+        githubLabels: ["sdk-schema-drift"],
+        stage: "Drift Guard"
+      },
+      {
+        source: "openai/openai-agents-python #462",
+        url: "https://github.com/openai/openai-agents-python/issues/462",
+        kind: "GitHub",
+        summary: "Missing extraction and accounting for reasoning_tokens across reasoning models.",
+        problemLabel: "thinking-tokens",
+        githubLabels: ["stale"],
+        stage: "Stage 2"
+      },
+      {
+        source: "openai/openai-agents-python #442",
+        url: "https://github.com/openai/openai-agents-python/issues/442",
+        kind: "GitHub",
+        summary: "Streaming usage missing or failing when injecting stream_options.include_usage across providers.",
+        problemLabel: "streaming & sdk-drift",
+        githubLabels: ["feature:chat-completions"],
+        stage: "Stage 2"
+      },
+      {
+        source: "vllm-project/vllm #44824",
+        url: "https://github.com/vllm-project/vllm/issues/44824",
+        kind: "GitHub",
+        summary: "OpenAI-compatible serving endpoint leaves prompt_tokens_details.cached_tokens at 0.",
+        problemLabel: "cache-invalidation",
+        githubLabels: ["unlabeled-upstream"],
+        stage: "Stage 1 & 2"
+      },
+      {
+        source: "r/ClaudeAI · 1xksgor",
+        url: "https://www.reddit.com/r/ClaudeAI/comments/1xksgor/things_that_quietly_break_your_prompt_cache_in/",
+        kind: "Reddit",
+        summary: "5-minute idle gaps, model switches, and subtle prefix edits silently wipe out 90% cache discounts.",
+        problemLabel: "cache-invalidation",
+        githubLabels: [],
+        stage: "Stage 1"
+      },
+      {
+        source: "r/ClaudeAI · 1s7mkn3",
+        url: "https://www.reddit.com/r/ClaudeAI/comments/1s7mkn3/psa_claude_code_has_two_cache_bugs_that_can/",
+        kind: "Reddit",
+        summary: "Pre-wire payload mutations break exact prefix matching and multiply API token bills 10x–20x.",
+        problemLabel: "cache-invalidation",
+        githubLabels: [],
+        stage: "Stage 1"
+      },
+      {
+        source: "r/OpenAI · 1uszfrr",
+        url: "https://www.reddit.com/r/OpenAI/comments/1uszfrr/gpt56_prompt_caching_appears_completely_broken/",
+        kind: "Reddit",
+        summary: "Unexpected cached_tokens = 0 misses on repeated long-prefix OpenAI requests.",
+        problemLabel: "cache-invalidation",
+        githubLabels: [],
+        stage: "Stage 1"
+      },
+      {
+        source: "r/openrouter · 1uf3ij4",
+        url: "https://www.reddit.com/r/openrouter/comments/1uf3ij4/is_anyone_else_paying_1032x_more_on_openrouter/",
+        kind: "Reddit",
+        summary: "Multi-host routing breaks KV caches and inflates agent loop bills 10x–32x.",
+        problemLabel: "cache-invalidation",
+        githubLabels: [],
+        stage: "Stage 1 & 3"
+      },
+      {
+        source: "r/ClaudeAI · 1p05r7p",
+        url: "https://www.reddit.com/r/ClaudeAI/comments/1p05r7p/my_claude_code_context_window_strategy_200k_is/",
+        kind: "Reddit",
+        summary: "Crossing the 200k context threshold triggers whole-request 2x pricing cliffs and recall degradation.",
+        problemLabel: "200k-cliff & spend-caps",
+        githubLabels: [],
+        stage: "Stage 1"
+      },
+      {
+        source: "r/googlecloud · 1jz43y6",
+        url: "https://www.reddit.com/r/googlecloud/comments/1jz43y6/056_to_34315_in_minutes_google_gemini_api_just/",
+        kind: "Reddit",
+        summary: "$0.56 to $34,315 Gemini API bill in minutes due to missing real-time spend kill-switches.",
+        problemLabel: "200k-cliff & spend-caps",
+        githubLabels: [],
+        stage: "Stage 2"
+      },
+      {
+        source: "r/googlecloud · 1szv8cr",
+        url: "https://www.reddit.com/r/googlecloud/comments/1szv8cr/warning_google_cloudgemini_api_spend_caps_do_not/",
+        kind: "Reddit",
+        summary: "GCP budget alerts notify hours late rather than circuit-breaking live Gemini API requests.",
+        problemLabel: "200k-cliff & spend-caps",
+        githubLabels: [],
+        stage: "Stage 2"
+      },
+      {
+        source: "r/googlecloud · 1vmxjry",
+        url: "https://www.reddit.com/r/googlecloud/comments/1vmxjry/long_term_feasibility_of_using_gemini_due_to/",
+        kind: "Reddit",
+        summary: "Production unit-economics impact of Gemini's >200k 2x whole-request tiered pricing.",
+        problemLabel: "200k-cliff & spend-caps",
+        githubLabels: [],
+        stage: "Stage 1"
+      },
+      {
+        source: "r/ClaudeCode · 1vca1ma",
+        url: "https://www.reddit.com/r/ClaudeCode/comments/1vca1ma/claude_code_burned_my_entire_fivehour_limit_in_6/",
+        kind: "Reddit",
+        summary: "Stuck autonomous tool-retry loop burns an entire 5-hour quota in 6 minutes.",
+        problemLabel: "agent-loop",
+        githubLabels: [],
+        stage: "Stage 2"
+      },
+      {
+        source: "r/Bard · 1p113qb",
+        url: "https://www.reddit.com/r/Bard/comments/1p113qb/api_calls_to_gemini_3_about_40_more_expensive/",
+        kind: "Reddit",
+        summary: "Internal thinking tokens billed at output rates make routine API calls ~40%+ costlier than expected.",
+        problemLabel: "thinking-tokens",
+        githubLabels: [],
+        stage: "Stage 2 & 3"
+      }
+    ];
+
+    const PROBLEM_BARS = [
+      { key: "cache-invalidation", count: 7, tone: "teal" },
+      { key: "thinking-tokens", count: 5, tone: "amber" },
+      { key: "200k-cliff & spend-caps", count: 4, tone: "coral" },
+      { key: "agent-loop", count: 3, tone: "amber" },
+      { key: "soft-failure-200", count: 2, tone: "sky" },
+      { key: "streaming & sdk-drift", count: 2, tone: "sky" }
+    ];
+
+    const GITHUB_BARS = [
+      { key: "bug / type: bug", count: 7, tone: "coral" },
+      { key: "stale", count: 5, tone: "amber" },
+      { key: "area/agent", count: 3, tone: "teal" },
+      { key: "area:cost", count: 2, tone: "teal" },
+      { key: "api:bedrock", count: 2, tone: "sky" },
+      { key: "api: gemini-api / vertex-ai", count: 2, tone: "sky" },
+      { key: "has repro", count: 2, tone: "teal" },
+      { key: "priority: p2", count: 2, tone: "amber" }
+    ];
+
+    let activeMode = "problem";
+    let selectedLabel = null;
+
+    const barContainer = document.getElementById("barContainer");
+    const tableBody = document.getElementById("issuesTableBody");
+    const filterStatus = document.getElementById("filterStatus");
+    const resetBtn = document.getElementById("resetFilterBtn");
+    const tabProblem = document.getElementById("tabProblemLabels");
+    const tabGithub = document.getElementById("tabGithubLabels");
+    const chartSubtitle = document.getElementById("chartSubtitle");
+
+    function renderChartAndTable() {
+      const bars = activeMode === "problem" ? PROBLEM_BARS : GITHUB_BARS;
+      const maxCount = Math.max(...bars.map((b) => b.count));
+
+      barContainer.innerHTML = "";
+      bars.forEach((bar) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "bar-row" + (selectedLabel === bar.key ? " is-selected" : "");
+        const pct = Math.round((bar.count / maxCount) * 100);
+        btn.innerHTML = `
+          <span class="bar-label">${bar.key}</span>
+          <span class="bar-track"><span class="bar-fill" data-tone="${bar.tone}" style="width: ${pct}%"></span></span>
+          <span class="bar-count">${bar.count} ${bar.count === 1 ? "issue" : "issues"}</span>
+        `;
+        btn.addEventListener("click", () => {
+          selectedLabel = selectedLabel === bar.key ? null : bar.key;
+          renderChartAndTable();
+        });
+        barContainer.appendChild(btn);
+      });
+
+      const filtered = REPORTS.filter((item) => {
+        if (activeMode === "github" && item.kind !== "GitHub") {
+          return selectedLabel ? false : true;
+        }
+        if (!selectedLabel) return true;
+        return activeMode === "problem"
+          ? item.problemLabel === selectedLabel
+          : item.githubLabels.includes(selectedLabel);
+      });
+
+      tableBody.innerHTML = "";
+      filtered.forEach((item) => {
+        const tr = document.createElement("tr");
+        const labelsHtml = [
+          `<span class="tag">${item.problemLabel}</span>`,
+          ...item.githubLabels
+            .filter((l) => l !== "unlabeled-upstream" && l !== "sdk-schema-drift")
+            .slice(0, 2)
+            .map((l) => `<span class="tag">${l}</span>`)
+        ].join("");
+
+        tr.innerHTML = `
+          <td><a href="${item.url}" target="_blank" rel="noopener noreferrer" class="mono">${item.source}</a></td>
+          <td>${item.summary}</td>
+          <td>${labelsHtml}</td>
+          <td><span class="tag tag-stage">${item.stage}</span></td>
+        `;
+        tableBody.appendChild(tr);
+      });
+
+      if (selectedLabel) {
+        filterStatus.textContent = `Filtered by "${selectedLabel}" — showing ${filtered.length} matching report${filtered.length === 1 ? "" : "s"}.`;
+        resetBtn.hidden = false;
+      } else {
+        filterStatus.textContent = "Showing all 23 verified problem reports (13 GitHub issues + 10 Reddit threads).";
+        resetBtn.hidden = true;
+      }
+    }
+
+    tabProblem.addEventListener("click", () => {
+      activeMode = "problem";
+      selectedLabel = null;
+      tabProblem.setAttribute("aria-selected", "true");
+      tabGithub.setAttribute("aria-selected", "false");
+      chartSubtitle.textContent = "Click any bar to filter the 23 linked GitHub issues and Reddit engineering threads below.";
+      renderChartAndTable();
+    });
+
+    tabGithub.addEventListener("click", () => {
+      activeMode = "github";
+      selectedLabel = null;
+      tabGithub.setAttribute("aria-selected", "true");
+      tabProblem.setAttribute("aria-selected", "false");
+      chartSubtitle.textContent = "Live maintainer labels across the 13 upstream GitHub issues (Anthropic, Google, OpenAI, vLLM).";
+      renderChartAndTable();
+    });
+
+    resetBtn.addEventListener("click", () => {
+      selectedLabel = null;
+      renderChartAndTable();
+    });
+
+    renderChartAndTable();
+
+    // Language Tabs (synchronized across code blocks)
+    document.querySelectorAll(".lang-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const lang = tab.dataset.lang;
+        document.querySelectorAll("[data-codegroup]").forEach((panel) => {
+          panel.querySelectorAll(".lang-tab").forEach((t) => {
+            t.setAttribute("aria-selected", String(t.dataset.lang === lang));
+          });
+          panel.querySelectorAll("[data-pane]").forEach((pane) => {
+            pane.hidden = pane.dataset.pane !== lang;
+          });
+        });
+      });
+    });
+
+    // Copy buttons
+    function flashCopied(btn) {
+      const prev = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(() => { btn.textContent = prev; }, 1400);
+    }
+
+    document.querySelectorAll("[data-copy]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(btn.dataset.copy);
+        flashCopied(btn);
+      });
+    });
+
+    document.querySelectorAll("[data-copy-group]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const group = btn.closest("[data-codegroup]");
+        const visiblePre = group.querySelector("pre:not([hidden])");
+        if (visiblePre) {
+          navigator.clipboard.writeText(visiblePre.innerText);
+          flashCopied(btn);
+        }
+      });
+    });
+
+    // Theme switcher
+    const themeToggle = document.getElementById("themeToggle");
+    const themeLabel = document.getElementById("themeLabel");
+    const brandLogo = document.getElementById("brandLogo");
+    const archDiagram = document.getElementById("archDiagram");
+    themeToggle.addEventListener("click", () => {
+      const root = document.documentElement;
+      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      themeLabel.textContent = next === "dark" ? "Light mode" : "Dark mode";
+      brandLogo.src = next === "dark" ? "./assets/logo-white.png" : "./assets/logo-dark.png";
+      archDiagram.src = next === "dark" ? "./assets/architecture-dark.svg" : "./assets/architecture-light.svg";
+    });
+  </script>
+</body>
+</html>

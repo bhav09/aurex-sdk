@@ -28,7 +28,8 @@ export function reportProviderDrift(opts: {
     message: opts.message,
   };
   if (opts.driftLog) opts.driftLog.push(entry);
-  if (opts.strict || process.env.AUREX_STRICT_DRIFT === "1") {
+  const isStrict = opts.strict ?? (process.env.AUREX_STRICT_DRIFT === "1");
+  if (isStrict) {
     throw new AurexProviderDriftError(opts.message, {
       provider: opts.provider,
       providerVersion: opts.providerVersion,

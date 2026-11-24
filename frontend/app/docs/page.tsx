@@ -47,9 +47,16 @@ export default function DocsOverviewPage() {
       <DocHashRedirect />
 
       <div>
-        <h1 className="text-4xl font-display font-bold tracking-tight text-white mb-3">
-          Aurex SDK Documentation
-        </h1>
+        <div className="flex items-center gap-3.5 mb-3">
+          <img
+            src="/heyaurex_logo/1.png"
+            alt="Aurex logo"
+            className="w-10 h-10 object-contain"
+          />
+          <h1 className="text-4xl font-display font-bold tracking-tight text-white">
+            Aurex SDK Documentation
+          </h1>
+        </div>
         <p className="text-white/60 leading-relaxed">
           Aurex protects your AI bill inside your own process—adding <strong>0 ms proxy latency</strong> and never sending raw prompt text outside your servers.
         </p>
@@ -66,6 +73,13 @@ export default function DocsOverviewPage() {
 
       <section className="space-y-3">
         <h2 className="text-xl font-display font-semibold text-white">2. What does Aurex solve?</h2>
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
+          <img
+            src="/heyaurex_logo/architecture-dark.svg"
+            alt="Aurex SDK in-process architecture"
+            className="w-full h-auto rounded-lg"
+          />
+        </div>
         <p className="text-sm text-white/65 leading-relaxed">
           One lightweight SDK connects three stages around every OpenAI, Anthropic, Gemini, LiteLLM, or Llama call: <strong>Stage 1</strong> shields your prefix cache and warns before pricing cliffs, <strong>Stage 2</strong> enforces live session and thinking-token circuit breakers across workers, and <strong>Stage 3</strong> measures real cost per outcome and flags cost regressions on Pull Requests.
         </p>

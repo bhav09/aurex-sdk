@@ -39,6 +39,7 @@ backend/.venv/
 
 # Features Aurex PDF
 Features Aurex.pdf
+aurex_feature.md
 
 # Log files
 *.log
@@ -57,6 +58,4 @@ session.json
 summary.json
 upload_res.json
 
-# Internal MD files
-aurex_feature.md
 

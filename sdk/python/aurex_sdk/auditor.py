@@ -160,7 +160,7 @@ class AurexConfig:
         redis_url: Optional[str] = None,
         redis_client: Optional[Any] = None,
         cache_ttl: str = "5m",
-        strict_provider_drift: bool = False,
+        strict_provider_drift: Optional[bool] = None,
     ):
         self.api_key = api_key or os.getenv("AUREX_API_KEY")
         self.project = project
@@ -203,7 +203,11 @@ class AurexConfig:
         self.redis_url = redis_url or os.getenv("AUREX_REDIS_URL")
         self.redis_client = redis_client
         self.cache_ttl = cache_ttl or os.getenv("AUREX_CACHE_TTL", "5m")
-        self.strict_provider_drift = strict_provider_drift or (os.getenv("AUREX_STRICT_DRIFT") == "1")
+        self.strict_provider_drift = (
+            (os.getenv("AUREX_STRICT_DRIFT", "0") in ("1", "true", "True"))
+            if strict_provider_drift is None
+            else bool(strict_provider_drift)
+        )
 
 
 class AurexAuditor:
