@@ -8,7 +8,7 @@
 
 ## What Problems Does It Solve?
 
-- **Silent cache & `200k` price traps:** Putting a changing timestamp or unsorted JSON schema in a system prompt wipes out 50%–90% prompt-cache discounts, and crossing `200,000` input tokens doubles whole-request pricing on Claude 4+ and Gemini 2.5+ ([anthropics/claude-code#91151](https://github.com/anthropics/claude-code/issues/91151)).
+- **Silent cache & `200k` price traps:** Putting a changing timestamp or unsorted JSON schema in a system prompt wipes out 50%–90% prompt-cache discounts, and crossing `200,000` input tokens doubles whole-request pricing on Claude and Gemini ([anthropics/claude-code#91151](https://github.com/anthropics/claude-code/issues/91151)).
 - **Runaway agent loops & hidden thinking tokens:** Reasoning models burn thousands of internal thought tokens billed at output rates ([googleapis/python-genai#782](https://github.com/googleapis/python-genai/issues/782)), while stuck tool loops drain budgets without a per-session fuse.
 - **Paid `HTTP 200` soft failures:** Models return `200 OK` with empty or whitespace-looped replies ([openai/codex#60294](https://github.com/openai/codex/issues/60294)) that bill full price without completing the user's task.
 
@@ -71,11 +71,11 @@ aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comm
 
 ## Tested on Real Open-Source Agent Stacks (`8.6 / 10`)
 
-Verified across **SWE-agent** (autonomous coding on Google Gemini reasoning models), **LangGraph** multi-agent workflows on local **Ollama** (`granite4.2:3b`, `llama3.1`), and cloud OpenAI/Anthropic/LiteLLM pipelines—allowing normal multi-step file exploration before halting stuck structural tool loops in `<0.1 ms`.
+Verified across **SWE-agent** autonomous coding runs and **LangGraph** multi-agent workflows across **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models—allowing normal multi-step file exploration before halting stuck structural tool loops in `<0.1 ms`.
 
 ## Production Tips
 
-- **Keep system prompts static:** Move changing dates or request IDs to the end of the user message, and set `"max_context_tokens": 195000` on long Claude 4+ and Gemini 2.5+ threads.
+- **Keep system prompts static:** Move changing dates or request IDs to the end of the user message, and set `"max_context_tokens": 195000` on long Claude and Gemini threads.
 - **Propagate `workflow_id` in LangGraph / sub-agents:** Use `aurex_context.set({"workflow_id": run_id})` so multi-agent nodes share one isolated session budget.
 - **Do not retry `AurexBlocked`:** In `tenacity`, pass `retry=retry_if_not_exception_type(AurexBlocked)` so intentional circuit-breaker stops are not retried.
 - **Interactive Docs & AI-agent guide:** https://bhav09.github.io/aurex-sdk/ and https://github.com/bhav09/aurex-sdk (see `llms.txt` and `AGENTS.md`).

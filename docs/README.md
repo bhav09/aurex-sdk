@@ -177,11 +177,11 @@ aurex install-hook && AUREX_ENABLED=1 python app.py
 
 ## 4. Real-World Testing & Open-Source Agent Benchmarks (`8.6 / 10`)
 
-Aurex was evaluated end-to-end across **SWE-agent** (autonomous coding on Google Gemini `gemini-2.5-flash` reasoning models), **LangGraph** multi-agent workflows on local **Ollama** (`granite4.2:3b`, `llama3.1`), and **110+ automated Python, Node.js, and Backend tests**:
+Aurex was evaluated end-to-end across **SWE-agent** autonomous coding runs and **LangGraph** multi-agent workflows across **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models, alongside **110+ automated Python, Node.js, and Backend tests**:
 
 ### SWE-agent Trajectory Breakdown
 
-Aurex allowed **3 full exploration turns** (`str_replace_editor` path discovery and file inspection) before catching non-progressive structural repetition on **Step 4**, while logging streamed Gemini reasoning tokens and Zero-PII SHA-256 prompt hashes. On real multi-file repository tasks (`40k–120k` context + `4k–16k` reasoning tokens per step), halting a stuck `30–50` step loop at Step 4 prevents **1.5M–5M+ wasted tokens** per runaway run:
+Aurex allowed **3 full exploration turns** (`str_replace_editor` path discovery and file inspection) before catching non-progressive structural repetition on **Step 4**, while logging streamed reasoning tokens and Zero-PII SHA-256 prompt hashes. On real multi-file repository tasks (`40k–120k` context + `4k–16k` reasoning tokens per step), halting a stuck `30–50` step loop at Step 4 prevents **1.5M–5M+ wasted tokens** per runaway run:
 
 | Step | SWE-agent Action | Observation | Aurex Status |
 | :--- | :--- | :--- | :--- |
@@ -203,6 +203,6 @@ Aurex allowed **3 full exploration turns** (`str_replace_editor` path discovery 
 ## 5. Data Privacy, Setup Improvements & Contributing
 
 - **Zero-PII Local Default:** Without `AUREX_API_KEY`, zero data leaves your machine—metrics and one-way SHA-256 hashes write locally to `.aurex/ledger.jsonl`. Even with opt-in cloud sync enabled, raw prompt and response text are never sent or stored (`prompt=None`, `response=None`).
-- **Move dynamic values to prompt tails & cap context at `195,000` tokens:** Preserve 50%–90% prefix-cache discounts and prevent accidental `200k` 2x whole-request repricing on Claude 4+ and Gemini 2.5+.
+- **Move dynamic values to prompt tails & cap context at `195,000` tokens:** Preserve 50%–90% prefix-cache discounts and prevent accidental `200k` 2x whole-request repricing on Claude and Gemini.
 - **Propagate `workflow_id` & skip retrying `AurexBlocked`:** Use `aurex_context.set({"workflow_id": run_id})` / `aurexContext.run({ workflowId }, ...)` in LangGraph or sub-agent hooks, exclude `AurexBlocked` from `tenacity` (`retry=retry_if_not_exception_type(AurexBlocked)`), and raise `loop_similarity_threshold` (`0.90`–`0.95`) when coding agents need wider file-reading headroom on large benchmarks.
 - **Share state across pods & contribute:** Set `AUREX_REDIS_URL=redis://...` in multi-worker deployments. To contribute, fork [bhav09/aurex-sdk](https://github.com/bhav09/aurex-sdk), keep Python and Node.js changes in lockstep, run `AUREX_STRICT_DRIFT=1 bash .agent/skills/aurex-smoke-test/scripts/run_smoke.sh`, and open a Pull Request.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aurex-sdk"
-version = "0.5.2"
+version = "0.5.3"
 license = "MIT"
 description = "In-process LLM FinOps shield, runtime circuit breaker, and CI outcome gate for Python"
 readme = "README.md"

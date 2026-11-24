@@ -756,7 +756,7 @@
       <a class="brand" href="#overview">
         <img id="brandLogo" src="./assets/logo-white.png" width="26" height="26" alt="Aurex logo" style="display:block;object-fit:contain;" />
         <span>Aurex SDK</span>
-        <span class="brand-version">v0.5.2 · MIT</span>
+        <span class="brand-version">v0.5.3 · MIT</span>
       </a>
       <div class="topbar-actions">
         <a class="nav-pill" href="https://pypi.org/project/aurex-sdk/" target="_blank" rel="noopener noreferrer">PyPI</a>
@@ -825,7 +825,7 @@
           </p>
           <ul>
             <li><strong>Silent cache invalidation &amp; TTL rewrites:</strong> Changing a timestamp at character 20 or shuffling JSON tool keys wipes out 50%–90% prefix-cache discounts, while resuming an Anthropic session past 5 minutes triggers a <code>1.25x</code> cache-write surcharge.</li>
-            <li><strong>The 200k 2x pricing cliff &amp; missing cloud spend caps:</strong> Sending <code>200,001</code> input tokens to Claude 4+ or Gemini 2.5+ doubles the price of the <em>entire</em> request, and cloud budget alerts arrive hours after runaway spend.</li>
+            <li><strong>The 200k 2x pricing cliff &amp; missing cloud spend caps:</strong> Sending <code>200,001</code> input tokens to Claude or Gemini doubles the price of the <em>entire</em> request, and cloud budget alerts arrive hours after runaway spend.</li>
             <li><strong>Hidden reasoning tokens, agent loops &amp; HTTP-200 soft failures:</strong> Reasoning models burn thousands of internal thinking tokens billed at output rates, nested retries multiply <code>429</code> storms <code>6x</code>, and empty or whitespace-looped HTTP <code>200 OK</code> responses still bill full price.</li>
           </ul>
         </div>
@@ -1025,10 +1025,10 @@ npx aurex install-hook &amp;&amp; source .env.aurex &amp;&amp; AUREX_ENABLED=1 n
       </section>
 
       <section id="benchmarks">
-        <h2>Real-World Testing: SWE-agent, LangGraph, Ollama &amp; Gemini (8.6 / 10)</h2>
+        <h2>Real-World Testing: SWE-agent &amp; LangGraph Across Claude, GPT, Gemini &amp; Llama (8.6 / 10)</h2>
         <div class="prose-measure">
           <p>
-            Aurex was evaluated end-to-end on <strong>SWE-agent</strong> autonomous coding trajectories using Google Gemini reasoning models (<code>gemini-2.5-flash</code>) and <strong>LangGraph</strong> multi-agent loops running local <strong>Ollama</strong> models (<code>granite4.2:3b</code>, <code>llama3.1</code>). Instead of tripping on the first failed file lookup, Aurex gave SWE-agent <strong>3 exploration steps</strong> before blocking non-progressive repetition on Step 4—while recording streamed thought tokens and Zero-PII SHA-256 hashes. On real multi-file repository tasks (<code>40k–120k</code> context + <code>4k–16k</code> reasoning tokens per turn), halting a stuck <code>30–50</code> step loop at Step 4 prevents <strong>1.5M–5M+ wasted tokens</strong> per runaway run.
+            Aurex was evaluated end-to-end on <strong>SWE-agent</strong> autonomous coding trajectories and <strong>LangGraph</strong> multi-agent loops across <strong>Claude</strong>, <strong>GPT</strong>, <strong>Gemini</strong> reasoning models, and local <strong>Ollama</strong> (<strong>Llama</strong>) models. Instead of tripping on the first failed file lookup, Aurex gave SWE-agent <strong>3 exploration steps</strong> before blocking non-progressive repetition on Step 4—while recording streamed reasoning tokens and Zero-PII SHA-256 hashes. On real multi-file repository tasks (<code>40k–120k</code> context + <code>4k–16k</code> reasoning tokens per turn), halting a stuck <code>30–50</code> step loop at Step 4 prevents <strong>1.5M–5M+ wasted tokens</strong> per runaway run.
           </p>
         </div>
 
@@ -1209,7 +1209,7 @@ npx aurex install-hook &amp;&amp; source .env.aurex &amp;&amp; AUREX_ENABLED=1 n
         <h2>Production Playbook &amp; Contributing</h2>
         <div class="prose-measure">
           <ol>
-            <li><strong>Move changing dates and IDs to the tail of prompts:</strong> Keep <code>messages[0]</code> / <code>system</code> static and set <code>max_context_tokens: 195000</code> on Claude 4+ and Gemini 2.5+ pipelines so 50%–90% cache discounts stay warm and requests stop before the 2x cliff.</li>
+            <li><strong>Move changing dates and IDs to the tail of prompts:</strong> Keep <code>messages[0]</code> / <code>system</code> static and set <code>max_context_tokens: 195000</code> on Claude and Gemini pipelines so 50%–90% cache discounts stay warm and requests stop before the 2x cliff.</li>
             <li><strong>Scope LangGraph &amp; multi-agent workflows:</strong> Wrap agent runs with <code>aurex_context.set({"workflow_id": run_id})</code> (Python) or <code>aurexContext.run({ workflowId }, ...)</code> (Node.js) so sub-agents share one isolated session budget instead of falling back to <code>default_workflow</code>.</li>
             <li><strong>Exclude <code>AurexBlocked</code> from retry decorators:</strong> Pass <code>retry=retry_if_not_exception_type(AurexBlocked)</code> in <code>tenacity</code> so intentional blocks are never re-fired, and raise <code>loop_similarity_threshold</code> (e.g. <code>0.90</code>–<code>0.95</code>) when coding agents need wider file-reading headroom on large repos.</li>
             <li><strong>Share state with Redis &amp; gate PRs:</strong> Set <code>AUREX_REDIS_URL=redis://...</code> in multi-worker Kubernetes or Gunicorn deployments and run <code>aurex ci --fail-on-regression</code> in GitHub Actions.</li>

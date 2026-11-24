@@ -1,6 +1,6 @@
 {
   "name": "aurex-sdk",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Aurex AI FinOps SDK — local-first LLM cost shield, circuit breaker, and outcome gate.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

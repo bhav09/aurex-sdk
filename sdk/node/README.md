@@ -8,7 +8,7 @@
 
 ## What Problems Does It Solve?
 
-- **Silent cache & `200k` price traps:** Dynamic timestamps or unstable JSON key ordering wipe out 50%–90% prompt-cache discounts, and crossing `200,000` input tokens doubles whole-request pricing on Claude 4+ and Gemini 2.5+ ([anthropics/claude-code#91151](https://github.com/anthropics/claude-code/issues/91151)).
+- **Silent cache & `200k` price traps:** Dynamic timestamps or unstable JSON key ordering wipe out 50%–90% prompt-cache discounts, and crossing `200,000` input tokens doubles whole-request pricing on Claude and Gemini ([anthropics/claude-code#91151](https://github.com/anthropics/claude-code/issues/91151)).
 - **Runaway agent loops & hidden thinking tokens:** Reasoning models burn thousands of internal thought tokens billed at output rates ([googleapis/python-genai#782](https://github.com/googleapis/python-genai/issues/782)), while stuck tool loops drain budgets mid-flight.
 - **Paid `HTTP 200` soft failures:** Empty or whitespace-looped responses ([openai/codex#60294](https://github.com/openai/codex/issues/60294)) return `200 OK` and bill full price without completing the user's task.
 
@@ -72,7 +72,7 @@ npx aurex ci --ledger=.aurex/ledger.jsonl --baseline=main_ledger.jsonl --github-
 
 ## Production Tips
 
-- **Keep system prompts static:** Move per-request dates or IDs to the end of the user message, and set `maxContextTokens: 195000` on Claude 4+ and Gemini 2.5+ workflows.
+- **Keep system prompts static:** Move per-request dates or IDs to the end of the user message, and set `maxContextTokens: 195000` on Claude and Gemini workflows.
 - **Scope concurrent & multi-agent runs:** Wrap requests with `aurexContext.run({ workflowId, tenantId }, async () => { ... })` so sub-agents share one isolated session budget.
 - **Do not retry `AurexBlocked`:** Skip retrying `err instanceof AurexBlocked` in custom retry wrappers so intentional circuit-breaker stops halt immediately.
 - **Docs & AI-agent guide:** https://github.com/bhav09/aurex-sdk (see `llms.txt` and `AGENTS.md`).

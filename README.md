@@ -21,7 +21,7 @@
 
 Most engineering teams only discover runaway AI spend weeks later on their monthly cloud invoice:
 
-- **Quiet prompt-cache & `200k` price traps:** Changing a single timestamp at the top of a system prompt wipes out 50%–90% prompt-cache discounts—and crossing `200,000` input tokens on Claude 4+ or Gemini 2.5+ suddenly **doubles the price of the entire request**.
+- **Quiet prompt-cache & `200k` price traps:** Changing a single timestamp at the top of a system prompt wipes out 50%–90% prompt-cache discounts—and crossing `200,000` input tokens on Claude or Gemini suddenly **doubles the price of the entire request**.
 - **No per-task kill switch while agents run:** Cloud budget alerts arrive hours late. Meanwhile, a stuck tool loop, 20,000 hidden "thinking" tokens billed at output rates, or nested `429` retries can drain budget in minutes.
 - **Paying full price for broken `HTTP 200` replies:** Models regularly return `200 OK` with empty text or repeated whitespace/JSON loops—charging full price while leaving the user's task unfinished.
 
@@ -131,11 +131,11 @@ aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comm
 
 ## Real-World Testing & Open-Source Agent Benchmarks
 
-Aurex has been verified end-to-end across autonomous coding agents (**SWE-agent** with Google Gemini `gemini-2.5-flash` reasoning models), **LangGraph** multi-agent loops on local **Ollama** (`granite4.2:3b`, `llama3.1`), and **110+ automated Python, Node.js, and Backend tests**:
+Aurex has been verified end-to-end across autonomous coding agents (**SWE-agent**) and **LangGraph** multi-agent loops running **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models, alongside **110+ automated Python, Node.js, and Backend tests**:
 
 ### SWE-agent Trajectory Verification
 
-Instead of blocking on the first failed file lookup, Aurex gave the coding agent **3 exploration steps** to locate and read files before halting non-progressive tool repetition on **Step 4**—while tracking streamed Gemini thought tokens and Zero-PII SHA-256 prompt hashes. On real multi-file repository tasks (`40k–120k` context tokens + `4k–16k` reasoning tokens per step), cutting off a stuck `30–50` step loop at Step 4 prevents **1.5M–5M+ wasted tokens** per runaway trajectory:
+Instead of blocking on the first failed file lookup, Aurex gave the coding agent **3 exploration steps** to locate and read files before halting non-progressive tool repetition on **Step 4**—while tracking streamed reasoning tokens and Zero-PII SHA-256 prompt hashes. On real multi-file repository tasks (`40k–120k` context tokens + `4k–16k` reasoning tokens per step), cutting off a stuck `30–50` step loop at Step 4 prevents **1.5M–5M+ wasted tokens** per runaway trajectory:
 
 | Step | SWE-agent Action | Observation | Aurex Decision |
 | :--- | :--- | :--- | :--- |
@@ -144,7 +144,7 @@ Instead of blocking on the first failed file lookup, Aurex gave the coding agent
 | **Step 3** | `str_replace_editor view .../tests/missing_colon.py` | Read and displayed target source file | **Allowed** |
 | **Step 4** | 4th consecutive `str_replace_editor` without a diff | Repeated pattern `['str_replace_editor', 'str_replace_editor', 'str_replace_editor']` | **Blocked (`AurexBlocked`)** |
 
-### End-to-End Evaluation Scorecard (SWE-agent + LangGraph + Ollama + Gemini)
+### End-to-End Evaluation Scorecard (SWE-agent + LangGraph Across Claude, GPT, Gemini & Llama)
 
 | Evaluation Category | Score | Key Takeaway |
 | :--- | :---: | :--- |
