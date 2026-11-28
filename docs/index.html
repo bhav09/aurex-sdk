@@ -780,6 +780,8 @@
       <a href="#problem-evidence">Problem &amp; Issue Graph</a>
       <a href="#how-it-works">3-Stage Call Lifecycle</a>
       <a href="#quickstart">How to Use It</a>
+      <a href="#multi-provider">Multi-Provider Snippet</a>
+      <a href="#ai-assistants">llms.txt &amp; AI Agents</a>
       <a href="#benchmarks">SWE-agent &amp; Benchmarks</a>
       <a href="#configuration">Config &amp; Providers</a>
       <a href="#privacy">Data &amp; Zero-PII Model</a>
@@ -1024,6 +1026,196 @@ npx aurex install-hook &amp;&amp; source .env.aurex &amp;&amp; AUREX_ENABLED=1 n
         </div>
       </section>
 
+      <section id="multi-provider">
+        <h2>Multi-Provider Integration: One Shared Budget Across Every Model</h2>
+        <div class="prose-measure">
+          <p>
+            A single <code>patch_all(auditor)</code> / <code>await auditor.patchAll()</code> call intercepts native SDKs and OpenAI-compatible gateways side by side—sharing <strong>one unified <code>workflow_id</code> session cap</strong> across <strong>OpenAI</strong>, <strong>Anthropic Claude</strong>, <strong>Google Gemini</strong>, <strong>LiteLLM</strong>, <strong>OpenRouter</strong>, <strong>IBM watsonx</strong>, <strong>NVIDIA NIM</strong>, <strong>Groq</strong>, <strong>Together AI</strong>, <strong>Fireworks AI</strong>, <strong>Hugging Face</strong>, and local <strong>Ollama</strong> (<code>$0.00</code>):
+          </p>
+        </div>
+
+        <div class="code-panel" data-codegroup="multiprov">
+          <div class="code-bar">
+            <div class="lang-tabs" role="tablist" aria-label="Multi-provider integration snippets">
+              <button class="lang-tab" role="tab" aria-selected="true" data-lang="py" type="button">Python (All Providers)</button>
+              <button class="lang-tab" role="tab" aria-selected="false" data-lang="ts" type="button">Node.js / TypeScript (All Providers)</button>
+            </div>
+            <button class="copy-btn" data-copy-group="multiprov" type="button">Copy snippet</button>
+          </div>
+          <pre data-pane="py"><code>import os
+from aurex_sdk import AurexAuditor, AurexConfig, patch_all
+import openai
+import anthropic
+from google import genai
+import litellm
+import ollama
+from huggingface_hub import InferenceClient
+
+# 1. Initialize once — enforces one shared $2.50 session cap across EVERY provider below
+auditor = AurexAuditor(
+    AurexConfig(
+        enable_loop_guard=True,
+        budget_guard={"max_cost_per_session": 2.50, "max_thinking_tokens": 4096, "on_budget_exceeded": "throw"},
+    )
+)
+patch_all(auditor)
+
+wf = "pipeline-order-108"
+
+# 2. Anthropic Claude (5m/1h prompt caching, ThinkingBlock &amp; &gt;200k cliff guard)
+claude = anthropic.Anthropic()
+claude.messages.create(
+    model="claude-sonnet-4",
+    max_tokens=512,
+    messages=[{"role": "user", "content": "Plan the order validation steps."}],
+    workflow_id=wf,
+)
+
+# 3. Google Gemini (thoughts_token_count &amp; &gt;200k cliff guard)
+gemini = genai.Client()
+gemini.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Extract structured shipping metadata.",
+    workflow_id=wf,
+)
+
+# 4. OpenAI + OpenAI-Compatible Gateways (Groq, OpenRouter, NVIDIA NIM, IBM watsonx, Together, Fireworks)
+openai_client = openai.OpenAI()
+groq_client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=os.getenv("GROQ_API_KEY"))
+openrouter_client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.getenv("OPENROUTER_API_KEY"))
+nvidia_nim_client = openai.OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=os.getenv("NVIDIA_API_KEY"))
+watsonx_client = openai.OpenAI(
+    base_url=f"https://us-south.ml.cloud.ibm.com/ml/v1",
+    api_key=os.getenv("WATSONX_API_KEY"),
+)
+together_client = openai.OpenAI(base_url="https://api.together.xyz/v1", api_key=os.getenv("TOGETHER_API_KEY"))
+fireworks_client = openai.OpenAI(base_url="https://api.fireworks.ai/inference/v1", api_key=os.getenv("FIREWORKS_API_KEY"))
+
+for client, model_id in [
+    (openai_client, "gpt-4o-mini"),
+    (groq_client, "llama-3.3-70b-versatile"),
+    (openrouter_client, "anthropic/claude-3-5-haiku"),
+    (nvidia_nim_client, "meta/llama-3.3-70b-instruct"),
+    (watsonx_client, "meta-llama/llama-3-3-70b-instruct"),
+    (together_client, "meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+    (fireworks_client, "accounts/fireworks/models/llama-v3p3-70b-instruct"),
+]:
+    client.chat.completions.create(
+        model=model_id,
+        messages=[{"role": "user", "content": "Verify line-item tax rules."}],
+        workflow_id=wf,
+    )
+
+# 5. LiteLLM Unified Router (watsonx, NVIDIA NIM, AWS Bedrock, Vertex AI, Azure)
+litellm.completion(
+    model="watsonx/meta-llama/llama-3-3-70b-instruct",
+    messages=[{"role": "user", "content": "Cross-check regional compliance."}],
+    workflow_id=wf,
+)
+
+# 6. Local Ollama ($0.00 local billing) &amp; Hugging Face InferenceClient
+ollama.Client().chat(model="llama3.3", messages=[{"role": "user", "content": "Draft local summary."}], workflow_id=wf)
+InferenceClient().chat_completion(model="Qwen/Qwen2.5-72B-Instruct", messages=[{"role": "user", "content": "Tag intent."}], workflow_id=wf)
+
+auditor.mark_success(wf)
+auditor.flush()</code></pre>
+          <pre data-pane="ts" hidden><code>import { AurexAuditor } from "aurex-sdk";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
+import { Ollama } from "ollama";
+import { HfInference } from "@huggingface/inference";
+
+// 1. Initialize once — enforces one shared $2.50 session cap across EVERY provider below
+const auditor = AurexAuditor.getInstance({
+  enableLoopGuard: true,
+  budgetGuard: { maxCostPerSession: 2.5, maxThinkingTokens: 4096, onBudgetExceeded: "throw" },
+});
+await auditor.patchAll();
+auditor.instrument(OpenAI, Anthropic, GoogleGenAI, Ollama, HfInference);
+
+const wf = "pipeline-order-108";
+
+// 2. Anthropic Claude &amp; Google Gemini
+const claude = new Anthropic();
+await claude.messages.create({
+  model: "claude-sonnet-4",
+  max_tokens: 512,
+  messages: [{ role: "user", content: "Plan the order validation steps." }],
+  workflowId: wf,
+} as any);
+
+const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+await gemini.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: "Extract structured shipping metadata.",
+  workflowId: wf,
+} as any);
+
+// 3. OpenAI, Groq, OpenRouter, NVIDIA NIM, IBM watsonx, Together AI, Fireworks AI &amp; LiteLLM Proxy
+const providers: Array<[OpenAI, string]> = [
+  [new OpenAI(), "gpt-4o-mini"],
+  [new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: process.env.GROQ_API_KEY }), "llama-3.3-70b-versatile"],
+  [new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY }), "anthropic/claude-3-5-haiku"],
+  [new OpenAI({ baseURL: "https://integrate.api.nvidia.com/v1", apiKey: process.env.NVIDIA_API_KEY }), "meta/llama-3.3-70b-instruct"],
+  [new OpenAI({ baseURL: "https://us-south.ml.cloud.ibm.com/ml/v1", apiKey: process.env.WATSONX_API_KEY }), "meta-llama/llama-3-3-70b-instruct"],
+  [new OpenAI({ baseURL: "https://api.together.xyz/v1", apiKey: process.env.TOGETHER_API_KEY }), "meta-llama/Llama-3.3-70B-Instruct-Turbo"],
+  [new OpenAI({ baseURL: "https://api.fireworks.ai/inference/v1", apiKey: process.env.FIREWORKS_API_KEY }), "accounts/fireworks/models/llama-v3p3-70b-instruct"],
+];
+
+for (const [client, model] of providers) {
+  await client.chat.completions.create({
+    model,
+    messages: [{ role: "user", content: "Verify line-item tax rules." }],
+    workflowId: wf,
+  } as any);
+}
+
+// 4. Local Ollama ($0.00 local billing) &amp; Hugging Face
+const localOllama = new Ollama({ host: "http://127.0.0.1:11434" });
+await localOllama.chat({ model: "llama3.3", messages: [{ role: "user", content: "Draft local summary." }], workflowId: wf } as any);
+
+const hf = new HfInference(process.env.HF_TOKEN);
+await hf.chatCompletion({ model: "Qwen/Qwen2.5-72B-Instruct", messages: [{ role: "user", content: "Tag intent." }], workflowId: wf } as any);
+
+auditor.markSuccess(wf);
+await auditor.flushAndWait();</code></pre>
+        </div>
+      </section>
+
+      <section id="ai-assistants">
+        <h2>Integrate in 30 Seconds Using <code>llms.txt</code> with AI Coding Assistants</h2>
+        <div class="prose-measure">
+          <p>
+            Aurex ships a compact, machine-readable <a href="https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt" target="_blank" rel="noopener noreferrer"><code>llms.txt</code></a> and <a href="https://github.com/bhav09/aurex-sdk/blob/main/AGENTS.md" target="_blank" rel="noopener noreferrer"><code>AGENTS.md</code></a> specification so coding assistants (<strong>Claude Code</strong>, <strong>Cursor</strong>, <strong>Antigravity</strong>, <strong>GitHub Copilot</strong>, <strong>Windsurf</strong>, and <strong>Codex</strong>) wire Aurex into your existing codebase without hallucinating config keys or rewriting your LLM calls:
+          </p>
+          <ol>
+            <li><strong>One-Prompt Drop-In (Claude Code, Antigravity, Copilot, Codex, Cursor Chat):</strong> Paste the prompt below—your coding agent fetches <code>llms.txt</code>, finds your entrypoint (FastAPI <code>lifespan</code>, Express/Next.js <code>instrumentation.ts</code>, Celery, or LangGraph), and wires Aurex cleanly in one pass.</li>
+            <li><strong>Cursor / Windsurf <code>@Docs</code> Indexing:</strong> Add <code>https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt</code> under <strong>Settings &rarr; Features &rarr; Docs</strong> as <code>@Aurex</code>, then ask <code>@Aurex protect our LLM routes and background workers</code>.</li>
+            <li><strong>Repo-Local Rule File (Offline / CI Agents):</strong> Save a local copy in your repo root so every developer&apos;s coding agent inherits the exact rules automatically.</li>
+          </ol>
+        </div>
+
+        <div class="code-panel" data-codegroup="llmstxt">
+          <div class="code-bar">
+            <div class="lang-tabs" role="tablist" aria-label="llms.txt integration methods">
+              <button class="lang-tab" role="tab" aria-selected="true" data-lang="prompt" type="button">Copy-Paste Agent Prompt</button>
+              <button class="lang-tab" role="tab" aria-selected="false" data-lang="cli" type="button">Save Local Rules (CLI)</button>
+            </div>
+            <button class="copy-btn" data-copy-group="llmstxt" type="button">Copy snippet</button>
+          </div>
+          <pre data-pane="prompt"><code>Read https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt and integrate aurex-sdk into our existing codebase:
+1. Initialize AurexAuditor once at application startup and call patch_all (plus auditor.instrument(...) if bundled TypeScript). Do NOT rewrite our existing LLM client calls.
+2. Enable enable_loop_guard and set budget_guard caps (max_cost_per_session, max_context_tokens=195000, max_thinking_tokens=4096).
+3. Propagate workflow_id per request/job (via call kwargs or aurex_context / aurexContext), call mark_success on completion, exclude AurexBlocked from retry decorators, and flush on shutdown.</code></pre>
+          <pre data-pane="cli" hidden><code># Download llms.txt into your repo for Claude Code, Cursor, Antigravity &amp; Codex
+curl -sL https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt -o .aurex-llms.txt
+
+# Or run with Claude Code directly from your terminal:
+claude "Read .aurex-llms.txt and integrate aurex-sdk into this repository without rewriting existing LLM calls."</code></pre>
+        </div>
+      </section>
+
       <section id="benchmarks">
         <h2>Real-World Testing: SWE-agent &amp; LangGraph Across Claude, GPT, Gemini &amp; Llama (8.6 / 10)</h2>
         <div class="prose-measure">
@@ -1185,7 +1377,7 @@ npx aurex install-hook &amp;&amp; source .env.aurex &amp;&amp; AUREX_ENABLED=1 n
 
         <div class="prose-measure">
           <ul>
-            <li><strong>Supported Providers:</strong> OpenAI (Chat, Structured <code>.parse()</code>, <code>.stream()</code>, and <code>responses</code> API, plus automatic <code>base_url</code> pricing for Groq, Together AI, Fireworks, OpenRouter, and <code>$0.00</code> local Ollama), Anthropic Claude (<code>5m</code>/<code>1h</code> prompt caching, <code>ThinkingBlock</code>, <code>&gt;200k</code> 2x tiers), Google Gemini (sync &amp; <code>.aio</code> async, <code>thoughts_token_count</code>, <code>&gt;200k</code> 2x tiers), LiteLLM, Ollama, and Hugging Face.</li>
+            <li><strong>Supported Providers:</strong> OpenAI (Chat, Structured <code>.parse()</code>, <code>.stream()</code>, and <code>responses</code> API, plus automatic <code>base_url</code> pricing for Groq, OpenRouter, NVIDIA NIM, IBM watsonx, Together AI, Fireworks, and <code>$0.00</code> local Ollama), Anthropic Claude (<code>5m</code>/<code>1h</code> prompt caching, <code>ThinkingBlock</code>, <code>&gt;200k</code> 2x tiers), Google Gemini (sync &amp; <code>.aio</code> async, <code>thoughts_token_count</code>, <code>&gt;200k</code> 2x tiers), LiteLLM, Ollama, and Hugging Face.</li>
             <li><strong>Typed Exceptions &amp; Health:</strong> Catch <code>AurexBlocked</code>, <code>AurexBudgetExceeded</code>, <code>AurexResilienceExhausted</code>, and <code>AurexProviderDriftError</code>. Inspect live patch state anytime with <code>auditor.get_health()</code> / <code>auditor.getHealth()</code>.</li>
           </ul>
         </div>
@@ -1560,11 +1752,12 @@ npx aurex install-hook &amp;&amp; source .env.aurex &amp;&amp; AUREX_ENABLED=1 n
 
     renderChartAndTable();
 
-    // Language Tabs (synchronized across code blocks)
+    // Language Tabs (synchronized across matching py/ts code blocks)
     document.querySelectorAll(".lang-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
         const lang = tab.dataset.lang;
         document.querySelectorAll("[data-codegroup]").forEach((panel) => {
+          if (!panel.querySelector(`[data-pane="${lang}"]`)) return;
           panel.querySelectorAll(".lang-tab").forEach((t) => {
             t.setAttribute("aria-selected", String(t.dataset.lang === lang));
           });

@@ -69,7 +69,7 @@ auditor.instrument(OpenAI, Anthropic);
 
 ## 4. Supported SDK Methods & Provider Nuances
 
-- **OpenAI (`openai`):** Sync & Async `chat.completions.create`, `chat.completions.parse` (Pydantic/Zod), `chat.completions.stream`, `responses.create`, `responses.parse`, `responses.stream`. Auto-injects `stream_options={"include_usage": True}`. Automatically detects `base_url` / `baseURL` for **Groq**, **Together AI**, **Fireworks**, **OpenRouter**, **Bedrock**, and **Ollama** (`localhost` = `$0.00`, hosted cloud = real token rates).
+- **OpenAI (`openai`):** Sync & Async `chat.completions.create`, `chat.completions.parse` (Pydantic/Zod), `chat.completions.stream`, `responses.create`, `responses.parse`, `responses.stream`. Auto-injects `stream_options={"include_usage": True}`. Automatically detects `base_url` / `baseURL` for **Groq**, **OpenRouter**, **NVIDIA NIM** (`integrate.api.nvidia.com`), **IBM watsonx** (`ml.cloud.ibm.com`), **Together AI**, **Fireworks**, **Bedrock**, and **Ollama** (`localhost` = `$0.00`, hosted cloud = real token rates).
 - **Anthropic (`anthropic` / `@anthropic-ai/sdk`):** Sync & Async `messages.create`, `messages.parse`, `messages.stream`. Inspects `cache_control` block arrays, tracks mixed `5m` (`1.25x`) and `1h` (`2.0x`) cache writes, separates `ThinkingBlock` from `TextBlock`, and enforces the `>200k` 2x cliff on Claude models.
 - **Google Gemini (`google-genai` / `@google/genai`):** `models.generate_content` & `models.generate_content_stream` (sync & `.aio` async), `thoughts_token_count`, `cached_content_token_count`, and `>200k` 2x cliff on Gemini models.
 - **LiteLLM, Ollama & Hugging Face:** `litellm.completion` / `acompletion`, `ollama.Client` / `AsyncClient`, `huggingface_hub.InferenceClient`.

@@ -17,6 +17,9 @@ PAID_CLOUD_PREFIXES = (
     "fireworks/",
     "fireworks_ai/",
     "openrouter/",
+    "nvidia_nim/",
+    "watsonx/",
+    "ibm/",
     "bedrock/",
     "amazon.",
     "meta.",
@@ -212,7 +215,7 @@ def is_paid_cloud_open_weight(model: str, provider: Optional[str] = None) -> boo
     prov = (provider or "").strip().lower()
     if ml.startswith("ollama/") or ml.startswith("local/") or prov == "ollama":
         return False
-    if prov in ("groq", "together", "fireworks", "openrouter", "bedrock", "azure", "vertex"):
+    if prov in ("groq", "together", "fireworks", "openrouter", "nvidia_nim", "watsonx", "bedrock", "azure", "vertex"):
         return True
     return any(ml.startswith(p) for p in PAID_CLOUD_PREFIXES)
 
@@ -225,6 +228,9 @@ def extract_provider(model: str) -> str:
         ("together_ai/", "together"),
         ("fireworks/", "fireworks"),
         ("openrouter/", "openrouter"),
+        ("nvidia_nim/", "nvidia_nim"),
+        ("watsonx/", "watsonx"),
+        ("ibm/", "watsonx"),
         ("bedrock/", "bedrock"),
         ("amazon.", "bedrock"),
         ("ollama/", "ollama"),

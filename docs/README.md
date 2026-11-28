@@ -175,6 +175,70 @@ aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comm
 aurex install-hook && AUREX_ENABLED=1 python app.py
 ```
 
+### Multi-Provider Integration (LiteLLM, OpenRouter, watsonx, Anthropic, NVIDIA NIM, Groq, Gemini, OpenAI, Together, Fireworks, Ollama & Hugging Face)
+
+A single `patch_all(auditor)` / `await auditor.patchAll()` call governs every native SDK and OpenAI-compatible endpoint under **one shared `workflow_id` session budget**:
+
+```python
+import os
+from aurex_sdk import AurexAuditor, AurexConfig, patch_all
+import openai, anthropic, litellm, ollama
+from google import genai
+from huggingface_hub import InferenceClient
+
+auditor = AurexAuditor(
+    AurexConfig(
+        enable_loop_guard=True,
+        budget_guard={"max_cost_per_session": 2.50, "max_thinking_tokens": 4096, "on_budget_exceeded": "throw"},
+    )
+)
+patch_all(auditor)
+
+wf = "pipeline-order-108"
+
+# Anthropic Claude & Google Gemini
+anthropic.Anthropic().messages.create(
+    model="claude-sonnet-4", max_tokens=512,
+    messages=[{"role": "user", "content": "Plan validation steps."}], workflow_id=wf,
+)
+genai.Client().models.generate_content(
+    model="gemini-2.5-flash", contents="Extract shipping metadata.", workflow_id=wf,
+)
+
+# OpenAI + OpenAI-Compatible Gateways (Groq, OpenRouter, NVIDIA NIM, IBM watsonx, Together, Fireworks)
+for base_url, api_key, model_id in [
+    (None, os.getenv("OPENAI_API_KEY"), "gpt-4o-mini"),
+    ("https://api.groq.com/openai/v1", os.getenv("GROQ_API_KEY"), "llama-3.3-70b-versatile"),
+    ("https://openrouter.ai/api/v1", os.getenv("OPENROUTER_API_KEY"), "anthropic/claude-3-5-haiku"),
+    ("https://integrate.api.nvidia.com/v1", os.getenv("NVIDIA_API_KEY"), "meta/llama-3.3-70b-instruct"),
+    ("https://us-south.ml.cloud.ibm.com/ml/v1", os.getenv("WATSONX_API_KEY"), "meta-llama/llama-3-3-70b-instruct"),
+    ("https://api.together.xyz/v1", os.getenv("TOGETHER_API_KEY"), "meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+    ("https://api.fireworks.ai/inference/v1", os.getenv("FIREWORKS_API_KEY"), "accounts/fireworks/models/llama-v3p3-70b-instruct"),
+]:
+    openai.OpenAI(base_url=base_url, api_key=api_key).chat.completions.create(
+        model=model_id, messages=[{"role": "user", "content": "Verify tax rules."}], workflow_id=wf,
+    )
+
+# LiteLLM Router (watsonx, NVIDIA NIM, Bedrock, Vertex, Azure) + Local Ollama ($0) + Hugging Face
+litellm.completion(model="watsonx/meta-llama/llama-3-3-70b-instruct", messages=[{"role": "user", "content": "Check compliance."}], workflow_id=wf)
+ollama.Client().chat(model="llama3.3", messages=[{"role": "user", "content": "Local summary."}], workflow_id=wf)
+InferenceClient().chat_completion(model="Qwen/Qwen2.5-72B-Instruct", messages=[{"role": "user", "content": "Tag intent."}], workflow_id=wf)
+
+auditor.mark_success(wf)
+auditor.flush()
+```
+
+### Integrate in 30 Seconds Using `llms.txt` with AI Coding Assistants
+
+Point **Claude Code**, **Cursor**, **Antigravity**, **GitHub Copilot**, **Windsurf**, or **Codex** at [`llms.txt`](https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt) so it wires Aurex into your existing codebase without rewriting client calls:
+
+1. **Copy-Paste Prompt (Any Coding Agent):**
+   ```text
+   Read https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt and integrate aurex-sdk into our existing codebase without rewriting our LLM client calls. Initialize AurexAuditor once at startup with enable_loop_guard and budget_guard caps, propagate workflow_id per request, exclude AurexBlocked from retry decorators, and flush on shutdown.
+   ```
+2. **Cursor / Windsurf `@Docs`:** Add `https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt` under **Settings -> Docs** as `@Aurex`, then run `@Aurex integrate aurex-sdk into this repo`.
+3. **Local Repo Copy:** Run `curl -sL https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt -o .aurex-llms.txt` so offline or sandboxed agents read exact Python `snake_case` and Node.js `camelCase` rules locally.
+
 ## 4. Real-World Testing & Open-Source Agent Benchmarks (`8.6 / 10`)
 
 Aurex was evaluated end-to-end across **SWE-agent** autonomous coding runs and **LangGraph** multi-agent workflows across **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models, alongside **110+ automated Python, Node.js, and Backend tests**:

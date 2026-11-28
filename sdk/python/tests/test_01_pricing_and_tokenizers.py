@@ -120,9 +120,16 @@ def test_anthropic_mixed_5m_and_1h_cache_creation_and_batch_discount():
 
 
 def test_hosted_cloud_vs_local_ollama_open_weight_pricing():
+    from aurex_sdk.runtime_guard import resolve_endpoint_provider
+
     assert get_model_pricing("llama-4-scout", provider="ollama") == (0.0, 0.0)
     assert get_model_pricing("ollama/llama-3.3-70b") == (0.0, 0.0)
 
-    for prov in ("groq", "together", "fireworks", "openrouter", "bedrock"):
+    for prov in ("groq", "together", "fireworks", "openrouter", "nvidia_nim", "watsonx", "bedrock"):
         inp, outp = get_model_pricing("llama-4-scout", provider=prov)
         assert inp > 0.0 and outp > 0.0
+
+    assert resolve_endpoint_provider("meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1") == "nvidia_nim"
+    assert resolve_endpoint_provider("meta-llama/llama-3-3-70b-instruct", "https://us-south.ml.cloud.ibm.com/ml/v1") == "watsonx"
+    assert get_model_pricing("nvidia_nim/llama-3.3-70b")[0] > 0.0
+    assert get_model_pricing("watsonx/llama-3.3-70b")[0] > 0.0

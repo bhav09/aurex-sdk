@@ -13,6 +13,9 @@ const PAID_CLOUD_PREFIXES = [
   "fireworks/",
   "fireworks_ai/",
   "openrouter/",
+  "nvidia_nim/",
+  "watsonx/",
+  "ibm/",
   "bedrock/",
   "amazon.",
   "meta.",
@@ -223,7 +226,7 @@ export function isPaidCloudOpenWeight(model: string, provider?: string): boolean
   const ml = (model || "").trim().toLowerCase();
   const prov = (provider || "").trim().toLowerCase();
   if (ml.startsWith("ollama/") || ml.startsWith("local/") || prov === "ollama") return false;
-  if (["groq", "together", "fireworks", "openrouter", "bedrock", "azure", "vertex"].includes(prov)) return true;
+  if (["groq", "together", "fireworks", "openrouter", "nvidia_nim", "watsonx", "bedrock", "azure", "vertex"].includes(prov)) return true;
   return PAID_CLOUD_PREFIXES.some((p) => ml.startsWith(p));
 }
 
@@ -235,6 +238,9 @@ export function extractProvider(model: string): string {
     ["together_ai/", "together"],
     ["fireworks/", "fireworks"],
     ["openrouter/", "openrouter"],
+    ["nvidia_nim/", "nvidia_nim"],
+    ["watsonx/", "watsonx"],
+    ["ibm/", "watsonx"],
     ["bedrock/", "bedrock"],
     ["amazon.", "bedrock"],
     ["ollama/", "ollama"],
