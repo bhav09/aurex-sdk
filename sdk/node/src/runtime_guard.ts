@@ -196,6 +196,25 @@ export function sanitizeThinkingParams<T extends Record<string, any>>(
     delete out.reasoning_effort;
     delete out.reasoning;
     delete out.thinking;
+    delete out.reasoning_budget;
+    delete out.thinking_budget;
+    if (out.extra_body && typeof out.extra_body === "object") {
+      const ebCopy: Record<string, any> = { ...out.extra_body };
+      delete ebCopy.reasoning_budget;
+      delete ebCopy.thinking_budget;
+      delete ebCopy.thinking;
+      delete ebCopy.reasoning;
+      if (ebCopy.chat_template_kwargs && typeof ebCopy.chat_template_kwargs === "object") {
+        const ctk = { ...ebCopy.chat_template_kwargs };
+        delete ctk.thinking_budget;
+        delete ctk.reasoning_budget;
+        delete ctk.enable_thinking;
+        if (Object.keys(ctk).length > 0) ebCopy.chat_template_kwargs = ctk;
+        else delete ebCopy.chat_template_kwargs;
+      }
+      if (Object.keys(ebCopy).length > 0) out.extra_body = ebCopy;
+      else delete out.extra_body;
+    }
     if (out.config && typeof out.config === "object") {
       const cfgCopy = { ...out.config };
       delete cfgCopy.thinkingConfig;
@@ -210,6 +229,39 @@ export function sanitizeThinkingParams<T extends Record<string, any>>(
     if (out.thinking && typeof out.thinking === "object" && "budget_tokens" in out.thinking) {
       const clamped = Math.max(1024, Math.min(Number(out.thinking.budget_tokens), cap));
       out.thinking = { ...out.thinking, budget_tokens: clamped };
+    }
+    for (const topKey of ["reasoning_budget", "thinking_budget"]) {
+      if (typeof out[topKey] === "number" && out[topKey] > cap) {
+        out[topKey] = cap;
+      }
+    }
+    if (out.extra_body && typeof out.extra_body === "object") {
+      const ebCopy: Record<string, any> = { ...out.extra_body };
+      let mutatedEb = false;
+      for (const ebKey of ["reasoning_budget", "thinking_budget"]) {
+        if (typeof ebCopy[ebKey] === "number" && ebCopy[ebKey] > cap) {
+          ebCopy[ebKey] = cap;
+          mutatedEb = true;
+        }
+      }
+      if (ebCopy.thinking && typeof ebCopy.thinking === "object" && "budget_tokens" in ebCopy.thinking) {
+        const tb = Number(ebCopy.thinking.budget_tokens);
+        if (tb > cap) {
+          ebCopy.thinking = { ...ebCopy.thinking, budget_tokens: Math.max(1024, Math.min(tb, cap)) };
+          mutatedEb = true;
+        }
+      }
+      if (ebCopy.chat_template_kwargs && typeof ebCopy.chat_template_kwargs === "object") {
+        const ctk: Record<string, any> = { ...ebCopy.chat_template_kwargs };
+        for (const ck of ["reasoning_budget", "thinking_budget"]) {
+          if (typeof ctk[ck] === "number" && ctk[ck] > cap) {
+            ctk[ck] = cap;
+            mutatedEb = true;
+          }
+        }
+        if (mutatedEb) ebCopy.chat_template_kwargs = ctk;
+      }
+      if (mutatedEb) out.extra_body = ebCopy;
     }
     const targetEffort = cap <= 2048 ? "low" : cap <= 8192 ? "medium" : "high";
     if (out.reasoning_effort === "high" && targetEffort !== "high") {

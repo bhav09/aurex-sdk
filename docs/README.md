@@ -239,30 +239,28 @@ Point **Claude Code**, **Cursor**, **Antigravity**, **GitHub Copilot**, **Windsu
 2. **Cursor / Windsurf `@Docs`:** Add `https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt` under **Settings -> Docs** as `@Aurex`, then run `@Aurex integrate aurex-sdk into this repo`.
 3. **Local Repo Copy:** Run `curl -sL https://raw.githubusercontent.com/bhav09/aurex-sdk/main/llms.txt -o .aurex-llms.txt` so offline or sandboxed agents read exact Python `snake_case` and Node.js `camelCase` rules locally.
 
-## 4. Real-World Testing & Open-Source Agent Benchmarks (`8.6 / 10`)
+## 4. Real-World Benchmarks: OpenHands, BrowserGym, tau-bench, terminal-bench & SWE-agent
 
-Aurex was evaluated end-to-end across **SWE-agent** autonomous coding runs and **LangGraph** multi-agent workflows across **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models, alongside **110+ automated Python, Node.js, and Backend tests**:
+Aurex has been verified across **six open-source agent frameworks** (**terminal-bench `8.9/10`**, **tau-bench `8.8/10`**, **OpenHands `8.7/10`**, **SWE-agent `8.6/10`**, **BrowserGym `8.4/10`**, and **LangGraph**) spanning **Claude**, **GPT**, **Gemini**, **NVIDIA NIM (`Nemotron`)**, **LiteLLM**, and local **Ollama (`Llama`)**:
 
-### SWE-agent Trajectory Breakdown
+### Cross-Benchmark Scorecard & Stage Coverage
 
-Aurex allowed **3 full exploration turns** (`str_replace_editor` path discovery and file inspection) before catching non-progressive structural repetition on **Step 4**, while logging streamed reasoning tokens and Zero-PII SHA-256 prompt hashes. On real multi-file repository tasks (`40k–120k` context + `4k–16k` reasoning tokens per step), halting a stuck `30–50` step loop at Step 4 prevents **1.5M–5M+ wasted tokens** per runaway run:
+| Benchmark | Archetype | Score | Hot-Path `p50` | Stage 1 (Prefix & Cliff) | Stage 2 (Loop, Spend & Concurrency) | Stage 3 (Soft Failures & `aurex ci`) |
+| :--- | :--- | :---: | :---: | :--- | :--- | :--- |
+| **terminal-bench** | Linux Bash (`LiteLLM` + `Terminus2` / `MCPTerminus`) | **`8.9 / 10`** | **`0.080 ms`** | Blocked `336k`-tok dump (`+\$1.01` saved); caught dropped `messages[0]` cache & char `2,884` timestamp | Clamped `16k -> 1k` think; blocked `Permission denied` loop; bypassed `3x3` `tenacity` sleep | Caught `64/64` reasoning starvation (`content=""`) · `aurex ci` exit `1` (`+9,280%`) |
+| **tau-bench** | Multi-Actor Retail (`LiteLLM` + 15 tools + User Sim) | **`8.8 / 10`** | `< 0.50 ms` | Isolated `-agent` vs `-user` `workflow_id` dual `system` caches; blocked `8.3k` few-shot bloat | Clamped `8k -> 1k` think; thread-isolated `2k`-cap blocked task from `8k`-cap passing task | Caught `48/48` reasoning starvation (`content=""`) · `aurex ci` exit `1` (`+3,516%`) |
+| **OpenHands** | Coding (`OpenAI` + `file_editor`) | **`8.7 / 10`** | `0.268 ms` | Kept reordered tools warm; caught `system` timestamp at char `590`; blocked `360k` cliff (`+\$1.08` saved) | Blocked stuck `file_editor` (`1.16 ms`); `80%` budget downgrade; caught mid-stream abort | Caught JSON grammar loop + `4k` think starvation · `aurex ci` exit `1` (`+861%`) |
+| **SWE-agent** | Autonomous Repo Solver | **`8.6 / 10`** | `< 0.30 ms` | Zero-PII SHA-256 prompt/system hashing & `>200k` pre-call guard | Allowed multi-file discovery while halting stuck loops (`1.5M–5M+` cumulative tokens saved) | Verified `mark_success()` / `mark_failure()` cost-per-outcome ledger |
+| **BrowserGym** | Multimodal Web (`OpenAI` + Vision/DOM) | **`8.4 / 10`** | `0.558 ms` | Blocked `480k`-tok DOM pre-call (`+\$1.44` saved; native callback missed it); **`64.9x`** cacheable prefix boost | Blocked stuck disabled button in `0.109 ms` pre-network; multimodal base64 digest hashing | Marked `reward=0.0` episode failed · `aurex ci` exit `1` (`+1,890%`) |
 
-| Step | SWE-agent Action | Observation | Aurex Status |
-| :--- | :--- | :--- | :--- |
-| **Step 1** | `str_replace_editor view .../missing_colon.py` | File not found (wrong directory path) | **Allowed** |
-| **Step 2** | `str_replace_editor view .../test-repo` | Listed folder structure to locate file | **Allowed** |
-| **Step 3** | `str_replace_editor view .../tests/missing_colon.py` | Read and displayed target source file | **Allowed** |
-| **Step 4** | 4th consecutive `str_replace_editor` without a diff | Pattern `['str_replace_editor', 'str_replace_editor', 'str_replace_editor']` | **Blocked (`AurexBlocked`)** |
+### Live End-to-End NVIDIA NIM (`Nemotron`) Runs — `4/4` Solved for `< \$0.01` Combined (`\$0.00` Wasted)
 
-### Evaluation Scorecard
-
-| Category | Score | Summary |
-| :--- | :---: | :--- |
-| **1. Code Implementation (DX)** | **9.0 / 10** | One-line `patch_all(auditor)` interception across LiteLLM, OpenAI, Gemini, and Ollama. |
-| **2. Guardrails & Governance Features** | **8.8 / 10** | Accurate streaming thought-token tracking, 3-step exploration headroom, and session USD caps. |
-| **3. Log & Telemetry Clarity** | **8.5 / 10** | Readable `AurexBlocked` messages and structured `.aurex/ledger.*.jsonl` outcome events. |
-| **4. Framework Resilience & Compatibility** | **8.0 / 10** | `<0.1 ms` overhead across local Ollama (`\$0.00`) and cloud endpoints. |
-| **Composite Score** | **8.6 / 10** | **Production-ready & verified on real multi-agent loops.** |
+| Benchmark | Live Task Executed | Result | Wall Time | Input Tokens | Reasoning Tokens | Total Cost |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **OpenHands** | Inspect `@openhands/agent-canvas` via `file_editor` | Solved | `1.43 s` | `1,077` | `99` | **`\$0.000186`** |
+| **BrowserGym** | 3-step `ExpArgs.run()` web checkout episode | Solved (`reward=1.0`) | `10.01 s` | `3,843` | `1,533` | **`\$0.001206`** |
+| **tau-bench** | Retail Task 0 (16 multi-actor messages) | Solved (`Pass^1=1.0`) | `17.08 s` | `41,088` | `1,332` | **`\$0.003053`** |
+| **terminal-bench** | `analyze-access-logs` (`2,000` log lines, 7 bash cmds) | Solved (`is_resolved=True`) | `15.41 s` | `25,488` | `874` | **`\$0.002989`** |
 
 ## 5. Data Privacy, Setup Improvements & Contributing
 

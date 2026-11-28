@@ -69,9 +69,9 @@ aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comm
 
 *(Zero-code option: run `aurex install-hook` once, then start your app with `AUREX_ENABLED=1`.)*
 
-## Tested on Real Open-Source Agent Stacks (`8.6 / 10`)
+## Tested on Real Open-Source Agent Benchmarks (`8.4` – `8.9 / 10`)
 
-Verified across **SWE-agent** autonomous coding runs and **LangGraph** multi-agent workflows across **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models—allowing normal multi-step file exploration before halting stuck structural tool loops in `<0.1 ms`.
+Verified across **terminal-bench (`8.9/10`, `0.08 ms` `p50`)**, **tau-bench (`8.8/10`)**, **OpenHands (`8.7/10`)**, **SWE-agent (`8.6/10`)**, **BrowserGym (`8.4/10`)**, and **LangGraph** across **Claude**, **GPT**, **Gemini**, **NVIDIA NIM**, **LiteLLM**, and local **Ollama** (**Llama**)—allowing multi-step file/bash exploration when arguments progress while halting stuck `(tool + args)` loops, clamping `extra_body.reasoning_budget`, and blocking `>200k` context cliffs pre-call.
 
 ## Production Tips
 

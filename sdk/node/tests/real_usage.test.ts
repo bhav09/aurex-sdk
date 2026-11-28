@@ -368,5 +368,38 @@ describe("Aurex Node.js Real-Usage & Latest-Package Functionality Suite", () => 
         strict: true,
       }),
     ).toThrow(AurexProviderDriftError);
+
+    // 4. v0.5.5 checks: argument-aware tool exploration vs identical repeat + NIM extra_body.reasoning_budget clamping
+    const { sanitizeThinkingParams } = await import("../src/runtime_guard");
+    const nimClamped = sanitizeThinkingParams(
+      { model: "nvidia/nemotron", extra_body: { reasoning_budget: 16384, chat_template_kwargs: { thinking_budget: 8192 } } },
+      { maxThinkingTokens: 1024 },
+    );
+    expect(nimClamped.extra_body.reasoning_budget).toBe(1024);
+    expect(nimClamped.extra_body.chat_template_kwargs.thinking_budget).toBe(1024);
+
+    const exploreDec = auditor.preCallCheck({
+      model: "gpt-4o",
+      prompt: "Explore files",
+      workflowId: "wf-node-explore",
+      messages: [
+        { role: "assistant", tool_calls: [{ function: { name: "file_editor", arguments: '{"path":"a.ts"}' } }] },
+        { role: "assistant", tool_calls: [{ function: { name: "file_editor", arguments: '{"path":"b.ts"}' } }] },
+        { role: "assistant", tool_calls: [{ function: { name: "file_editor", arguments: '{"path":"c.ts"}' } }] },
+        { role: "assistant", tool_calls: [{ function: { name: "file_editor", arguments: '{"path":"d.ts"}' } }] },
+      ],
+    });
+    expect(exploreDec.action).toBe("proceed");
+
+    const stuckDec = auditor.preCallCheck({
+      model: "gpt-4o",
+      prompt: "Stuck click",
+      workflowId: "wf-node-stuck",
+      messages: [
+        { role: "assistant", tool_calls: [{ function: { name: "click", arguments: '{"bid":"42","btn":"left"}' } }] },
+        { role: "assistant", tool_calls: [{ function: { name: "click", arguments: '{"btn":"left","bid":"42"}' } }] },
+      ],
+    });
+    expect(stuckDec.action).toBe("block");
   });
 });

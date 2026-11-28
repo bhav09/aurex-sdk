@@ -22,7 +22,7 @@ from aurex_sdk.resilience import (
     execute_with_resilience,
     parse_resilience_config,
 )
-from aurex_sdk.loop_guard import LoopGuard
+from aurex_sdk.loop_guard import LoopGuard, canonicalize_tool_call_signature, summarize_content_for_loop
 from aurex_sdk.prefix_shield import append_tail_instruction, canonicalize_json_keys, inspect_pre_call_shield
 from aurex_sdk.pricing import (
     MODEL_PRICING,
@@ -149,6 +149,7 @@ class AurexConfig:
         simple_prompt_token_limit: int = 120,
         runaway_context_multiplier: float = 2.2,
         loop_similarity_threshold: float = 0.8,
+        max_consecutive_same_tool: int = 8,
         downgrade_map: Optional[Dict[str, str]] = None,
         max_queue_size: int = 10000,
         sync_timeout_seconds: float = 10.0,
@@ -192,6 +193,7 @@ class AurexConfig:
         self.simple_prompt_token_limit = simple_prompt_token_limit
         self.runaway_context_multiplier = runaway_context_multiplier
         self.loop_similarity_threshold = loop_similarity_threshold
+        self.max_consecutive_same_tool = max_consecutive_same_tool
         self.downgrade_map = downgrade_map or {}
         self.max_queue_size = max_queue_size
         self.sync_timeout_seconds = sync_timeout_seconds
@@ -1405,7 +1407,11 @@ class AurexAuditor:
 
             # Stage 2: Loop Guard raises/blocks cleanly (never returns MagicMock fake chat strings)
             if self.config.enable_loop_guard and messages:
-                is_loop = self._loop_guard.check_for_loop(workflow_id, messages)
+                is_loop = self._loop_guard.check_for_loop(
+                    workflow_id,
+                    messages,
+                    similarity_threshold=loop_similarity_threshold,
+                )
                 if is_loop:
                     decision = AurexDecision(
                         action="block",
@@ -1480,23 +1486,43 @@ class AurexAuditor:
                         original_model=model,
                     )
 
-            # In-Process Hybrid Loop Guard (Structural + Semantic)
+            # In-Process Hybrid Loop Guard (Argument-Aware Structural + Tool Streak + Semantic)
             if messages:
-                tool_sequence = []
+                tool_names: List[str] = []
+                tool_sigs: List[str] = []
+                tool_has_args: List[bool] = []
                 for m in messages:
-                    if m.get("role") == "assistant" and m.get("tool_calls"):
+                    if isinstance(m, dict) and m.get("role") == "assistant" and m.get("tool_calls"):
                         for tc in m["tool_calls"]:
-                            if "function" in tc:
-                                tool_sequence.append(tc["function"]["name"])
+                            if isinstance(tc, dict) and "function" in tc:
+                                t_name, t_sig, has_args = canonicalize_tool_call_signature(tc)
+                                if t_name:
+                                    tool_names.append(t_name)
+                                    tool_sigs.append(t_sig)
+                                    tool_has_args.append(has_args)
 
-                if len(tool_sequence) >= 3:
-                    last_three = tool_sequence[-3:]
-                    if last_three[0] == last_three[1] == last_three[2] or (len(tool_sequence) >= 4 and tool_sequence[-4:-2] == tool_sequence[-2:]):
-                        decision = AurexDecision(
-                            action="block",
-                            reason=f"In-Process Loop Guard triggered: Structural repetition of tool calls {last_three}",
-                            original_model=model,
-                        )
+                max_same_tool = int(ctx.get("max_consecutive_same_tool") or getattr(self.config, "max_consecutive_same_tool", 8) or 8)
+                blocked_tools: Optional[List[str]] = None
+
+                # 1. Exact (name + arguments) repeat: 2x consecutive when args are present, 3x when empty, or 4-call [A, B, A, B] ping-pong
+                if len(tool_sigs) >= 2 and tool_has_args[-1] and tool_sigs[-2] == tool_sigs[-1]:
+                    blocked_tools = tool_names[-2:]
+                elif len(tool_sigs) >= 3 and tool_sigs[-3] == tool_sigs[-2] == tool_sigs[-1]:
+                    blocked_tools = tool_names[-3:]
+                elif len(tool_sigs) >= 4 and tool_sigs[-4:-2] == tool_sigs[-2:]:
+                    blocked_tools = tool_names[-4:]
+                # 2. Same tool name with distinct arguments exceeding consecutive exploration cap
+                elif max_same_tool >= 2 and len(tool_names) >= max_same_tool:
+                    tail_names = tool_names[-max_same_tool:]
+                    if len(set(tail_names)) == 1:
+                        blocked_tools = tail_names[-3:]
+
+                if blocked_tools is not None:
+                    decision = AurexDecision(
+                        action="block",
+                        reason=f"In-Process Loop Guard triggered: Structural repetition of tool calls {blocked_tools}",
+                        original_model=model,
+                    )
 
             if loop_score >= loop_similarity_threshold and decision.action == "proceed":
                 decision = AurexDecision(

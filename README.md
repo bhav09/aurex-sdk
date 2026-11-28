@@ -131,28 +131,30 @@ aurex ci --ledger .aurex/ledger.jsonl --baseline main_ledger.jsonl --github-comm
 
 ## Real-World Testing & Open-Source Agent Benchmarks
 
-Aurex has been verified end-to-end across autonomous coding agents (**SWE-agent**) and **LangGraph** multi-agent loops running **Claude**, **GPT**, **Gemini**, and local **Ollama** (**Llama**) models, alongside **110+ automated Python, Node.js, and Backend tests**:
+Aurex has been benchmarked end-to-end across **six open-source agent frameworks** (**OpenHands**, **BrowserGym**, **tau-bench**, **terminal-bench**, **SWE-agent**, and **LangGraph**) spanning **Claude**, **GPT**, **Gemini**, **NVIDIA NIM (`Nemotron`)**, **LiteLLM**, and local **Ollama (`Llama`)**, plus **110+ automated Python, Node.js, and Backend tests**:
 
-### SWE-agent Trajectory Verification
+### Cross-Benchmark Evaluation Summary
 
-Instead of blocking on the first failed file lookup, Aurex gave the coding agent **3 exploration steps** to locate and read files before halting non-progressive tool repetition on **Step 4**—while tracking streamed reasoning tokens and Zero-PII SHA-256 prompt hashes. On real multi-file repository tasks (`40k–120k` context tokens + `4k–16k` reasoning tokens per step), cutting off a stuck `30–50` step loop at Step 4 prevents **1.5M–5M+ wasted tokens** per runaway trajectory:
+| Benchmark | Agent Archetype | Score | Hot-Path `p50` | Key Real-World Waste Caught & Prevented |
+| :--- | :--- | :---: | :---: | :--- |
+| **terminal-bench** | Linux Bash (`LiteLLM` + `Terminus2` / `MCPTerminus`) | **`8.9 / 10`** | **`0.080 ms`** | Blocked `336k`-token log dump pre-call (`+\$1.01` saved), clamped `16k -> 1k` thinking budget, bypassed `3x3` `tenacity` sleep (`1.8 ms`), caught `64/64` reasoning-starvation `HTTP 200` soft failures, and failed `aurex ci` (`+9,280%` regression). |
+| **tau-bench** | Multi-Actor Retail (`LiteLLM` + 15 tools + User Sim) | **`8.8 / 10`** | `< 0.50 ms` | Isolated `-agent` vs `-user` `workflow_id` caches, clamped `8k -> 1k` thinking budget, thread-isolated concurrent session caps, and caught `48/48` empty reasoning-starvation calls (`aurex ci` `+3,516%`). |
+| **OpenHands** | Coding Agent (`OpenAI` + `file_editor` tools) | **`8.7 / 10`** | `0.268 ms` | Kept reordered tool schemas cache-warm, pinpointed `system` timestamp break at char `590`, blocked `360k`-token cliff pre-call (`+\$1.08` saved), and caught aborted streams + grammar loops (`aurex ci` `+861%`). |
+| **SWE-agent** | Repo Issue Solver (Coding + `str_replace_editor`) | **`8.6 / 10`** | `< 0.30 ms` | Allowed multi-file path & code discovery while halting stuck non-progressive tool loops before burning `1.5M–5M+` cumulative tokens on `40k–120k`-context trajectories. |
+| **BrowserGym** | Multimodal Web (`OpenAI` + Vision PNG / DOM) | **`8.4 / 10`** | `0.558 ms` | Blocked `480k`-token unpruned DOM pre-call (`+\$1.44` saved where native callback only checked post-call), boosted cacheable prefix **`64.9x`**, and halted stuck disabled-button clicks in `0.109 ms`. |
 
-| Step | SWE-agent Action | Observation | Aurex Decision |
+- **Live End-to-End NVIDIA NIM Verification:** Completed **4/4 (`100%` solve rate)** live tasks across **OpenHands**, **BrowserGym** (`reward=1.0`), **tau-bench** (`Pass^1=1.0`), and **terminal-bench** (`2,000`-line access-log analysis, `is_resolved=True`) for **`\$0.0074` combined (< 1 cent)** with **`\$0.00` wasted spend** and `0` SDK drift under `AUREX_STRICT_DRIFT=1`.
+
+### SWE-agent Step-by-Step Loop Verification
+
+Instead of blocking on the first failed file lookup, Aurex allows multi-step file discovery (`max_consecutive_same_tool=8` when arguments progress) while immediately blocking identical `(tool + arguments)` repeats or non-progressive streaks:
+
+| Step | Agent Action | Observation | Aurex Decision |
 | :--- | :--- | :--- | :--- |
 | **Step 1** | `str_replace_editor view .../missing_colon.py` | File not found (wrong directory path) | **Allowed** |
 | **Step 2** | `str_replace_editor view .../test-repo` | Listed folder structure to locate file | **Allowed** |
 | **Step 3** | `str_replace_editor view .../tests/missing_colon.py` | Read and displayed target source file | **Allowed** |
-| **Step 4** | 4th consecutive `str_replace_editor` without a diff | Repeated pattern `['str_replace_editor', 'str_replace_editor', 'str_replace_editor']` | **Blocked (`AurexBlocked`)** |
-
-### End-to-End Evaluation Scorecard (SWE-agent + LangGraph Across Claude, GPT, Gemini & Llama)
-
-| Evaluation Category | Score | Key Takeaway |
-| :--- | :---: | :--- |
-| **1. Code Implementation (DX)** | **9.0 / 10** | One-line `patch_all(auditor)` setup across LiteLLM, OpenAI, Gemini, and Ollama with clean `AurexConfig`. |
-| **2. Guardrails & Governance Features** | **8.8 / 10** | Accurate streaming reasoning-token capture, balanced 3-step loop headroom, and hard USD session caps. |
-| **3. Log & Telemetry Clarity** | **8.5 / 10** | Clear `AurexBlocked` explanations and rich Zero-PII `.aurex/ledger.*.jsonl` outcome records. |
-| **4. Framework Resilience & Compatibility** | **8.0 / 10** | `<0.1 ms` overhead across local Ollama (`\$0.00`) and cloud APIs; pairs cleanly with custom agent hooks. |
-| **Composite Score** | **8.6 / 10** | **Production-ready in-process cost & loop control.** |
+| **Repeated Loop** | Repeated identical `(tool + args)` or stuck tool streak | Non-progressive structural repetition detected | **Blocked (`AurexBlocked`)** |
 
 ## How Can You Improve Your Setup?
 

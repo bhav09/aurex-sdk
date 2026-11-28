@@ -201,6 +201,26 @@ def sanitize_thinking_params(
         out.pop("reasoning_effort", None)
         out.pop("reasoning", None)
         out.pop("thinking", None)
+        out.pop("reasoning_budget", None)
+        out.pop("thinking_budget", None)
+        eb = out.get("extra_body")
+        if isinstance(eb, dict):
+            eb_copy = dict(eb)
+            for k in ("reasoning_budget", "thinking_budget", "thinking", "reasoning"):
+                eb_copy.pop(k, None)
+            if isinstance(eb_copy.get("chat_template_kwargs"), dict):
+                ctk = dict(eb_copy["chat_template_kwargs"])
+                ctk.pop("thinking_budget", None)
+                ctk.pop("reasoning_budget", None)
+                ctk.pop("enable_thinking", None)
+                if ctk:
+                    eb_copy["chat_template_kwargs"] = ctk
+                else:
+                    eb_copy.pop("chat_template_kwargs", None)
+            if eb_copy:
+                out["extra_body"] = eb_copy
+            else:
+                out.pop("extra_body", None)
         cfg = out.get("config")
         if isinstance(cfg, dict) and "thinking_config" in cfg:
             cfg_copy = dict(cfg)
@@ -219,6 +239,34 @@ def sanitize_thinking_params(
         if isinstance(thinking, dict) and "budget_tokens" in thinking:
             clamped = max(1024, min(int(thinking["budget_tokens"]), cap))
             out["thinking"] = {**thinking, "budget_tokens": clamped}
+
+        for top_k in ("reasoning_budget", "thinking_budget"):
+            if isinstance(out.get(top_k), (int, float)) and out[top_k] > cap:
+                out[top_k] = cap
+
+        eb = out.get("extra_body")
+        if isinstance(eb, dict):
+            eb_copy = dict(eb)
+            mutated_eb = False
+            for eb_k in ("reasoning_budget", "thinking_budget"):
+                if isinstance(eb_copy.get(eb_k), (int, float)) and eb_copy[eb_k] > cap:
+                    eb_copy[eb_k] = cap
+                    mutated_eb = True
+            if isinstance(eb_copy.get("thinking"), dict) and "budget_tokens" in eb_copy["thinking"]:
+                t_budget = int(eb_copy["thinking"]["budget_tokens"])
+                if t_budget > cap:
+                    eb_copy["thinking"] = {**eb_copy["thinking"], "budget_tokens": max(1024, min(t_budget, cap))}
+                    mutated_eb = True
+            if isinstance(eb_copy.get("chat_template_kwargs"), dict):
+                ctk = dict(eb_copy["chat_template_kwargs"])
+                for ck in ("reasoning_budget", "thinking_budget"):
+                    if isinstance(ctk.get(ck), (int, float)) and ctk[ck] > cap:
+                        ctk[ck] = cap
+                        mutated_eb = True
+                if mutated_eb:
+                    eb_copy["chat_template_kwargs"] = ctk
+            if mutated_eb:
+                out["extra_body"] = eb_copy
 
         target_effort = "low" if cap <= 2048 else ("medium" if cap <= 8192 else "high")
         if out.get("reasoning_effort") == "high" and target_effort != "high":

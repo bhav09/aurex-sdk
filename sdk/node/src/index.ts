@@ -116,6 +116,7 @@ export interface AurexConfig {
   simplePromptTokenLimit?: number;
   runawayContextMultiplier?: number;
   loopSimilarityThreshold?: number;
+  maxConsecutiveSameTool?: number;
   downgradeMap?: Record<string, string>;
   maxQueueSize?: number;
   syncTimeoutMs?: number;
@@ -269,6 +270,7 @@ export class AurexAuditor {
       simplePromptTokenLimit: config?.simplePromptTokenLimit ?? 120,
       runawayContextMultiplier: config?.runawayContextMultiplier ?? 2.2,
       loopSimilarityThreshold: config?.loopSimilarityThreshold ?? 0.8,
+      maxConsecutiveSameTool: config?.maxConsecutiveSameTool ?? 8,
       downgradeMap: config?.downgradeMap || {},
       maxQueueSize: config?.maxQueueSize ?? 10000,
       syncTimeoutMs: config?.syncTimeoutMs ?? 10000,
@@ -987,32 +989,75 @@ export class AurexAuditor {
         }
       }
 
-      // 5. Structural tool-call & semantic loop circuit breaker (Stage 2)
+      // 5. Argument-aware structural tool-call & multimodal-safe semantic loop circuit breaker (Stage 2)
       if (Array.isArray(params.messages)) {
-        const toolSeq: string[] = [];
+        const toolNames: string[] = [];
+        const toolSigs: string[] = [];
+        const toolHasArgs: boolean[] = [];
+
+        const canonToolSig = (tc: any): { name: string; sig: string; hasArgs: boolean } => {
+          const fn = tc?.function;
+          const name = String(fn?.name || "");
+          if (!name) return { name: "", sig: "", hasArgs: false };
+          const rawArgs = fn?.arguments;
+          let canon = "";
+          if (rawArgs && typeof rawArgs === "object") {
+            canon = JSON.stringify(canonicalizeJsonKeys(rawArgs));
+          } else if (typeof rawArgs === "string") {
+            const s = rawArgs.trim();
+            if (s && s !== "{}") {
+              try {
+                canon = JSON.stringify(canonicalizeJsonKeys(JSON.parse(s)));
+              } catch {
+                canon = s;
+              }
+            }
+          }
+          if (!canon || canon === "{}" || canon === "null") return { name, sig: name, hasArgs: false };
+          return { name, sig: `${name}(${canon})`, hasArgs: true };
+        };
+
         for (const m of params.messages) {
           if (m?.role === "assistant" && Array.isArray(m.tool_calls)) {
             for (const tc of m.tool_calls) {
-              if (tc?.function?.name) toolSeq.push(String(tc.function.name));
+              const parsed = canonToolSig(tc);
+              if (parsed.name) {
+                toolNames.push(parsed.name);
+                toolSigs.push(parsed.sig);
+                toolHasArgs.push(parsed.hasArgs);
+              }
             }
           }
         }
-        if (toolSeq.length >= 3) {
-          const last3 = toolSeq.slice(-3);
-          const pairLoop =
-            toolSeq.length >= 4 &&
-            toolSeq[toolSeq.length - 4] === toolSeq[toolSeq.length - 2] &&
-            toolSeq[toolSeq.length - 3] === toolSeq[toolSeq.length - 1];
-          if ((last3[0] === last3[1] && last3[1] === last3[2]) || pairLoop) {
-            decision = {
-              action: "block",
-              reason: `In-Process Loop Guard triggered: Structural repetition of tool calls [${last3.join(", ")}]`,
-              originalModel: params.model,
-            };
-          }
+
+        const maxSameTool = Number(ctx.maxConsecutiveSameTool ?? this.config.maxConsecutiveSameTool ?? 8);
+        let blockedTools: string[] | null = null;
+        if (toolSigs.length >= 2 && toolHasArgs[toolHasArgs.length - 1] && toolSigs[toolSigs.length - 2] === toolSigs[toolSigs.length - 1]) {
+          blockedTools = toolNames.slice(-2);
+        } else if (toolSigs.length >= 3 && toolSigs[toolSigs.length - 3] === toolSigs[toolSigs.length - 2] && toolSigs[toolSigs.length - 2] === toolSigs[toolSigs.length - 1]) {
+          blockedTools = toolNames.slice(-3);
+        } else if (
+          toolSigs.length >= 4 &&
+          toolSigs[toolSigs.length - 4] === toolSigs[toolSigs.length - 2] &&
+          toolSigs[toolSigs.length - 3] === toolSigs[toolSigs.length - 1]
+        ) {
+          blockedTools = toolNames.slice(-4);
+        } else if (maxSameTool >= 2 && toolNames.length >= maxSameTool) {
+          const tail = toolNames.slice(-maxSameTool);
+          if (new Set(tail).size === 1) blockedTools = tail.slice(-3);
         }
+
+        if (blockedTools) {
+          decision = {
+            action: "block",
+            reason: `In-Process Loop Guard triggered: Structural repetition of tool calls [${blockedTools.join(", ")}]`,
+            originalModel: params.model,
+          };
+        }
+
         if (this.config.enableLoopGuard && decision.action !== "block" && workflowRequests.length >= 3) {
-          const lastPrompts = workflowRequests.slice(-3).map((r) => r.promptText || "");
+          const stripDataUri = (txt: string) => txt.replace(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/g, "").trim();
+          const lastPrompts = workflowRequests.slice(-3).map((r) => stripDataUri(r.promptText || ""));
           if (
             lastPrompts[0] &&
             jaccardNGramSimilarity(lastPrompts[0], lastPrompts[1]) >= loopSimilarityThreshold &&

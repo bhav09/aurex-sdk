@@ -859,19 +859,20 @@ def patch_google_sdk(auditor: Any, ctx_var: Any) -> None:
             orig_leg = gm.generate_content
 
             def leg_gen(model_self: Any, *args: Any, **kwargs: Any) -> Any:
+                aud = _active(auditor)
                 ctx = ctx_var.get()
                 clean_kw, ex = strip_aurex_params(kwargs, provider="google", ctx=ctx)
                 wf = resolve_workflow_id(ex["workflow_id"], ctx)
                 model_name = normalize_model_name(getattr(model_self, "model_name", "gemini-1.5-flash"))
                 contents = clean_kw.get("contents") or (args[0] if args else None)
                 user_p = str(contents) if contents else None
-                decision = auditor.pre_call_check(model=model_name, prompt=user_p, workflow_id=wf, tenant_id=ex["tenant_id"])
+                decision = aud.pre_call_check(model=model_name, prompt=user_p, workflow_id=wf, tenant_id=ex["tenant_id"])
                 if decision.action == "block":
                     raise AurexBlocked(f"[Aurex] Blocked: {decision.reason}", workflow_id=wf, reason=decision.reason, action="block")
-                resp = auditor._call_with_resilience(lambda: orig_leg(model_self, *args, **clean_kw), provider="google", workflow_id=wf, model=model_name)
+                resp = aud._call_with_resilience(lambda: orig_leg(model_self, *args, **clean_kw), provider="google", workflow_id=wf, model=model_name)
                 if clean_kw.get("stream") is True:
-                    return auditor._wrap_sync_stream(resp, {"model": model_name}, wf, user_p, None, provider="google")
-                log_google_response(auditor, model_self, args, clean_kw, resp, workflow_id=wf, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"], ctx=ctx)
+                    return aud._wrap_sync_stream(resp, {"model": model_name}, wf, user_p, None, provider="google")
+                log_google_response(aud, model_self, args, clean_kw, resp, workflow_id=wf, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"], ctx=ctx)
                 return resp
 
             leg_gen.__aurex_patched__ = True  # type: ignore[attr-defined]
@@ -925,23 +926,24 @@ def patch_litellm_sdk(auditor: Any, ctx_var: Any) -> None:
     orig = litellm.completion
     if not getattr(orig, "__aurex_patched__", False):
         def patched_comp(*args: Any, **kwargs: Any) -> Any:
+            aud = _active(auditor)
             ctx = ctx_var.get()
             clean_kw, ex = strip_aurex_params(kwargs, provider="litellm", ctx=ctx)
             wf = resolve_workflow_id(ex["workflow_id"], ctx)
             sys_p, user_p = extract_messages_prompts(clean_kw.get("messages", []))
             prov = resolve_endpoint_provider(clean_kw.get("model", "unknown"), extract_client_base_url(None, clean_kw))
             clean_kw, cached = _run_chat_precheck(
-                auditor, clean_kw, provider=prov, workflow_id=wf, user_prompt=user_p,
+                aud, clean_kw, provider=prov, workflow_id=wf, user_prompt=user_p,
                 system_prompt=sys_p, messages=clean_kw.get("messages", []), tenant_id=ex["tenant_id"],
                 aurex_meta=ex["extra_metadata"],
             )
             if cached is not None:
                 return cached
             clean_kw = ensure_openai_stream_usage(clean_kw)
-            resp = auditor._call_with_resilience(lambda: orig(*args, **clean_kw), provider=prov, workflow_id=wf, model=clean_kw.get("model", "unknown"))
+            resp = aud._call_with_resilience(lambda: orig(*args, **clean_kw), provider=prov, workflow_id=wf, model=clean_kw.get("model", "unknown"))
             if clean_kw.get("stream") is True:
-                return auditor._wrap_sync_stream(resp, clean_kw, wf, user_p, sys_p, provider=prov, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
-            log_litellm_response(auditor, clean_kw, resp, workflow_id=wf, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"], ctx=ctx)
+                return aud._wrap_sync_stream(resp, clean_kw, wf, user_p, sys_p, provider=prov, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
+            log_litellm_response(aud, clean_kw, resp, workflow_id=wf, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"], ctx=ctx)
             return resp
         patched_comp.__aurex_patched__ = True  # type: ignore[attr-defined]
         litellm.completion = patched_comp
@@ -949,23 +951,24 @@ def patch_litellm_sdk(auditor: Any, ctx_var: Any) -> None:
     orig_a = getattr(litellm, "acompletion", None)
     if orig_a is not None and not getattr(orig_a, "__aurex_patched__", False):
         async def patched_acomp(*args: Any, **kwargs: Any) -> Any:
+            aud = _active(auditor)
             ctx = ctx_var.get()
             clean_kw, ex = strip_aurex_params(kwargs, provider="litellm", ctx=ctx)
             wf = resolve_workflow_id(ex["workflow_id"], ctx)
             sys_p, user_p = extract_messages_prompts(clean_kw.get("messages", []))
             prov = resolve_endpoint_provider(clean_kw.get("model", "unknown"), extract_client_base_url(None, clean_kw))
             clean_kw, cached = _run_chat_precheck(
-                auditor, clean_kw, provider=prov, workflow_id=wf, user_prompt=user_p,
+                aud, clean_kw, provider=prov, workflow_id=wf, user_prompt=user_p,
                 system_prompt=sys_p, messages=clean_kw.get("messages", []), tenant_id=ex["tenant_id"],
                 aurex_meta=ex["extra_metadata"],
             )
             if cached is not None:
                 return cached
             clean_kw = ensure_openai_stream_usage(clean_kw)
-            resp = await auditor._acall_with_resilience(lambda: orig_a(*args, **clean_kw), provider=prov, workflow_id=wf, model=clean_kw.get("model", "unknown"))
+            resp = await aud._acall_with_resilience(lambda: orig_a(*args, **clean_kw), provider=prov, workflow_id=wf, model=clean_kw.get("model", "unknown"))
             if clean_kw.get("stream") is True:
-                return auditor._wrap_async_stream(resp, clean_kw, wf, user_p, sys_p, provider=prov, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
-            log_litellm_response(auditor, clean_kw, resp, workflow_id=wf, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"], ctx=ctx)
+                return aud._wrap_async_stream(resp, clean_kw, wf, user_p, sys_p, provider=prov, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
+            log_litellm_response(aud, clean_kw, resp, workflow_id=wf, tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"], ctx=ctx)
             return resp
         patched_acomp.__aurex_patched__ = True  # type: ignore[attr-defined]
         litellm.acompletion = patched_acomp
@@ -1059,6 +1062,7 @@ def patch_huggingface_sdk(auditor: Any, ctx_var: Any) -> None:
         orig_c = inf_cls.chat_completion
 
         def sync_hf(self_c: Any, *args: Any, **kwargs: Any) -> Any:
+            aud = _active(auditor)
             ctx = ctx_var.get()
             clean_kw, ex = strip_aurex_params(kwargs, provider="huggingface", ctx=ctx)
             wf = resolve_workflow_id(ex["workflow_id"], ctx)
@@ -1066,11 +1070,11 @@ def patch_huggingface_sdk(auditor: Any, ctx_var: Any) -> None:
             msgs = clean_kw.get("messages") or (args[0] if args else [])
             sys_p, user_p = extract_messages_prompts(msgs)
             clean_kw["model"] = model
-            clean_kw, _ = _run_chat_precheck(auditor, clean_kw, provider="huggingface", workflow_id=wf, user_prompt=user_p, system_prompt=sys_p, messages=msgs, tenant_id=ex["tenant_id"], aurex_meta=ex["extra_metadata"])
-            resp = auditor._call_with_resilience(lambda: orig_c(self_c, *args, **clean_kw), provider="huggingface", workflow_id=wf, model=clean_kw.get("model", model))
+            clean_kw, _ = _run_chat_precheck(aud, clean_kw, provider="huggingface", workflow_id=wf, user_prompt=user_p, system_prompt=sys_p, messages=msgs, tenant_id=ex["tenant_id"], aurex_meta=ex["extra_metadata"])
+            resp = aud._call_with_resilience(lambda: orig_c(self_c, *args, **clean_kw), provider="huggingface", workflow_id=wf, model=clean_kw.get("model", model))
             if clean_kw.get("stream") is True:
-                return auditor._wrap_sync_stream(resp, clean_kw, wf, user_p, sys_p, provider="huggingface", tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
-            log_openai_response(auditor, clean_kw, resp, tags=ex["tags"], quality_score=ex["quality_score"], provider="huggingface", workflow_id=wf, aurex_meta=ex["extra_metadata"], ctx=ctx)
+                return aud._wrap_sync_stream(resp, clean_kw, wf, user_p, sys_p, provider="huggingface", tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
+            log_openai_response(aud, clean_kw, resp, tags=ex["tags"], quality_score=ex["quality_score"], provider="huggingface", workflow_id=wf, aurex_meta=ex["extra_metadata"], ctx=ctx)
             return resp
 
         sync_hf.__aurex_patched__ = True  # type: ignore[attr-defined]
@@ -1080,6 +1084,7 @@ def patch_huggingface_sdk(auditor: Any, ctx_var: Any) -> None:
         orig_ac = ainf_cls.chat_completion
 
         async def async_hf(self_c: Any, *args: Any, **kwargs: Any) -> Any:
+            aud = _active(auditor)
             ctx = ctx_var.get()
             clean_kw, ex = strip_aurex_params(kwargs, provider="huggingface", ctx=ctx)
             wf = resolve_workflow_id(ex["workflow_id"], ctx)
@@ -1087,11 +1092,11 @@ def patch_huggingface_sdk(auditor: Any, ctx_var: Any) -> None:
             msgs = clean_kw.get("messages") or (args[0] if args else [])
             sys_p, user_p = extract_messages_prompts(msgs)
             clean_kw["model"] = model
-            clean_kw, _ = _run_chat_precheck(auditor, clean_kw, provider="huggingface", workflow_id=wf, user_prompt=user_p, system_prompt=sys_p, messages=msgs, tenant_id=ex["tenant_id"], aurex_meta=ex["extra_metadata"])
-            resp = await auditor._acall_with_resilience(lambda: orig_ac(self_c, *args, **clean_kw), provider="huggingface", workflow_id=wf, model=clean_kw.get("model", model))
+            clean_kw, _ = _run_chat_precheck(aud, clean_kw, provider="huggingface", workflow_id=wf, user_prompt=user_p, system_prompt=sys_p, messages=msgs, tenant_id=ex["tenant_id"], aurex_meta=ex["extra_metadata"])
+            resp = await aud._acall_with_resilience(lambda: orig_ac(self_c, *args, **clean_kw), provider="huggingface", workflow_id=wf, model=clean_kw.get("model", model))
             if clean_kw.get("stream") is True:
-                return auditor._wrap_async_stream(resp, clean_kw, wf, user_p, sys_p, provider="huggingface", tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
-            log_openai_response(auditor, clean_kw, resp, tags=ex["tags"], quality_score=ex["quality_score"], provider="huggingface", workflow_id=wf, aurex_meta=ex["extra_metadata"], ctx=ctx)
+                return aud._wrap_async_stream(resp, clean_kw, wf, user_p, sys_p, provider="huggingface", tags=ex["tags"], quality_score=ex["quality_score"], aurex_meta=ex["extra_metadata"])
+            log_openai_response(aud, clean_kw, resp, tags=ex["tags"], quality_score=ex["quality_score"], provider="huggingface", workflow_id=wf, aurex_meta=ex["extra_metadata"], ctx=ctx)
             return resp
 
         async_hf.__aurex_patched__ = True  # type: ignore[attr-defined]

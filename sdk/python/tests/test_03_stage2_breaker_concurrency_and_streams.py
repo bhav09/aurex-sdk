@@ -337,3 +337,97 @@ def test_provider_drift_strict_exception_vs_prod_warning_fail_open(monkeypatch):
     assert exc_info.value.provider == "openai"
     assert exc_info.value.provider_version == "99.0.0"
     assert "Completions.create" in (exc_info.value.missing_symbol or "")
+
+
+def test_v055_arg_aware_loop_multimodal_base64_litellm_reset_and_nim_reasoning_budget(monkeypatch):
+    import sys
+    from aurex_sdk.runtime_guard import sanitize_thinking_params
+
+    aud = AurexAuditor(
+        AurexConfig(
+            storage_mode="memory",
+            local_only=True,
+            enable_loop_guard=True,
+            loop_similarity_threshold=0.95,
+            max_consecutive_same_tool=6,
+            budget_guard={"max_thinking_tokens": 1024, "on_budget_exceeded": "throw"},
+        )
+    )
+
+    # 1. Single-tool exploration with DIFFERENT arguments (OpenHands / SWE-agent / MCPTerminus) -> proceeds!
+    explore_msgs = [
+        {"role": "user", "content": "Inspect repository modules"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "file_editor", "arguments": '{"command":"view","path":"src/a.py"}'}}]},
+        {"role": "tool", "content": "def a(): return 1"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "file_editor", "arguments": '{"command":"view","path":"src/b.py"}'}}]},
+        {"role": "tool", "content": "def b(): return 2"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "file_editor", "arguments": '{"command":"view","path":"src/c.py"}'}}]},
+        {"role": "tool", "content": "def c(): return 3"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "file_editor", "arguments": '{"command":"view","path":"src/d.py"}'}}]},
+        {"role": "tool", "content": "def d(): return 4"},
+    ]
+    dec_ok = aud.pre_call_check(model="gpt-4o", prompt="Continue", workflow_id="wf-explore", messages=explore_msgs)
+    assert dec_ok.action == "proceed"
+
+    # 2. Exact (name + canonicalized arguments) repeat 2x in a row (BrowserGym stuck disabled button) -> blocks immediately!
+    stuck_click_msgs = [
+        {"role": "user", "content": "Complete checkout"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "click", "arguments": '{"bid":"btn-42","button":"left"}'}}]},
+        {"role": "tool", "content": "Button is disabled"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "click", "arguments": '{"button":"left","bid":"btn-42"}'}}]},
+    ]
+    with pytest.raises(AurexBlocked):
+        aud.pre_call_check(model="gpt-4o", prompt="Retry click", workflow_id="wf-stuck-click", messages=stuck_click_msgs)
+
+    # 3. Multimodal base64 screenshots (BrowserGym): 50KB shared base64 header + distinct tail & action text -> no false block!
+    shared_b64 = "iVBORw0KGgoAAAANSUhEUgAA" + ("A" * 20000)
+    for idx, step_text in enumerate(["Fill shipping name", "Select express delivery", "Enter promo code"]):
+        mm_msgs = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"Step {idx}: {step_text}"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{shared_b64}{idx}"}},
+                ],
+            }
+        ]
+        dec_mm = aud.pre_call_check(model="gpt-4o", prompt=step_text, workflow_id="wf-browsergym-mm", messages=mm_msgs)
+        assert dec_mm.action == "proceed"
+
+    # 4. NIM / OpenAI-compatible extra_body.reasoning_budget clamping & downgrade stripping
+    clamped = sanitize_thinking_params(
+        {
+            "model": "nvidia/nemotron",
+            "extra_body": {"reasoning_budget": 16384, "chat_template_kwargs": {"thinking_budget": 8192}},
+        },
+        max_thinking_tokens=1024,
+    )
+    assert clamped["extra_body"]["reasoning_budget"] == 1024
+    assert clamped["extra_body"]["chat_template_kwargs"]["thinking_budget"] == 1024
+
+    stripped = sanitize_thinking_params(
+        {
+            "model": "gpt-4o-mini",
+            "reasoning_budget": 4096,
+            "extra_body": {"reasoning_budget": 16384, "chat_template_kwargs": {"thinking_budget": 8192, "enable_thinking": True}},
+        },
+        is_downgraded=True,
+    )
+    assert "reasoning_budget" not in stripped
+    assert "extra_body" not in stripped
+
+    # 5. LiteLLM patch survives AurexAuditor.reset() and binds to the NEW auditor instance!
+    fake_litellm = types.ModuleType("litellm")
+    fake_litellm.completion = lambda *a, **kw: types.SimpleNamespace(
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok", tool_calls=None), finish_reason="stop")],
+        usage=types.SimpleNamespace(prompt_tokens=50, completion_tokens=10, prompt_tokens_details=None, completion_tokens_details=None),
+    )
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+    aud.patch_litellm()
+
+    AurexAuditor.reset()
+    aud2 = AurexAuditor(AurexConfig(storage_mode="memory", local_only=True))
+    fake_litellm.completion(model="groq/llama-3.3-70b", messages=[{"role": "user", "content": "post-reset call"}], workflow_id="wf-after-reset")
+    aud2.flush()
+    ev_ids = [e["workflow_id"] for e in aud2.get_local_events()]
+    assert "wf-after-reset" in ev_ids

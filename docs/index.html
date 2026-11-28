@@ -756,7 +756,7 @@
       <a class="brand" href="#overview">
         <img id="brandLogo" src="./assets/logo-white.png" width="26" height="26" alt="Aurex logo" style="display:block;object-fit:contain;" />
         <span>Aurex SDK</span>
-        <span class="brand-version">v0.5.4 · MIT</span>
+        <span class="brand-version">v0.5.5 · MIT</span>
       </a>
       <div class="topbar-actions">
         <a class="nav-pill" href="https://pypi.org/project/aurex-sdk/" target="_blank" rel="noopener noreferrer">PyPI</a>
@@ -782,7 +782,7 @@
       <a href="#quickstart">How to Use It</a>
       <a href="#multi-provider">Multi-Provider Snippet</a>
       <a href="#ai-assistants">llms.txt &amp; AI Agents</a>
-      <a href="#benchmarks">SWE-agent &amp; Benchmarks</a>
+      <a href="#benchmarks">Open-Source Benchmarks</a>
       <a href="#configuration">Config &amp; Providers</a>
       <a href="#privacy">Data &amp; Zero-PII Model</a>
       <a href="#production-tips">Playbook &amp; Contributing</a>
@@ -1217,86 +1217,109 @@ claude "Read .aurex-llms.txt and integrate aurex-sdk into this repository withou
       </section>
 
       <section id="benchmarks">
-        <h2>Real-World Testing: SWE-agent &amp; LangGraph Across Claude, GPT, Gemini &amp; Llama (8.6 / 10)</h2>
+        <h2>Open-Source Agent Benchmarks: OpenHands, BrowserGym, tau-bench, terminal-bench &amp; SWE-agent</h2>
         <div class="prose-measure">
           <p>
-            Aurex was evaluated end-to-end on <strong>SWE-agent</strong> autonomous coding trajectories and <strong>LangGraph</strong> multi-agent loops across <strong>Claude</strong>, <strong>GPT</strong>, <strong>Gemini</strong> reasoning models, and local <strong>Ollama</strong> (<strong>Llama</strong>) models. Instead of tripping on the first failed file lookup, Aurex gave SWE-agent <strong>3 exploration steps</strong> before blocking non-progressive repetition on Step 4—while recording streamed reasoning tokens and Zero-PII SHA-256 hashes. On real multi-file repository tasks (<code>40k–120k</code> context + <code>4k–16k</code> reasoning tokens per turn), halting a stuck <code>30–50</code> step loop at Step 4 prevents <strong>1.5M–5M+ wasted tokens</strong> per runaway run.
+            Aurex has been benchmarked end-to-end across <strong>six open-source agent ecosystems</strong> (<strong>terminal-bench 8.9/10</strong>, <strong>tau-bench 8.8/10</strong>, <strong>OpenHands 8.7/10</strong>, <strong>SWE-agent 8.6/10</strong>, <strong>BrowserGym 8.4/10</strong>, and <strong>LangGraph</strong>) across <strong>Claude</strong>, <strong>GPT</strong>, <strong>Gemini</strong>, <strong>NVIDIA NIM (Nemotron)</strong>, <strong>LiteLLM</strong>, and local <strong>Ollama (Llama)</strong>—with <code>healthy</code> status and <code>0</code> SDK drift under <code>AUREX_STRICT_DRIFT=1</code>.
           </p>
         </div>
 
         <div class="table-wrap">
-          <table aria-label="SWE-agent trajectory step-by-step verification">
+          <table aria-label="Cross-benchmark evaluation across OpenHands, BrowserGym, tau-bench, terminal-bench, and SWE-agent">
             <thead>
               <tr>
-                <th>Step</th>
-                <th>SWE-agent Action</th>
-                <th>Observation</th>
-                <th>Aurex Status</th>
+                <th>Benchmark</th>
+                <th>Agent Archetype</th>
+                <th>Score</th>
+                <th>Hot-Path p50</th>
+                <th>Verified Waste Caught &amp; Prevented</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>Step 1</strong></td>
-                <td><code>str_replace_editor view .../missing_colon.py</code></td>
-                <td>File not found (wrong directory path)</td>
-                <td><span class="tag">Allowed</span></td>
+                <td><strong>terminal-bench</strong></td>
+                <td>Linux Bash (<code>LiteLLM</code> + <code>Terminus2</code> / <code>MCPTerminus</code>)</td>
+                <td class="mono"><strong>8.9 / 10</strong></td>
+                <td class="mono">0.080 ms</td>
+                <td>Blocked <code>336k</code>-token dump pre-call (<code>+$1.01</code> saved), clamped <code>16k &rarr; 1k</code> thinking budget (including <code>extra_body.reasoning_budget</code>), bypassed <code>3x3</code> <code>tenacity</code> sleep, caught <code>64/64</code> reasoning-starvation <code>HTTP 200</code> soft failures, and gated PR in <code>aurex ci</code> (<code>+9,280%</code>).</td>
               </tr>
               <tr>
-                <td><strong>Step 2</strong></td>
-                <td><code>str_replace_editor view .../test-repo</code></td>
-                <td>Listed folder structure to locate target file</td>
-                <td><span class="tag">Allowed</span></td>
+                <td><strong>tau-bench</strong></td>
+                <td>Multi-Actor Retail (<code>LiteLLM</code> + 15 tools + User Sim)</td>
+                <td class="mono"><strong>8.8 / 10</strong></td>
+                <td class="mono">&lt; 0.50 ms</td>
+                <td>Isolated <code>-agent</code> vs <code>-user</code> <code>workflow_id</code> dual system caches, clamped <code>8k &rarr; 1k</code> thinking budget, thread-isolated concurrent session caps, and caught <code>48/48</code> empty reasoning-starvation calls (<code>aurex ci</code> <code>+3,516%</code>).</td>
               </tr>
               <tr>
-                <td><strong>Step 3</strong></td>
-                <td><code>str_replace_editor view .../tests/missing_colon.py</code></td>
-                <td>Read and displayed target source file</td>
-                <td><span class="tag">Allowed</span></td>
+                <td><strong>OpenHands</strong></td>
+                <td>Coding Agent (<code>OpenAI</code> + <code>file_editor</code>)</td>
+                <td class="mono"><strong>8.7 / 10</strong></td>
+                <td class="mono">0.268 ms</td>
+                <td>Kept reordered tool schemas cache-warm, pinpointed <code>system</code> timestamp break at char <code>590</code>, blocked <code>360k</code>-token cliff pre-call (<code>+$1.08</code> saved), and caught mid-stream aborts + JSON grammar loops (<code>aurex ci</code> <code>+861%</code>).</td>
               </tr>
               <tr>
-                <td><strong>Step 4</strong></td>
-                <td>4th consecutive <code>str_replace_editor</code> without code diff</td>
-                <td>Pattern <code>[&apos;str_replace_editor&apos;, &apos;str_replace_editor&apos;, &apos;str_replace_editor&apos;]</code></td>
-                <td><span class="tag tag-stage">Blocked (AurexBlocked)</span></td>
+                <td><strong>SWE-agent</strong></td>
+                <td>Autonomous Repo Solver (<code>str_replace_editor</code>)</td>
+                <td class="mono"><strong>8.6 / 10</strong></td>
+                <td class="mono">&lt; 0.30 ms</td>
+                <td>Granted multi-file discovery headroom while halting stuck non-progressive tool loops—preventing <code>1.5M–5M+</code> wasted tokens across <code>40k–120k</code>-context repo trajectories.</td>
+              </tr>
+              <tr>
+                <td><strong>BrowserGym</strong></td>
+                <td>Multimodal Web (<code>OpenAI</code> + Vision PNG / DOM)</td>
+                <td class="mono"><strong>8.4 / 10</strong></td>
+                <td class="mono">0.558 ms</td>
+                <td>Blocked <code>480k</code>-token unpruned DOM pre-call (<code>+$1.44</code> saved where native callback only checked post-call), boosted cacheable prefix <strong>64.9x</strong>, and blocked stuck disabled-button clicks in <code>0.109 ms</code>.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
+        <h3>Live End-to-End NVIDIA NIM (Nemotron) Runs — 4/4 Solved for &lt; $0.01 Combined ($0.00 Wasted)</h3>
         <div class="table-wrap">
-          <table aria-label="Aurex SDK end-to-end evaluation scorecard">
+          <table aria-label="Live NVIDIA NIM end-to-end benchmark runs">
             <thead>
               <tr>
-                <th>Evaluation Category</th>
-                <th>Score</th>
-                <th>Verdict</th>
+                <th>Benchmark</th>
+                <th>Live Task Executed</th>
+                <th>Result</th>
+                <th>Wall Time</th>
+                <th>Input / Reasoning Tokens</th>
+                <th>Live Cost</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>1. Code Implementation (DX)</strong></td>
-                <td class="mono">9.0 / 10</td>
-                <td>One-line <code>patch_all(auditor)</code> setup across LiteLLM, OpenAI, Gemini, and Ollama.</td>
+                <td><strong>OpenHands</strong></td>
+                <td>Inspect <code>@openhands/agent-canvas</code> via <code>file_editor</code></td>
+                <td><span class="tag tag-stage">Solved</span></td>
+                <td class="mono">1.43 s</td>
+                <td class="mono">1,077 / 99</td>
+                <td class="mono"><strong>$0.000186</strong></td>
               </tr>
               <tr>
-                <td><strong>2. Guardrails &amp; Governance Features</strong></td>
-                <td class="mono">8.8 / 10</td>
-                <td>Accurate streamed thought-token capture, 3-step exploration headroom, and hard USD caps.</td>
+                <td><strong>BrowserGym</strong></td>
+                <td>3-step <code>ExpArgs.run()</code> web checkout episode</td>
+                <td><span class="tag tag-stage">Solved (reward=1.0)</span></td>
+                <td class="mono">10.01 s</td>
+                <td class="mono">3,843 / 1,533</td>
+                <td class="mono"><strong>$0.001206</strong></td>
               </tr>
               <tr>
-                <td><strong>3. Log &amp; Telemetry Clarity</strong></td>
-                <td class="mono">8.5 / 10</td>
-                <td>Readable <code>AurexBlocked</code> reasons and structured Zero-PII <code>.aurex/ledger.*.jsonl</code> rows.</td>
+                <td><strong>tau-bench</strong></td>
+                <td>Retail Task 0 (16 multi-actor messages)</td>
+                <td><span class="tag tag-stage">Solved (Pass^1=1.0)</span></td>
+                <td class="mono">17.08 s</td>
+                <td class="mono">41,088 / 1,332</td>
+                <td class="mono"><strong>$0.003053</strong></td>
               </tr>
               <tr>
-                <td><strong>4. Framework Resilience &amp; Compatibility</strong></td>
-                <td class="mono">8.0 / 10</td>
-                <td><code>&lt;0.1 ms</code> overhead across local Ollama (<code>$0.00</code>) and cloud APIs.</td>
-              </tr>
-              <tr>
-                <td><strong>Composite Final Score</strong></td>
-                <td class="mono"><strong>8.6 / 10</strong></td>
-                <td><strong>Production-ready &amp; verified on real multi-agent workflows.</strong></td>
+                <td><strong>terminal-bench</strong></td>
+                <td><code>analyze-access-logs</code> (2,000 log lines, 7 bash cmds)</td>
+                <td><span class="tag tag-stage">Solved (is_resolved=True)</span></td>
+                <td class="mono">15.41 s</td>
+                <td class="mono">25,488 / 874</td>
+                <td class="mono"><strong>$0.002989</strong></td>
               </tr>
             </tbody>
           </table>
@@ -1349,7 +1372,12 @@ claude "Read .aurex-llms.txt and integrate aurex-sdk into this repository withou
               <tr>
                 <td><code>enable_loop_guard</code> / <code>enableLoopGuard</code></td>
                 <td><code>False</code></td>
-                <td>Stops structural and semantic agent retry loops cleanly with <code>AurexBlocked</code>.</td>
+                <td>Stops argument-aware structural, multimodal, and semantic agent retry loops with <code>AurexBlocked</code>.</td>
+              </tr>
+              <tr>
+                <td><code>max_consecutive_same_tool</code> / <code>maxConsecutiveSameTool</code></td>
+                <td><code>8</code></td>
+                <td>Exploration headroom when an agent calls the same tool name consecutively with <em>different</em> arguments (identical <code>name + args</code> still blocks on Turn 2).</td>
               </tr>
               <tr>
                 <td><code>cache_ttl</code> / <code>cacheTtl</code></td>
